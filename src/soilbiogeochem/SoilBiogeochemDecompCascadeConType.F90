@@ -149,8 +149,8 @@ contains
        ! c210418.nc and later
        ndecomp_pools_max = 8  ! largest ndecomp_pools value above
     else
-       ndecomp_pools               = 7
-       ndecomp_cascade_transitions = 7
+       ndecomp_pools               = 7 ! maybe 9
+       ndecomp_cascade_transitions = 7 ! also bigger
        ndecomp_pools_max           = 8
     end if
     ! Set ndecomp_pools_vr needed for Matrix solution
@@ -182,7 +182,7 @@ contains
    
        !-- properties of each decomposing pool
        allocate(decomp_cascade_con%floating_cn_ratio_decomp_pools(ibeg:ndecomp_pools))
-       allocate(decomp_cascade_con%decomp_pool_name_restart(ibeg:ndecomp_pools))
+       allocate(decomp_cascade_con%decomp_pool_name_restart(ibeg:ndecomp_pools)) ! ndecomp pools has to be bigger after adding myc
        allocate(decomp_cascade_con%decomp_pool_name_history(ibeg:ndecomp_pools))
        allocate(decomp_cascade_con%decomp_pool_name_long(ibeg:ndecomp_pools))
        allocate(decomp_cascade_con%decomp_pool_name_short(ibeg:ndecomp_pools))

@@ -336,7 +336,7 @@ contains
     call t_stopf('CNMResp')
 
     !--------------------------------------------
-    ! Soil Biogeochemistry
+    ! Soil Biogeochemistry !!B_!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     !--------------------------------------------
 
     call t_startf('SoilBiogeochem')
@@ -345,7 +345,7 @@ contains
        call decomp_rate_constants_bgc(bounds, num_bgc_soilc, filter_bgc_soilc, &
             soilstate_inst, temperature_inst, ch4_inst, soilbiogeochem_carbonflux_inst)
     else if (decomp_method == mimics_decomp) then
-       call decomp_rates_mimics(bounds, num_bgc_soilc, filter_bgc_soilc, &
+       call decomp_rates_mimics(bounds, num_bgc_soilc, filter_bgc_soilc, &            ! MIMICS called
             num_bgc_vegp, filter_bgc_vegp, clm_fates, &
             soilstate_inst, temperature_inst, cnveg_carbonflux_inst, ch4_inst, &
             soilbiogeochem_carbonflux_inst, soilbiogeochem_carbonstate_inst)
