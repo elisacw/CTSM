@@ -12,7 +12,7 @@ module SoilBiogeochemNitrogenStateType
   use clm_varpar                         , only : nlevdecomp_full, nlevdecomp, nlevsoi
   use clm_varcon                         , only : spval, dzsoi_decomp, zisoi
   use clm_varctl                         , only : use_nitrif_denitrif, use_fates_bgc
-  use SoilBiogeochemDecompCascadeConType , only : mimics_decomp, century_decomp, decomp_method, use_soil_matrixcn
+  use SoilBiogeochemDecompCascadeConType , only : mimics_decomp, mimicsplus_decomp, century_decomp, decomp_method, use_soil_matrixcn
   use clm_varctl                         , only : iulog, override_bgc_restart_mismatch_dump, spinup_state
   use landunit_varcon                    , only : istcrop, istsoil 
   use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con
@@ -311,6 +311,11 @@ contains
        call hist_addfld1d (fname='TOTMICN', units='gN/m^2', &
          avgflag='A', long_name='total microbial N', &
          ptr_col=this%totmicn_col)
+    else if (decomp_method == mimicsplus_decomp ) then
+       this%totmicn_col(begc:endc) = spval
+       call hist_addfld1d (fname='TOTMICN', units='gN/m^2', &
+         avgflag='A', long_name='total microbial N', &
+         ptr_col=this%totmicn_col)
     end if
 
     this%totsomn_col(begc:endc) = spval
@@ -589,6 +594,8 @@ contains
        decomp_cascade_state = 1
     else if (decomp_method == mimics_decomp ) then
        decomp_cascade_state = 2
+    else if (decomp_method == mimicsplus_decomp ) then
+       decomp_cascade_state = 3
     else
        decomp_cascade_state = 0
     end if

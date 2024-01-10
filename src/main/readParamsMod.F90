@@ -8,7 +8,7 @@ module readParamsMod
   !
   ! ! USES:
   use clm_varctl , only : paramfile, iulog, use_fates, use_cn
-  use SoilBiogeochemDecompCascadeConType, only : mimics_decomp, century_decomp, decomp_method
+  use SoilBiogeochemDecompCascadeConType, only : mimics_decomp, mimicsplus_decomp, century_decomp, decomp_method
   use spmdMod    , only : masterproc
   use fileutils  , only : getfil
   use ncdio_pio  , only : ncd_pio_closefile, ncd_pio_openfile
@@ -40,6 +40,7 @@ contains
     use SoilBiogeochemPotentialMod        , only : readSoilBiogeochemPotentialParams      => readParams
     use SoilBiogeochemDecompMod           , only : readSoilBiogeochemDecompParams         => readParams
     use SoilBiogeochemDecompCascadeMIMICSMod, only : readSoilBiogeochemDecompMimicsParams => readParams
+    use SoilBiogeochemDecompCascadeMIMICSplusMod, only : readSoilBiogeochemDecompMimicsplusParams => readParams !ECW create
     use SoilBiogeochemDecompCascadeBGCMod , only : readSoilBiogeochemDecompBgcParams      => readParams
     use ch4Mod                            , only : readCH4Params                          => readParams
     use LunaMod                           , only : readParams_Luna                        => readParams
@@ -101,6 +102,8 @@ contains
        call readSoilBiogeochemCompetitionParams(ncid)
        if (decomp_method == mimics_decomp) then
           call readSoilBiogeochemDecompMimicsParams(ncid)
+       else if (decomp_method == mimicsplus_decomp) then
+            call readSoilBiogeochemDecompMimicsplusParams(ncid)      !ECW create this parameterfile
        else if (decomp_method == century_decomp) then
           call readSoilBiogeochemDecompBgcParams(ncid)
        end if

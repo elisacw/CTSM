@@ -523,7 +523,7 @@ contains
     use clm_varctl  , only : paramfile, use_fates, use_flexibleCN, use_dynroot, use_biomass_heat_storage, z0param_method
     use spmdMod     , only : masterproc
     use CLMFatesParamInterfaceMod, only : FatesReadPFTs
-    use SoilBiogeochemDecompCascadeConType, only : mimics_decomp, decomp_method
+    use SoilBiogeochemDecompCascadeConType, only : mimics_decomp, mimicsplus_decomp, decomp_method
     !
     ! !ARGUMENTS:
     class(pftcon_type) :: this
@@ -826,7 +826,12 @@ contains
        this%fr_f(:,3) = 0.0_r8
        this%lf_f(:,2) = this%lf_fcel + this%lf_flig
        this%lf_f(:,3) = 0.0_r8
-    else
+    else if (decomp_method == mimicsplus_decomp) then    !ECW change values 
+       this%fr_f(:,2) = this%fr_fcel + this%fr_flig
+       this%fr_f(:,3) = 0.0_r8
+       this%lf_f(:,2) = this%lf_fcel + this%lf_flig
+       this%lf_f(:,3) = 0.0_r8
+    else if
        this%fr_f(:,2) = this%fr_fcel
        this%fr_f(:,3) = this%fr_flig
        this%lf_f(:,2) = this%lf_fcel

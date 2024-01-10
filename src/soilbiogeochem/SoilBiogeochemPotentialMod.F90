@@ -11,7 +11,7 @@ module SoilBiogeochemPotentialMod
   use decompMod                          , only : bounds_type
   use clm_varpar                         , only : nlevdecomp, ndecomp_cascade_transitions, ndecomp_pools
   use clm_varpar                         , only : i_cop_mic, i_oli_mic
-  use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, mimics_decomp, decomp_method
+  use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, mimics_decomp, mimicsplus_decomp, decomp_method
   use SoilBiogeochemStateType            , only : soilbiogeochem_state_type
   use SoilBiogeochemCarbonStateType      , only : soilbiogeochem_carbonstate_type
   use SoilBiogeochemCarbonFluxType       , only : soilbiogeochem_carbonflux_type
@@ -217,7 +217,25 @@ contains
                            p_decomp_npool_loss * nue_decomp_cascade(k)
                         p_decomp_npool_to_din(c,j,k) = &
                            p_decomp_npool_loss - p_decomp_npool_gain(c,j,k)
-                     end if  ! using mimics
+                     elseif (decomp_method == mimicsplus_decomp) then
+                        ! N:C ratio of donor pools (N:C instead of C:N because
+                        ! already checked that we're not dividing by zero)
+                        decomp_nc_loss_donor = &
+                           decomp_npools_vr(c,j,cascade_donor_pool(k)) / &
+                           decomp_cpools_vr(c,j,cascade_donor_pool(k))
+                        ! calculate N fluxes from donor pools
+                        p_decomp_npool_loss = &
+                           p_decomp_cpool_loss(c,j,k) * decomp_nc_loss_donor
+                        ! Track N lost to DIN from messy eating, ie the
+                        ! diff between p_decomp_npool_loss (pertains to
+                        ! donor) and p_decomp_npool_gain (receiver)
+                        p_decomp_cpool_gain(c,j,k) = &
+                           p_decomp_cpool_loss(c,j,k) * (1.0_r8 - rf_decomp_cascade(c,j,k))
+                        p_decomp_npool_gain(c,j,k) = &
+                           p_decomp_npool_loss * nue_decomp_cascade(k)
+                        p_decomp_npool_to_din(c,j,k) = &
+                           p_decomp_npool_loss - p_decomp_npool_gain(c,j,k)
+                     end if  ! using mimics / mimics+
                   end if  ! floating_cn_ratio_decomp_pools = .true.
                else  ! donors not donating
                   p_decomp_cpool_gain(c,j,k) = 0.0_r8
@@ -288,7 +306,61 @@ contains
                end do  ! transitions loop
             end do  ! column loop
          end do  ! soil levels loop
-      end if  ! using mimics
+      else  if (decomp_method == mimicsplus_decomp) then
+         do j = 1,nlevdecomp
+            do fc = 1,num_bgc_soilc
+               c = filter_bgc_soilc(fc)
+               ! Sum C & N fluxes from all transitions into m1 & m2 pools.
+               ! Had to form a new loop for the summation due to the order
+               ! necessary, ie do k as the innermost loop.
+               p_decomp_cpool_gain_sum(:) = 0.0_r8
+               p_decomp_npool_gain_sum(:) = 0.0_r8
+               do k = 1, ndecomp_cascade_transitions
+                  if (cascade_receiver_pool(k) == i_cop_mic .or. &
+                      cascade_receiver_pool(k) == i_oli_mic) then
+                     if (decomp_cpools_vr(c,j,cascade_donor_pool(k)) > 0._r8 .and. &
+                         decomp_k(c,j,cascade_donor_pool(k)) > 0._r8 ) then
+                        p_decomp_cpool_gain_sum(cascade_receiver_pool(k)) = &
+                           p_decomp_cpool_gain_sum(cascade_receiver_pool(k)) + &
+                           p_decomp_cpool_gain(c,j,k)
+                        p_decomp_npool_gain_sum(cascade_receiver_pool(k)) = &
+                           p_decomp_npool_gain_sum(cascade_receiver_pool(k)) + &
+                           p_decomp_npool_gain(c,j,k)
+                        ! Once k-loop completes, the left hand side should end
+                        ! up with the correct cn ratio
+                        if (p_decomp_npool_gain_sum(cascade_receiver_pool(k)) > 0.0_r8) then
+                           p_decomp_cn_gain(c,j,cascade_receiver_pool(k)) = &
+                              p_decomp_cpool_gain_sum(cascade_receiver_pool(k)) / &
+                              p_decomp_npool_gain_sum(cascade_receiver_pool(k))
+                        else
+                           p_decomp_cn_gain(c,j,cascade_receiver_pool(k)) = 0.0_r8
+                        end if  ! denominator check
+                     end if  ! donors donating (decomp_cpools_vr & decomp_k > 0)
+                  end if  ! microbes receiving
+               end do  ! transitions loop
+               do k = 1, ndecomp_cascade_transitions
+                  if (cascade_receiver_pool(k) == i_cop_mic .or. &
+                      cascade_receiver_pool(k) == i_oli_mic) then
+                     if (decomp_cpools_vr(c,j,cascade_donor_pool(k)) > 0._r8 .and. &
+                         decomp_k(c,j,cascade_donor_pool(k)) > 0._r8 ) then
+                        ! if p_decomp_cn_diff < 0  N mineralization
+                        !                     > 0  immobilization
+                        ! "min" in next line turns off immobilization flux
+                        p_decomp_cn_diff_ratio = min(0.0_r8,  &
+                           (p_decomp_cn_gain(c,j,cascade_receiver_pool(k)) - &
+                            cn_col(c,cascade_receiver_pool(k))) / cn_col(c,cascade_receiver_pool(k)))
+                        ! Actual amount of N that's mineralized or that would
+                        ! need to be immobilized
+                        ! negative=mineralization: add to the DIN pool
+                        ! positive=immobilizaiton: compete for N with plants to
+                        !                          see how much we get
+                        pmnf_decomp_cascade(c,j,k) = p_decomp_cn_diff_ratio * p_decomp_npool_gain(c,j,k)
+                     end if  ! donors donating (decomp_cpools_vr & decomp_k > 0)
+                  end if  ! microbes receiving
+               end do  ! transitions loop
+            end do  ! column loop
+         end do  ! soil levels loop
+      end if  ! using mimics / mimics+
 
       ! Sum up all the potential immobilization fluxes (positive pmnf flux)
       ! and all the mineralization fluxes (negative pmnf flux)
@@ -308,6 +380,8 @@ contains
                   gross_nmin_vr(c,j) = gross_nmin_vr(c,j) - pmnf_decomp_cascade(c,j,k)
                end if
                if (decomp_method == mimics_decomp) then
+                  gross_nmin_vr(c,j) = gross_nmin_vr(c,j) + p_decomp_npool_to_din(c,j,k)
+               else if (decomp_method == mimicsplus_decomp) then
                   gross_nmin_vr(c,j) = gross_nmin_vr(c,j) + p_decomp_npool_to_din(c,j,k)
                end if
             end do

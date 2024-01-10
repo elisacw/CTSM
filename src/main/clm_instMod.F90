@@ -11,7 +11,7 @@ module clm_instMod
   use clm_varctl      , only : use_cn, use_c13, use_c14, use_lch4, use_cndv, use_fates, use_fates_bgc
   use clm_varctl      , only : iulog
   use clm_varctl      , only : use_crop, snow_cover_fraction_method, paramfile
-  use SoilBiogeochemDecompCascadeConType , only : mimics_decomp, no_soil_decomp, century_decomp, decomp_method
+  use SoilBiogeochemDecompCascadeConType , only : mimics_decomp, mimicsplus_decomp, no_soil_decomp, century_decomp, decomp_method
   use clm_varcon      , only : bdsno, c13ratio, c14ratio
   use landunit_varcon , only : istice, istsoil
   use perf_mod        , only : t_startf, t_stopf
@@ -190,6 +190,8 @@ contains
     use controlMod                         , only : nlfilename, fsurdat
     use domainMod                          , only : ldomain
     use SoilBiogeochemDecompCascadeMIMICSMod, only : init_decompcascade_mimics
+    use SoilBiogeochemDecompCascadeMIMICSplusMod, only : init_decompcascade_mimicsplus !ECW create
+
     use SoilBiogeochemDecompCascadeBGCMod  , only : init_decompcascade_bgc
     use SoilBiogeochemDecompCascadeContype , only : init_decomp_cascade_constants
     use SoilBiogeochemCompetitionMod       , only : SoilBiogeochemCompetitionInit
@@ -386,6 +388,9 @@ contains
                                       soilstate_inst )
        else if (decomp_method == mimics_decomp ) then
           call init_decompcascade_mimics(bounds, soilbiogeochem_state_inst, &
+                                         soilstate_inst)
+       else if (decomp_method == mimicsplus_decomp ) then
+          call init_decompcascade_mimicsplus(bounds, soilbiogeochem_state_inst, & !ECW create init_decompcascade_mimicsplus
                                          soilstate_inst)
        end if
 

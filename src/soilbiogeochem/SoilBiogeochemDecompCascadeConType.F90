@@ -54,6 +54,7 @@ module SoilBiogeochemDecompCascadeConType
   integer, public, parameter :: no_soil_decomp = 0                     ! No soil decomposition is done
   integer, public, parameter :: century_decomp = 1                     ! CENTURY decomposition method type
   integer, public, parameter :: mimics_decomp = 2                      ! MIMICS decomposition method type
+  integer, public, parameter :: mimicsplus_decomp = 3                  ! MIMICS+ decomposition method type
   integer, public            :: decomp_method  = ispval                ! Type of decomposition to use
   logical, public, parameter :: use_soil_matrixcn = .false.            ! true => use cn matrix solution for soil BGC
   type(decomp_cascade_type), public :: decomp_cascade_con
@@ -99,6 +100,8 @@ contains
           decomp_method = century_decomp
        case( 'MIMICSWieder2015' )
           decomp_method = mimics_decomp
+       case( 'MIMICSplusAas2023' )
+          decomp_method = mimicsplus_decomp
        case default
           call endrun('Bad soil_decomp_method = '//soil_decomp_method )
        end select
@@ -135,6 +138,9 @@ contains
           else if (decomp_method == mimics_decomp) then
              ndecomp_pools = 7
              ndecomp_cascade_transitions = 14
+          else if (decomp_method == mimicsplus_decomp) then
+             ndecomp_pools = 7
+             ndecomp_cascade_transitions = 14 !ECW change later
           end if
        else
           if (decomp_method == century_decomp) then
@@ -143,7 +149,11 @@ contains
           else if (decomp_method == mimics_decomp) then
              ndecomp_pools = 8
              ndecomp_cascade_transitions = 15
-          end if
+          else if (decomp_method == mimicsplus_decomp) then
+             ndecomp_pools = 8
+             ndecomp_cascade_transitions = 15 !ECW 
+
+            end if
        endif
        ! The next param also appears as a dimension in the params files dated
        ! c210418.nc and later

@@ -183,7 +183,7 @@ contains
     use CNFUNMod         , only: CNFUN
     use subgridAveMod    , only: p2c
     use perf_mod         , only : t_startf, t_stopf
-    use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con,  mimics_decomp, decomp_method
+    use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con,  mimics_decomp, mimicsplus_decomp, decomp_method
     !
     ! !ARGUMENTS:
     type(bounds_type)                       , intent(in)    :: bounds
@@ -616,6 +616,12 @@ contains
                   ! TODO slevis: -ve or tiny sminn_vr could cause problems
                   fpi_nh4_vr(c,j) = 1.0_r8
                   actual_immob_nh4_vr(c,j) = potential_immob_vr(c,j)
+               else if (decomp_method == mimicsplus_decomp) then
+                  ! turn off fpi for MIMICS and only lets plants
+                  ! take up available mineral nitrogen.
+                  ! TODO slevis: -ve or tiny sminn_vr could cause problems
+                  fpi_nh4_vr(c,j) = 1.0_r8
+                  actual_immob_nh4_vr(c,j) = potential_immob_vr(c,j)
                end if
               
                if(.not.local_use_fun)then
@@ -709,6 +715,13 @@ contains
                end if
                
                if (decomp_method == mimics_decomp) then
+                  ! turn off fpi for MIMICS and only lets plants
+                  ! take up available mineral nitrogen.
+                  ! TODO slevis: -ve or tiny sminn_vr could cause problems
+                  fpi_no3_vr(c,j) = 1.0_r8 - fpi_nh4_vr(c,j)  ! => 0
+                  actual_immob_no3_vr(c,j) = potential_immob_vr(c,j) - &
+                                             actual_immob_nh4_vr(c,j)  ! => 0
+               else if (decomp_method == mimicsplus_decomp) then
                   ! turn off fpi for MIMICS and only lets plants
                   ! take up available mineral nitrogen.
                   ! TODO slevis: -ve or tiny sminn_vr could cause problems
@@ -839,7 +852,35 @@ contains
                   end do
                end do
             end do
-         else  ! not mimics_decomp
+         else if (decomp_method == mimicsplus_decomp) then
+            do j = 1, nlevdecomp
+               do fc=1,num_bgc_soilc
+                  c = filter_bgc_soilc(fc)
+
+                  do k = 1, ndecomp_cascade_transitions
+                     if (cascade_receiver_pool(k) == i_cop_mic .or. &
+                         cascade_receiver_pool(k) == i_oli_mic) then
+                        sum_ndemand_vr(c,j) = sum_no3_demand_scaled(c,j) + &
+                                              sum_nh4_demand_scaled(c,j)
+                        if (pmnf_decomp_cascade(c,j,k) > 0.0_r8 .and. &
+                            sum_ndemand_vr(c,j) > 0.0_r8) then
+                           amnf_immob_vr = (sminn_vr(c,j) / dt) * &
+                                           (pmnf_decomp_cascade(c,j,k) / &
+                                            sum_ndemand_vr(c,j))
+                           n_deficit_vr = pmnf_decomp_cascade(c,j,k) - &
+                                          amnf_immob_vr
+                           c_overflow_vr(c,j,k) = &
+                              n_deficit_vr * p_decomp_cn_gain(c,j,cascade_receiver_pool(k))
+                        else  ! not pmnf and sum_ndemand > 0
+                           c_overflow_vr(c,j,k) = 0.0_r8
+                        end if
+                     else  ! not microbes receiving
+                        c_overflow_vr(c,j,k) = 0.0_r8
+                     end if
+                  end do
+               end do
+            end do
+         else if  ! not mimics_decomp
             c_overflow_vr(:,:,:) = 0.0_r8
          end if
 

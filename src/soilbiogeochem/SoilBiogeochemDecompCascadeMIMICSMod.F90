@@ -1242,7 +1242,7 @@ contains
                  annsum_npp(bounds%begp:bounds%endp), &
                  annsum_npp_col_local(bounds%begc:bounds%endc))
          else
-            call endrun(msg='ERROR: soil_decomp_method = MIMICSWieder2015 '// &
+            call endrun(msg='ERROR: soil_decomp_method = MIMICSWieder2015 or MIMICSplusAas2023 '// &
               'will work with use_fates = .true. only if use_lch4 = .true. '// &
               errMsg(sourcefile, __LINE__))
          end if lch4_if
