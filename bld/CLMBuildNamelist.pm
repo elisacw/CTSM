@@ -90,11 +90,11 @@ OPTIONS
                                 sp    = Satellite Phenology (SP)
                                     This toggles off the namelist variable: use_cn
                                 bgc   = Carbon Nitrogen with methane, nitrification, vertical soil C,
-                                        CENTURY or MIMICS decomposition
+                                        CENTURY, MIMICS or MIMICSplus decomposition
 				        This toggles on the namelist variables:
                                           use_cn, use_lch4, use_nitrif_denitrif
 				fates = FATES/Ecosystem Demography with below ground BGC
-				        CENTURY or MIMICS decomposition
+				        CENTURY, MIMICS or MIMICSplus decomposition
                                         This toggles on the namelist variables:
 				        use_fates. use_lch4 and use_nitrif_denitrif are optional
 				 
@@ -919,6 +919,12 @@ sub setup_cmdl_bgc {
      if ( (! &value_is_true($nl_flags->{'use_lch4'})) && &value_is_true($nl_flags->{'use_fates'}) ) {
         if ( $soil_decomp_method eq "MIMICSWieder2015" ) {
            $log->warning("If MIMICS is on and use_fates = .true. then use_lch4 must be .true. and currently it's not" );
+        }
+     }
+     # if MIMICS+ is on and use_fates = .true. then use_lch4 must = .true.
+     if ( (! &value_is_true($nl_flags->{'use_lch4'})) && &value_is_true($nl_flags->{'use_fates'}) ) {
+        if ( $soil_decomp_method eq "MIMICSplusAas2023" ) {
+           $log->warning("If MIMICSplus is on and use_fates = .true. then use_lch4 must be .true. and currently it's not" );
         }
      }
   }

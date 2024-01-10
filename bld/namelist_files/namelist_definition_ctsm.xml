@@ -2234,11 +2234,12 @@ Number of days over which to use exponential relaxation of NPP in N fixation cal
 
 <!-- Soil decomposition options  -->
 <entry id="soil_decomp_method" type="char*20" category="clm_physics"
-       group="soilbgc_decomp" valid_values="None,CENTURYKoven2013,MIMICSWieder2015" >
+       group="soilbgc_decomp" valid_values="None,CENTURYKoven2013,MIMICSWieder2015,MIMICSplusAas2023" >
 Soil decomposition method
   None --  No soil decomposition is done
   CENTURYKoven2013 -- CENTURY model in CTSM from Koven et. al. 2013
   MIMICSWieder2015 -- MIMICS model in CTSM from Wieder et. al. 2015
+  MIMICSplusAas2023 -- MIMICSplus model in CTSM from Aas et al. 2023
 
 An active soil decomposition method requires the BGC or FATES model to work 
 And both BGC and FATES models require an active soil decomposition model

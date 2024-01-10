@@ -550,6 +550,33 @@
       <option name="comment"  >Test soil_decomp_method = 'MIMICSWieder2015'</option>
     </options>
   </test>
+  <test name="ERP_D_P36x2_Ld3" grid="f10_f10_mg37" compset="I1850Clm51BgcCrop" testmods="clm/mimicsplus">
+    <machines>
+      <machine name="cheyenne" compiler="gnu" category="aux_clm"/>
+    </machines>
+    <options>
+      <option name="wallclock">00:20:00</option>
+      <option name="comment"  >Test soil_decomp_method = 'MIMICSplusAas2023'</option>
+    </options>
+  </test>
+  <test name="SMS_Ld5_Mmpi-serial" grid="1x1_brazil" compset="IHistClm50BgcQianRs" testmods="clm/mimicsplus">
+    <machines>
+      <machine name="izumi" compiler="gnu" category="aux_clm"/>
+    </machines>
+    <options>
+      <option name="wallclock">00:20:00</option>
+      <option name="comment"  >Test soil_decomp_method = 'MIMICSplusAas2023'</option>
+    </options>
+  </test>
+  <test name="SMS_Ly5_Mmpi-serial" grid="1x1_brazil" compset="IHistClm50BgcQianRs" testmods="clm/newton_krylov_spinup">
+    <machines>
+      <machine name="izumi" compiler="intel" category="aux_clm"/>
+    </machines>
+    <options>
+      <option name="wallclock">00:20:00</option>
+      <option name="comment"  >Test soil_decomp_method = 'MIMICSplusAas2023'</option>
+    </options>
+  </test>
   <test name="ERP_D_P36x2_Ld3" grid="f10_f10_mg37" compset="I2000Clm50BgcCru" testmods="clm/flexCN_FUN">
     <machines>
       <machine name="cheyenne" compiler="intel" category="aux_clm"/>
@@ -2020,6 +2047,16 @@
     <options>
       <option name="wallclock">00:40:00</option>
       <option name="comment">30 day exact restart test with threading, running FATES-MIMICS on an f45 grid.</option>
+    </options>
+  </test>
+  <test name="ERP_P72x2_Ld30" grid="f45_f45_mg37" compset="I2000Clm50FatesRs" testmods="clm/mimicsplusFatesCold">
+    <machines>
+      <machine name="cheyenne" compiler="intel" category="aux_clm"/>
+      <machine name="cheyenne" compiler="intel" category="fates"/>
+    </machines>
+    <options>
+      <option name="wallclock">00:40:00</option>
+      <option name="comment">30 day exact restart test with threading, running FATES-MIMICSplus on an f45 grid.</option>
     </options>
   </test>
   <test name="SMS_D_Ld5" grid="f10_f10_mg37" compset="I2000Clm50BgcCrop" testmods="clm/irrig_alternate">
