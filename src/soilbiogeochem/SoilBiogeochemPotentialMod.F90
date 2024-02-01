@@ -217,7 +217,7 @@ contains
                            p_decomp_npool_loss * nue_decomp_cascade(k)
                         p_decomp_npool_to_din(c,j,k) = &
                            p_decomp_npool_loss - p_decomp_npool_gain(c,j,k)
-                     elseif (decomp_method == mimicsplus_decomp) then
+                     elseif (decomp_method == mimicsplus_decomp) then !ECW maybe .or.
                         ! N:C ratio of donor pools (N:C instead of C:N because
                         ! already checked that we're not dividing by zero)
                         decomp_nc_loss_donor = &
@@ -306,7 +306,7 @@ contains
                end do  ! transitions loop
             end do  ! column loop
          end do  ! soil levels loop
-      else  if (decomp_method == mimicsplus_decomp) then
+      else  if (decomp_method == mimicsplus_decomp) then !ECW maybe .or.
          do j = 1,nlevdecomp
             do fc = 1,num_bgc_soilc
                c = filter_bgc_soilc(fc)
@@ -381,7 +381,7 @@ contains
                end if
                if (decomp_method == mimics_decomp) then
                   gross_nmin_vr(c,j) = gross_nmin_vr(c,j) + p_decomp_npool_to_din(c,j,k)
-               else if (decomp_method == mimicsplus_decomp) then
+               else if (decomp_method == mimicsplus_decomp) then !ECW maybe .or.
                   gross_nmin_vr(c,j) = gross_nmin_vr(c,j) + p_decomp_npool_to_din(c,j,k)
                end if
             end do

@@ -821,17 +821,12 @@ contains
     ! to i_litr_min, i_litr_max.
     this%fr_f(:,1) = this%fr_flab
     this%lf_f(:,1) = this%lf_flab
-    if (decomp_method == mimics_decomp) then
+    if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
        this%fr_f(:,2) = this%fr_fcel + this%fr_flig
        this%fr_f(:,3) = 0.0_r8
        this%lf_f(:,2) = this%lf_fcel + this%lf_flig
        this%lf_f(:,3) = 0.0_r8
-    else if (decomp_method == mimicsplus_decomp) then    !ECW change values 
-       this%fr_f(:,2) = this%fr_fcel + this%fr_flig
-       this%fr_f(:,3) = 0.0_r8
-       this%lf_f(:,2) = this%lf_fcel + this%lf_flig
-       this%lf_f(:,3) = 0.0_r8
-    else if
+    else
        this%fr_f(:,2) = this%fr_fcel
        this%fr_f(:,3) = this%fr_flig
        this%lf_f(:,2) = this%lf_fcel

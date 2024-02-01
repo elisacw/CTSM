@@ -12,7 +12,7 @@ module CNDriverMod
   use perf_mod                        , only : t_startf, t_stopf
   use clm_varctl                      , only : use_nitrif_denitrif, use_nguardrail
   use clm_varctl                      , only : iulog, use_crop, use_crop_agsys, use_cn
-  use SoilBiogeochemDecompCascadeConType, only : mimics_decomp, mimicsplus_decomp, century_decomp, decomp_method !ECW create mimicsplus_decomp
+  use SoilBiogeochemDecompCascadeConType, only : mimics_decomp, mimicsplus_decomp, century_decomp, decomp_method
   use CNSharedParamsMod               , only : use_fun
   use CNVegStateType                  , only : cnveg_state_type
   use CNVegCarbonStateType            , only : cnveg_carbonstate_type
@@ -138,7 +138,7 @@ contains
     use dynHarvestMod                     , only: CNHarvest
     use dynGrossUnrepMod                  , only: CNGrossUnrep
     use SoilBiogeochemDecompCascadeMIMICSMod, only: decomp_rates_mimics
-    use SoilBiogeochemDecompCascadeMIMICSplusMod, only: decomp_rates_mimicsplus !ECW create this
+    use SoilBiogeochemDecompCascadeMIMICSplusMod, only: decomp_rates_mimicsplus !ECW decomp_rates_mimicsplus is created in SoilBiogeochemDecompCascadeMIMICSplusMod
     use SoilBiogeochemDecompCascadeBGCMod , only: decomp_rate_constants_bgc
     use SoilBiogeochemCompetitionMod      , only: SoilBiogeochemCompetition
     use SoilBiogeochemDecompMod           , only: SoilBiogeochemDecomp
@@ -351,7 +351,7 @@ contains
             soilstate_inst, temperature_inst, cnveg_carbonflux_inst, ch4_inst, &
             soilbiogeochem_carbonflux_inst, soilbiogeochem_carbonstate_inst)
     else if (decomp_method == mimicsplus_decomp) then
-       call decomp_rates_mimicsplus(bounds, num_bgc_soilc, filter_bgc_soilc, &            !ECW create decomp_rates_mimicsplus
+       call decomp_rates_mimicsplus(bounds, num_bgc_soilc, filter_bgc_soilc, &            !ECW this calls decomp_rates_mimicsplus from MIMICSplusMod
             num_bgc_vegp, filter_bgc_vegp, clm_fates, &
             soilstate_inst, temperature_inst, cnveg_carbonflux_inst, ch4_inst, &
             soilbiogeochem_carbonflux_inst, soilbiogeochem_carbonstate_inst)

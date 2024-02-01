@@ -190,7 +190,7 @@ contains
     use controlMod                         , only : nlfilename, fsurdat
     use domainMod                          , only : ldomain
     use SoilBiogeochemDecompCascadeMIMICSMod, only : init_decompcascade_mimics
-    use SoilBiogeochemDecompCascadeMIMICSplusMod, only : init_decompcascade_mimicsplus !ECW create
+    use SoilBiogeochemDecompCascadeMIMICSplusMod, only : init_decompcascade_mimicsplus !ECW init_decompcascade_mimicsplus is created in SoilBiogeochemDecompCascadeMIMICSplusMod
 
     use SoilBiogeochemDecompCascadeBGCMod  , only : init_decompcascade_bgc
     use SoilBiogeochemDecompCascadeContype , only : init_decomp_cascade_constants
@@ -390,7 +390,7 @@ contains
           call init_decompcascade_mimics(bounds, soilbiogeochem_state_inst, &
                                          soilstate_inst)
        else if (decomp_method == mimicsplus_decomp ) then
-          call init_decompcascade_mimicsplus(bounds, soilbiogeochem_state_inst, & !ECW create init_decompcascade_mimicsplus
+          call init_decompcascade_mimicsplus(bounds, soilbiogeochem_state_inst, & !ECW calls init_decompcascade_mimicsplus from MIMICSplusMod
                                          soilstate_inst)
        end if
 

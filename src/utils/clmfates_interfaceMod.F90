@@ -1134,12 +1134,9 @@ module CLMFatesInterfaceMod
           !     sum(this%fates(ci)%bc_out(s)%litt_flux_cel_n_si(1:nlevdecomp) * &
           !         this%fates(ci)%bc_in(s)%dz_decomp_sisl(1:nlevdecomp))
 
-          if (decomp_method == mimics_decomp) then
+          if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
              ! Mimics has a structural pool, which is cellulose and lignan
              i_lig_lit = i_cel_lit
-          elseif (decomp_method == mimicsplus_decomp) then
-             ! Mimics has a structural pool, which is cellulose and lignan
-             i_lig_lit = i_cel_lit !ECW? here +1 and century +2?
           elseif(decomp_method == century_decomp ) then
              ! CENTURY has a separate lignan pool from cellulose
              i_lig_lit = i_cel_lit + 1
@@ -1218,12 +1215,9 @@ module CLMFatesInterfaceMod
                sum(this%fates(ci)%bc_out(s)%litt_flux_cel_c_si(1:nlevdecomp) * &
                    this%fates(ci)%bc_in(s)%dz_decomp_sisl(1:nlevdecomp))
 
-          if (decomp_method == mimics_decomp) then
+          if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
              ! Mimics has a structural pool, which is cellulose and lignan
              i_lig_lit = i_cel_lit
-          elseif (decomp_method == mimicsplus_decomp) then
-            ! Mimics has a structural pool, which is cellulose and lignan
-            i_lig_lit = i_cel_lit !ECW? her +1 for century +2?
           elseif(decomp_method == century_decomp ) then
              ! CENTURY has a separate lignan pool from cellulose
              i_lig_lit = i_cel_lit + 1

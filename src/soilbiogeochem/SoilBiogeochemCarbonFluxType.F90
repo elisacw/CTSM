@@ -226,15 +226,10 @@ contains
              avgflag='A', long_name='total heterotrophic respiration', &
              ptr_col=this%hr_col)
 
-        if (decomp_method == mimics_decomp) then !ECW could I also just write if (decomp_method == mimics_decomp or mimicsplus_decomp) then
+        if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then !ECW
            this%michr_col(begc:endc) = spval
            call hist_addfld1d (fname='MICC_HR', units='gC/m^2/s', &
              avgflag='A', long_name='microbial C heterotrophic respiration: donor-pool based, so expect zero with MIMICS', &
-             ptr_col=this%michr_col, default='inactive')
-        else if (decomp_method == mimicsplus_decomp) then !ECW? Should this be as else if or rather a separate if statement?
-           this%michr_col(begc:endc) = spval
-           call hist_addfld1d (fname='MICC_HR', units='gC/m^2/s', &
-             avgflag='A', long_name='microbial C heterotrophic respiration: donor-pool based, so expect zero with MIMICSplus', &
              ptr_col=this%michr_col, default='inactive')
         end if
 
@@ -452,12 +447,7 @@ contains
              avgflag='A', long_name='C13 total heterotrophic respiration', &
              ptr_col=this%hr_col)
 
-        if (decomp_method == mimics_decomp) then
-           this%michr_col(begc:endc) = spval
-           call hist_addfld1d (fname='C13_MICC_HR', units='gC13/m^2/s', &
-             avgflag='A', long_name='C13 microbial heterotrophic respiration', &
-             ptr_col=this%michr_col, default='inactive')
-        else if (decomp_method == mimicsplus_decomp) then !ECW? Should this be as else if or rather a separate if statement?
+        if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then 
            this%michr_col(begc:endc) = spval
            call hist_addfld1d (fname='C13_MICC_HR', units='gC13/m^2/s', &
              avgflag='A', long_name='C13 microbial heterotrophic respiration', &
@@ -538,16 +528,11 @@ contains
              avgflag='A', long_name='C14 total heterotrophic respiration', &
              ptr_col=this%hr_col)
 
-             if (decomp_method == mimics_decomp) then
+             if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
                this%michr_col(begc:endc) = spval
                call hist_addfld1d (fname='C14_MICC_HR', units='gC13/m^2/s', &
                  avgflag='A', long_name='C14 microbial heterotrophic respiration', &
                  ptr_col=this%michr_col, default='inactive')
-             else if (decomp_method == mimicsplus_decomp) then 
-               this%michr_col(begc:endc) = spval
-               call hist_addfld1d (fname='C14_MICC_HR', units='gC13/m^2/s', &
-                 avgflag='A', long_name='C14 microbial heterotrophic respiration', &
-                 ptr_col=this%michr_col, default='inactive')!ECW? Should this be as else if or rather a separate if statement
         end if
 
         this%cwdhr_col(begc:endc) = spval
@@ -922,7 +907,7 @@ contains
 
     ! Calculate ligninNratio
     ! FATES does its own calculation
-    if_mimics: if (decomp_method == mimics_decomp ) then
+    if_mimics: if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
 
        if(num_soilp>0)then
           do fp = 1,num_soilp
@@ -977,64 +962,6 @@ contains
        end do
     end if if_mimics
 
-    
-    ! Calculate ligninNratio for MIMICS+
-    ! FATES does its own calculation
-    !ECW pools are wrong
-    if_mimicsplus: if (decomp_method == mimicsplus_decomp ) then
-
-      if(num_soilp>0)then
-         do fp = 1,num_soilp
-            p = filter_soilp(fp)
-            associate(ivt => patch%itype)  ! Input: [integer (:)] patch plant type
-              ligninNratio_leaf_patch(p) = pftcon%lf_flig(ivt(p)) * &
-                   pftcon%lflitcn(ivt(p)) * &
-                   leafc_to_litter_patch(p)
-              ligninNratio_froot_patch(p) = pftcon%fr_flig(ivt(p)) * &
-                   pftcon%frootcn(ivt(p)) * &
-                   frootc_to_litter_patch(p)
-            end associate
-         end do
-         
-         call p2c(bounds, num_bgc_soilc, filter_bgc_soilc, &
-              ligninNratio_leaf_patch(bounds%begp:bounds%endp), &
-              ligninNratio_leaf_col(bounds%begc:bounds%endc))
-         call p2c(bounds, num_bgc_soilc, filter_bgc_soilc, &
-              ligninNratio_froot_patch(bounds%begp:bounds%endp), &
-              ligninNratio_froot_col(bounds%begc:bounds%endc))
-         call p2c(bounds, num_bgc_soilc, filter_bgc_soilc, &
-              leafc_to_litter_patch(bounds%begp:bounds%endp), &
-              leafc_to_litter_col(bounds%begc:bounds%endc))
-         call p2c(bounds, num_bgc_soilc, filter_bgc_soilc, &
-              frootc_to_litter_patch(bounds%begp:bounds%endp), &
-              frootc_to_litter_col(bounds%begc:bounds%endc))
-         
-      end if
-
-      ! Calculate ligninNratioAve
-      do fc = 1,num_bgc_soilc
-         c = filter_bgc_soilc(fc)
-         if(.not.col%is_fates(c)) then
-            if (soilbiogeochem_cwdn_col(c) > 0._r8) then
-               ligninNratio_cwd = CNParamsShareInst%cwd_flig * &
-                    (soilbiogeochem_cwdc_col(c) / soilbiogeochem_cwdn_col(c)) * &
-                    soilbiogeochem_decomp_cascade_ctransfer_col(c,i_cwdl2)
-            else
-               ligninNratio_cwd = 0._r8
-            end if
-            this%litr_lig_c_to_n_col(c) = &
-                 (ligninNratio_leaf_col(c) + ligninNratio_froot_col(c) + &
-                 ligninNratio_cwd) / &
-                 max(1.0e-3_r8, leafc_to_litter_col(c) + &
-                 frootc_to_litter_col(c) + &
-                 soilbiogeochem_decomp_cascade_ctransfer_col(c,i_cwdl2))
-         !else
-            ! For FATES:
-            ! this array is currently updated here:
-            ! clmfates_interfaceMod.F90:wrap_update_hlmfates_dyn()
-         end if
-      end do
-   end if if_mimicsplus
 
   end subroutine Summary
 

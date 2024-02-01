@@ -40,7 +40,7 @@ contains
     use SoilBiogeochemPotentialMod        , only : readSoilBiogeochemPotentialParams      => readParams
     use SoilBiogeochemDecompMod           , only : readSoilBiogeochemDecompParams         => readParams
     use SoilBiogeochemDecompCascadeMIMICSMod, only : readSoilBiogeochemDecompMimicsParams => readParams
-    use SoilBiogeochemDecompCascadeMIMICSplusMod, only : readSoilBiogeochemDecompMimicsplusParams => readParams !ECW create
+    use SoilBiogeochemDecompCascadeMIMICSplusMod, only : readSoilBiogeochemDecompMimicsplusParams => readParams
     use SoilBiogeochemDecompCascadeBGCMod , only : readSoilBiogeochemDecompBgcParams      => readParams
     use ch4Mod                            , only : readCH4Params                          => readParams
     use LunaMod                           , only : readParams_Luna                        => readParams
@@ -103,7 +103,7 @@ contains
        if (decomp_method == mimics_decomp) then
           call readSoilBiogeochemDecompMimicsParams(ncid)
        else if (decomp_method == mimicsplus_decomp) then
-            call readSoilBiogeochemDecompMimicsplusParams(ncid)      !ECW create this parameterfile
+            call readSoilBiogeochemDecompMimicsplusParams(ncid) !ECW
        else if (decomp_method == century_decomp) then
           call readSoilBiogeochemDecompBgcParams(ncid)
        end if

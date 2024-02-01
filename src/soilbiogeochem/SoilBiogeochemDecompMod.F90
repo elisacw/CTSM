@@ -193,7 +193,7 @@ contains
                         p_decomp_cpool_loss(c,j,k), &
                         decomp_cascade_hr_vr(c,j,k) + c_overflow_vr(c,j,k))
                      decomp_cascade_ctransfer_vr(c,j,k) = max(0.0_r8, p_decomp_cpool_loss(c,j,k) - decomp_cascade_hr_vr(c,j,k))
-                  else if (decomp_method == mimicsplus_decomp) then
+                  else if (decomp_method == mimicsplus_decomp) then !ECW maybe .or.
                      decomp_cascade_hr_vr(c,j,k) = min( &
                         p_decomp_cpool_loss(c,j,k), &
                         decomp_cascade_hr_vr(c,j,k) + c_overflow_vr(c,j,k))
@@ -213,7 +213,7 @@ contains
                   if (decomp_method == mimics_decomp) then
                      decomp_cascade_sminn_flux_vr(c,j,k) = decomp_cascade_sminn_flux_vr(c,j,k) - p_decomp_npool_to_din(c,j,k)
                      net_nmin_vr(c,j) = net_nmin_vr(c,j) + p_decomp_npool_to_din(c,j,k)
-                  else if (decomp_method == mimicsplus_decomp) then
+                  else if (decomp_method == mimicsplus_decomp) then !ECW maybe .or.
                      decomp_cascade_sminn_flux_vr(c,j,k) = decomp_cascade_sminn_flux_vr(c,j,k) - p_decomp_npool_to_din(c,j,k)
                      net_nmin_vr(c,j) = net_nmin_vr(c,j) + p_decomp_npool_to_din(c,j,k)
                   end if
