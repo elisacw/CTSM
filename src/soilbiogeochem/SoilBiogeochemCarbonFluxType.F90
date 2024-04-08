@@ -893,6 +893,7 @@ contains
       end do
     end associate
 
+    
     ! total heterotrophic respiration (HR)
     do fc = 1,num_bgc_soilc
        c = filter_bgc_soilc(fc)

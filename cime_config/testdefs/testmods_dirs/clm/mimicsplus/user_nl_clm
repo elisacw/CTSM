@@ -1,1 +1,4 @@
 soil_decomp_method = 'MIMICSplusAas2023'
+hist_fincl1 += 'TOTMYCC', 'SOILC_vr', 'TOTMICC', 'TOTMYCC', 'TOTLITC', 'TOTSOMC', 'TOTLITC_1m', 'TOTSOMC_1m',
+'DYN_COL_SOIL_ADJUSTMENTS_C', 'TOTCOLC', 'TOTECOSYSC', 'LIT_MET_C_vr', 'LIT_STR_C_vr', 'SOM_AVL_C_vr', 
+'SOM_CHEM_C_vr', 'SOM_PHYS_C_vr', 'MIC_COP_C_vr', 'MIC_OLI_C_vr', 'MYC_ECM_C_vr', 'MYC_AM_C_vr'

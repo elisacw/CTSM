@@ -10,7 +10,7 @@ module SoilBiogeochemPotentialMod
   use shr_kind_mod                       , only : r8 => shr_kind_r8
   use decompMod                          , only : bounds_type
   use clm_varpar                         , only : nlevdecomp, ndecomp_cascade_transitions, ndecomp_pools
-  use clm_varpar                         , only : i_cop_mic, i_oli_mic
+  use clm_varpar                         , only : i_cop_mic, i_oli_mic, i_ecm_myc, i_am_myc
   use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, mimics_decomp, mimicsplus_decomp, decomp_method
   use SoilBiogeochemStateType            , only : soilbiogeochem_state_type
   use SoilBiogeochemCarbonStateType      , only : soilbiogeochem_carbonstate_type

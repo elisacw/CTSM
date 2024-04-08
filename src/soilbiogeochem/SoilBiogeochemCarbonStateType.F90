@@ -33,6 +33,7 @@ module SoilBiogeochemCarbonStateType
      ! summary (diagnostic) state variables, not involved in mass balance
      real(r8), pointer :: ctrunc_col              (:)   ! (gC/m2) column-level sink for C truncation
      real(r8), pointer :: totmicc_col             (:)   ! (gC/m2) total microbial carbon
+     real(r8), pointer :: totmycc_col             (:)   ! (gC/m2) total mycorrhizal carbon !ECW
      real(r8), pointer :: totlitc_col             (:)   ! (gC/m2) total litter carbon
      real(r8), pointer :: totlitc_1m_col          (:)   ! (gC/m2) total litter carbon to 1 meter
      real(r8), pointer :: totsomc_col             (:)   ! (gC/m2) total soil organic matter carbon
@@ -131,6 +132,7 @@ contains
     allocate(this%cwdc_col       (begc :endc)) ; this%cwdc_col       (:) = nan
 
     allocate(this%totmicc_col    (begc :endc)) ; this%totmicc_col    (:) = nan
+    allocate(this%totmycc_col    (begc :endc)) ; this%totmycc_col    (:) = nan
     allocate(this%totlitc_col    (begc :endc)) ; this%totlitc_col    (:) = nan
     allocate(this%totsomc_col    (begc :endc)) ; this%totsomc_col    (:) = nan
     allocate(this%totlitc_1m_col (begc :endc)) ; this%totlitc_1m_col (:) = nan
@@ -214,6 +216,15 @@ contains
            avgflag='A', long_name='total microbial carbon', &
            ptr_col=this%totmicc_col)
        end if
+
+       if (decomp_method == mimicsplus_decomp) then
+         this%totmycc_col(begc:endc) = spval !ECW ??? special value
+         call hist_addfld1d (fname='TOTMYCC', units='gC/m^2', & !ECW is this this automatic thing where output is written to hisory files
+           avgflag='A', long_name='total mycorrhizal carbon', &
+           ptr_col=this%totmycc_col)
+       end if
+
+       !ECW I think here Variable namnes for CLMoutut are definded, i should add the TOTMYCC here?
 
        ! Matrix solution history fields
        if(use_soil_matrixcn)then
@@ -313,6 +324,13 @@ contains
           call hist_addfld1d (fname='C13_TOTMICC', units='gC/m^2', &
             avgflag='A', long_name='C13 total microbial carbon', &
             ptr_col=this%totmicc_col)
+       end if
+
+       if (decomp_method == mimicsplus_decomp) then !ECW
+         this%totmycc_col(begc:endc) = spval
+         call hist_addfld1d (fname='C13_TOTMYCC', units='gC/m^2', &
+           avgflag='A', long_name='C13 total mycorrhizal carbon', &
+           ptr_col=this%totmycc_col)
        end if
 
        ! Matrix solution history fields
@@ -419,6 +437,13 @@ contains
             ptr_col=this%totmicc_col)
        end if
 
+       if (decomp_method == mimicsplus_decomp) then !ECW
+         this%totmycc_col(begc:endc) = spval 
+         call hist_addfld1d (fname='C14_TOTMYCC', units='gC/m^2', &
+           avgflag='A', long_name='C14 total mycorrhizal carbon', &
+           ptr_col=this%totmycc_col)
+       end if
+
        if(use_soil_matrixcn)then
           do l = 1, ndecomp_pools
              if ( nlevdecomp_full > 1 ) then
@@ -472,7 +497,7 @@ contains
        call hist_addfld1d (fname='C14_TOTECOSYSC', units='gC14/m^2', &
             avgflag='A', long_name='C14 total ecosystem carbon, incl veg but excl cpool and product pools', &
             ptr_col=this%totecosysc_col)
-
+ 
     endif
 
   end subroutine InitHistory
@@ -579,11 +604,11 @@ contains
           end if
           this%ctrunc_col(c)     = 0._r8
           this%totmicc_col(c)    = 0._r8
+          this%totmycc_col(c)    = 0._r8
           this%totlitc_col(c)    = 0._r8
           this%totsomc_col(c)    = 0._r8
           this%totlitc_1m_col(c) = 0._r8
           this%totsomc_1m_col(c) = 0._r8
-
           this%totc_col(c)       = 0._r8
           this%totecosysc_col(c) = 0._r8
        end if
@@ -874,6 +899,7 @@ contains
        end if
        this%ctrunc_col(i)     = value_column
        this%totmicc_col(i)    = value_column
+       this%totmycc_col(i)    = value_column
        this%totlitc_col(i)    = value_column
        this%totlitc_1m_col(i) = value_column
        this%totsomc_col(i)    = value_column
@@ -1093,6 +1119,20 @@ contains
        endif
     end do
 
+    ! total mycorrhizal carbon (TOTMYCC) !ECW
+    do fc = 1,num_allc
+      c = filter_allc(fc)
+      this%totmycc_col(c) = 0._r8
+   end do
+   do l = 1, ndecomp_pools
+      if ( decomp_cascade_con%is_mycorrhiza(l) ) then
+         do fc = 1,num_allc
+            c = filter_allc(fc)
+            this%totmycc_col(c) = this%totmycc_col(c) + this%decomp_cpools_col(c,l)
+         end do
+      end if
+   end do
+
     ! total litter carbon (TOTLITC)
     do fc = 1,num_allc
        c = filter_allc(fc)
@@ -1121,6 +1161,7 @@ contains
        end if
     end do
 
+    
     do fc = 1,num_allc
        c = filter_allc(fc)
        ! coarse woody debris carbon
@@ -1155,6 +1196,7 @@ contains
        this%totecosysc_col(c) =   &
             this%cwdc_col(c)    + &
             this%totmicc_col(c) + &
+            this%totmycc_col(c) + & !ECW
             this%totlitc_col(c) + &
             this%totsomc_col(c) + &
             ecovegc_col
@@ -1162,6 +1204,7 @@ contains
        this%totc_col(c) =         &
             this%cwdc_col(c)    + &
             this%totmicc_col(c) + &
+            this%totmycc_col(c) + & !ECW
             this%totlitc_col(c) + &
             this%totsomc_col(c) + &
             this%ctrunc_col(c)  + &

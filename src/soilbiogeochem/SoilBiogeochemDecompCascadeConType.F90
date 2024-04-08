@@ -35,6 +35,7 @@ module SoilBiogeochemDecompCascadeConType
      character(len=20) , pointer  :: decomp_pool_name_long(:)          ! name of pool for netcdf long names
      character(len=8)  , pointer  :: decomp_pool_name_short(:)         ! name of pool for netcdf short names
      logical           , pointer  :: is_microbe(:)                     ! TRUE => pool is a microbe pool
+     logical           , pointer  :: is_mycorrhiza(:)                  ! TRUE => pool is a mycorrhiza pool
      logical           , pointer  :: is_litter(:)                      ! TRUE => pool is a litter pool
      logical           , pointer  :: is_soil(:)                        ! TRUE => pool is a soil pool
      logical           , pointer  :: is_cwd(:)                         ! TRUE => pool is a cwd pool
@@ -140,7 +141,7 @@ contains
              ndecomp_cascade_transitions = 14
           else if (decomp_method == mimicsplus_decomp) then
              ndecomp_pools = 7
-             ndecomp_cascade_transitions = 14 !ECW change later
+             ndecomp_cascade_transitions = 14 !ECW change later !ECW is this double?
           end if
        else
           if (decomp_method == century_decomp) then
@@ -150,18 +151,18 @@ contains
              ndecomp_pools = 8
              ndecomp_cascade_transitions = 15
           else if (decomp_method == mimicsplus_decomp) then
-             ndecomp_pools = 8
-             ndecomp_cascade_transitions = 15 !ECW 
+             ndecomp_pools = 10
+             ndecomp_cascade_transitions = 21 !ECW 
 
             end if
        endif
        ! The next param also appears as a dimension in the params files dated
        ! c210418.nc and later
-       ndecomp_pools_max = 8  ! largest ndecomp_pools value above
+       ndecomp_pools_max = 10  ! largest ndecomp_pools value above
     else
        ndecomp_pools               = 7 ! maybe 9
        ndecomp_cascade_transitions = 7 ! also bigger
-       ndecomp_pools_max           = 8
+       ndecomp_pools_max           = 10
     end if
     ! Set ndecomp_pools_vr needed for Matrix solution
 
@@ -197,6 +198,7 @@ contains
        allocate(decomp_cascade_con%decomp_pool_name_long(ibeg:ndecomp_pools))
        allocate(decomp_cascade_con%decomp_pool_name_short(ibeg:ndecomp_pools))
        allocate(decomp_cascade_con%is_microbe(ibeg:ndecomp_pools))
+       allocate(decomp_cascade_con%is_mycorrhiza(ibeg:ndecomp_pools))
        allocate(decomp_cascade_con%is_litter(ibeg:ndecomp_pools))
        allocate(decomp_cascade_con%is_soil(ibeg:ndecomp_pools))
        allocate(decomp_cascade_con%is_cwd(ibeg:ndecomp_pools))
@@ -223,6 +225,7 @@ contains
        decomp_cascade_con%decomp_pool_name_long(ibeg:ndecomp_pools)          = ''
        decomp_cascade_con%decomp_pool_name_short(ibeg:ndecomp_pools)         = ''
        decomp_cascade_con%is_microbe(ibeg:ndecomp_pools)                     = .false.
+       decomp_cascade_con%is_mycorrhiza(ibeg:ndecomp_pools)                  = .false. !ECW
        decomp_cascade_con%is_litter(ibeg:ndecomp_pools)                      = .false.
        decomp_cascade_con%is_soil(ibeg:ndecomp_pools)                        = .false.
        decomp_cascade_con%is_cwd(ibeg:ndecomp_pools)                         = .false.
