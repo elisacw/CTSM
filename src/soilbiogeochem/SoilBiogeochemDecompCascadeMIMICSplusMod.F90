@@ -4,17 +4,31 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
     ! DESCRIPTION:
     
     ! Sets the coeffiecients used in the decomposition cascade submodel. 
-      
-    ! B- Modification to MIMICS+
-    ! B- At the momet this module uses the MIMICS parameters. - Have to create new parameter file with MIMICS+ parameters
-    ! B- Current parameter file for MIMICS under: /cluster/shared/noresm/inputdata/lnd/clm2/paramdata
+
+    ! ECW
+    ! This module is based on: SoilBiogeochemDecompCascadeMIMICSMod 
+    ! It is modified to couple MIMICS+ (Aas et al. 2023) into CLM
+
+    ! Changes:
+    ! - searching through modules and whereever an option for mimics was, created same option for mimicsplus
+    ! - renaming mimics to mimicsplus inside SoilBiogeochemDecompCascadeMIMICSplusMod
+    ! - created folders for century, mimicsplus and mimicsplusFatesCold in: /ctsm/cime_config/testdefs/testmods_dirs/clm/
+
+    ! Parameters
+    ! - new parameter file including updated MIMICS parameters & new parameters, saved under /cluster/home/elisacw/parameter_mimicsplus
+    ! - added read in method for new created parameters in SoilBiogeochemDecompCascadeMIMICSplusMod
+
+    ! Adding EcM and AM pools
+    ! - 
+
+   
     ! 
     ! !USES:
       use shr_kind_mod                       , only : r8 => shr_kind_r8
       use shr_const_mod                      , only : SHR_CONST_TKFRZ
       use shr_log_mod                        , only : errMsg => shr_log_errMsg
       use clm_varpar                         , only : nlevdecomp, ndecomp_pools_max
-      use clm_varpar                         , only : i_met_lit, i_cop_mic, i_oli_mic, i_cwd
+      use clm_varpar                         , only : i_met_lit, i_cop_mic, i_oli_mic, i_cwd, i_ecm_myc, i_am_myc
       use clm_varpar                         , only : i_litr_min, i_litr_max, i_cwdl2
       use clm_varctl                         , only : iulog, spinup_state, anoxia, use_lch4, use_fates
       use clm_varcon                         , only : zsoi
@@ -64,9 +78,7 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
       !
       ! !PRIVATE DATA MEMBERS 
       ! next four 2d vars are dimensioned (columns,nlevdecomp)
-    
-      ! B- in MIMICS+ this stuff is a real, ask Matvey!
-       
+         
       real(r8), private, allocatable :: desorp(:,:)
       real(r8), private, allocatable :: fphys_m1(:,:)
       real(r8), private, allocatable :: fphys_m2(:,:)
@@ -90,34 +102,27 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
       integer, private :: i_m1s3                                                                             ! C_SAPbSOMp     
       integer, private :: i_m2s3                                                                             ! C_SAPfSOMp   
       
-      ! B-
-      !adding additional Mycorrhiza pools for MIMICS+ ------- CAN I DO THAT?
-      !integer, private :: C_EcMSOMp
-      !integer, private :: C_EcMSOMa
-      !integer, private :: C_EcMSOMc
-      !integer, private :: C_AMSOMp
-      !integer, private :: C_AMSOMa
-      !integer, private :: C_AMSOMc
+      !ECW
+      ! Mycorrhizial necromass from EcM and AM to SOM pools
+      integer, private :: i_myc1s3                                                                            ! C_EcMSOMp
+      integer, private :: i_myc1s1                                                                            ! C_EcMSOMa
+      integer, private :: i_myc1s2                                                                            ! C_EcMSOMc
+      integer, private :: i_myc2s3                                                                             ! C_AMSOMp
+      integer, private :: i_myc2s1                                                                             ! C_AMSOMa
+      integer, private :: i_myc2s2                                                                             ! C_AMSOMc
     
-      !not so sure what that is, see MIMICS+ mycmimMod line 33
-      !integer, private :: C_PlantSOMc
-      !integer, private :: C_PlantSOMp
-      !integer, private :: C_PlantEcM
-      !integer, private :: C_PlantAM
-      !integer, private :: C_PlantLITm
-      !integer, private :: C_PlantLITs
-      !integer, private :: C_EcMdecompSOMp
-      !integer, private :: C_EcMdecompSOMc
-      !integer, private :: Leaching
-      !integer, private :: Deposition
-      !integer, private :: nitrif_rate
-      !integer, private :: C_EcMenz_prod
+      ! EcM enzyme production from EcM to SOMa
+      integer, private :: i_myc1s1_e
+
+      ! Mining from SOMc, SOMp to EcM
+      integer, private :: i_s2myc1_m                                                                           ! mining for N from SOMc to EcM
+      integer, private :: i_s3myc1_m                                                                           ! mining for N from SOMp to EcM
+
+      ! Mycorrhizal C:N exchange with plants (for now just C)
+      ! maybe just fix an amount of C going in ? What did Elin do?
+  
     
-    
-      ! B- MICHAELIS MENTEN?
-      ! B- I think this is further defined in the parameterfile (at least similar to paramMod in MIMICS+)
-      ! B- Just name the last part like its named in MIMICS+
-    
+      ! MICHAELIS MENTEN
       real(r8), private :: rf_l1m1  ! respiration fractions by transition
       real(r8), private :: rf_l1m2
       real(r8), private :: rf_l2m1
@@ -162,9 +167,8 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
       real(r8), private :: kslope_s1_m2
     
     
-      ! B- Those are all the parameters, that are also in the parameterfile
-      ! (I checked and they are all in the file and are defined here, great!)
-    
+   
+    ! Parameters from parameter file
       type, private :: params_type
          real(r8) :: mimicsplus_nue_into_mic  ! microbial N use efficiency for N fluxes
          real(r8) :: mimicsplus_desorpQ10
@@ -206,6 +210,24 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
          real(r8), allocatable :: mimicsplus_desorp(:)
          real(r8), allocatable :: mimicsplus_tau_r(:)
          real(r8), allocatable :: mimicsplus_tau_k(:)
+         
+         !ECW adding mycorrhoiza parameter:
+         real(r8), allocatable :: mimicsplus_k_myc_som(:)   !'Turnover rate for Mycorrhiza', 'units': 'h⁻1'
+         real(r8), allocatable :: mimicsplus_k_mo(:)        ! 'Mycorrhizal decay rate', 'units': 'm²gC⁻¹hr⁻¹'
+         real(r8), allocatable :: mimicsplus_vmax_myc(:)    ! 'Max. mycorrhizal uptake up inorg. N', 'units': 'g x g⁻¹h⁻¹'
+         real(r8), allocatable :: mimicsplus_k_m_emyc(:)    ! 'Half saturation constant of ectomycorrhizal uptake of inorg N', 'units': 'gNm⁻²'
+         real(r8), allocatable :: mimicsplus_mge_ecm(:)     ! 'Microbial growth efficiency (mg/mg) for ectomycorrhiza ', 'units': 'unitless'
+         real(r8), allocatable :: mimicsplus_mge_am(:)      ! 'Growth efficiency of arbuscular mycorrhiza ', 'units': 'unitless'
+         real(r8), allocatable :: mimicsplus_r_myc(:)       ! 'Mycorrhizal modifier', 'units': 'unitless'
+         real(r8), allocatable :: mimicsplus_fphys_ecm(:)   ! 'Fraction ectomycorrhizal necromass into physically protected soil organic matter pool', 'units': 'unitless'
+         real(r8), allocatable :: mimicsplus_fchem_ecm(:)   ! 'Fraction ectomycorrhizal necromass into chemically protected soil organic matter pool', 'units': 'unitless'
+         real(r8), allocatable :: mimicsplus_tau_ecm(:)     ! 'Fraction ectomycorrhizal necromass into avaliable soil organic matter pool', 'units': 'unitless'
+         real(r8), allocatable :: mimicsplus_fphys_am(:)    ! 'Fraction arbuscular mycorrhizal necromass into physically protected soil organic matter pool', 'units': 'unitless'
+         real(r8), allocatable :: mimicsplus_fchem_am(:)    ! 'Fraction arbuscular mycorrhizal necromass into chemically protected soil organic matter pool', 'units': 'unitless'
+         real(r8), allocatable :: mimicsplus_tau_am(:)      ! 'Fraction arbuscular mycorrhizal necromass into avaliable soil organic matter pool', 'units': 'unitless'
+         real(r8), allocatable :: mimicsplus_cn_myc(:)      ! 'Optimal CN ratio for mycorrhizal fungi', 'units': 'unitless'
+         
+         !add the new mycorrhiza parameter
       end type params_type
       !
       type(params_type), private :: params_inst
@@ -217,8 +239,7 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
     
     contains
     
-      ! B- Parameters are read in from parameter file:
-      ! B- Parameters for mycorrhiza & inorganic nitrogen have to be added here & in file
+      ! Parameters are read in from parameter file:
       !-----------------------------------------------------------------------
       subroutine readParams ( ncid )
         !
@@ -390,14 +411,78 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
         params_inst%mimicsplus_cn_k = tempr
     
     
-        ! B- How to: new parameters:
-        ! copy code & insert how parameter is called in parameter file:
+        !ECW add new parameters also heres:
     
-        ! tString='name_parameter'
-        ! call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-        ! if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-        ! params_inst%name_parameter = tempr
-    
+        tString='mimicsplus_k_myc_som'
+        call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+        if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+        params_inst%mimicsplus_k_myc_som = tempr
+
+        tString='mimicsplus_k_mo'
+        call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+        if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+        params_inst%mimicsplus_k_mo = tempr
+
+        tString='mimicsplus_vmax_myc'
+        call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+        if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+        params_inst%mimicsplus_vmax_myc = tempr
+
+        tString='mimicsplus_k_m_emyc'
+        call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+        if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+        params_inst%mimicsplus_k_m_emyc = tempr
+
+        tString='mimicsplus_mge_ecm'
+        call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+        if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+        params_inst%mimicsplus_mge_ecm = tempr
+
+        tString='mimicsplus_mge_am'
+        call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+        if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+        params_inst%mimicsplus_mge_am = tempr
+
+        tString='mimicsplus_r_myc'
+        call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+        if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+        params_inst%mimicsplus_r_myc = tempr
+
+        tString='mimicsplus_fphys_ecm'
+        call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+        if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+        params_inst%mimicsplus_fphys_ecm = tempr
+
+        tString='mimicsplus_fchem_ecm'
+        call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+        if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+        params_inst%mimicsplus_fchem_ecm = tempr
+
+        tString='mimicsplus_tau_ecm'
+        call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+        if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+        params_inst%mimicsplus_tau_ecm = tempr
+
+        tString='mimicsplus_fphys_am'
+        call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+        if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+        params_inst%mimicsplus_fphys_am = tempr
+
+        tString='mimicsplus_fchem_am'
+        call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+        if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+        params_inst%mimicsplus_fchem_am = tempr
+
+        tString='mimicsplus_tau_am'
+        call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+        if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+        params_inst%mimicsplus_tau_am = tempr
+
+        tString='mimicsplus_cn_myc'
+        call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+        if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+        params_inst%mimicsplus_cn_myc = tempr
+   
       end subroutine readParams
     
     
@@ -469,8 +554,8 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
              is_metabolic                   => decomp_cascade_con%is_metabolic                       , & ! Output: [logical           (:)     ]  TRUE => pool is metabolic material                        
              is_cellulose                   => decomp_cascade_con%is_cellulose                       , & ! Output: [logical           (:)     ]  TRUE => pool is cellulose                                 
              is_lignin                      => decomp_cascade_con%is_lignin                          , & ! Output: [logical           (:)     ]  TRUE => pool is lignin                                    
-             spinup_factor                  => decomp_cascade_con%spinup_factor                        & ! Output: [real(r8)          (:)     ]  factor for AD spinup associated with each pool           
-    
+             spinup_factor                  => decomp_cascade_con%spinup_factor                      , & ! Output: [real(r8)          (:)     ]  factor for AD spinup associated with each pool           
+             is_mycorrhiza                  => decomp_cascade_con%is_mycorrhiza                        & ! Output: [logical           (:)     ]  TRUE => pool is mycorrhiza
              )
     
           allocate(desorp(bounds%begc:bounds%endc,1:nlevdecomp))
@@ -579,6 +664,7 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
           is_litter(i_met_lit) = .true.
           is_soil(i_met_lit) = .false.
           is_cwd(i_met_lit) = .false.
+          is_mycorrhiza(i_met_lit) = .false. 
           initial_cn_ratio(i_met_lit) = 10._r8  ! 90 in BGC; not used in MIMICS
           initial_stock(i_met_lit) = params_inst%mimicsplus_initial_Cstocks(i_met_lit)
           is_metabolic(i_met_lit) = .true.
@@ -595,6 +681,7 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
           is_litter(i_str_lit) = .true.
           is_soil(i_str_lit) = .false.
           is_cwd(i_str_lit) = .false.
+          is_mycorrhiza(i_str_lit) = .false. 
           initial_cn_ratio(i_str_lit) = 10._r8  ! 90 in BGC; not used in MIMICS
           initial_stock(i_str_lit) = params_inst%mimicsplus_initial_Cstocks(i_str_lit)
           is_metabolic(i_str_lit) = .false.
@@ -621,6 +708,7 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
           is_litter(i_avl_som) = .false.
           is_soil(i_avl_som) = .true.
           is_cwd(i_avl_som) = .false.
+          is_mycorrhiza(i_avl_som) = .false. 
           initial_cn_ratio(i_avl_som) = 10._r8  ! cn_s1 in BGC; not used in MIMICS
           initial_stock(i_avl_som) = params_inst%mimicsplus_initial_Cstocks(i_avl_som)
           is_metabolic(i_avl_som) = .false.
@@ -637,6 +725,7 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
           is_litter(i_chem_som) = .false.
           is_soil(i_chem_som) = .true.
           is_cwd(i_chem_som) = .false.
+          is_mycorrhiza(i_chem_som) = .false. 
           initial_cn_ratio(i_chem_som) = 10._r8  ! cn_s2 in BGC; not used in MIMICS
           initial_stock(i_chem_som) = params_inst%mimicsplus_initial_Cstocks(i_chem_som)
           is_metabolic(i_chem_som) = .false.
@@ -653,6 +742,7 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
           is_litter(i_phys_som) = .false.
           is_soil(i_phys_som) = .true.
           is_cwd(i_phys_som) = .false.
+          is_mycorrhiza(i_phys_som) = .false. 
           initial_cn_ratio(i_phys_som) = 10._r8  ! cn_s3 in BGC; not used in MIMICS
           initial_stock(i_phys_som) = params_inst%mimicsplus_initial_Cstocks(i_phys_som)
           is_metabolic(i_phys_som) = .false.
@@ -669,6 +759,7 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
           is_litter(i_cop_mic) = .false.
           is_soil(i_cop_mic) = .false.
           is_cwd(i_cop_mic) = .false.
+          is_mycorrhiza(i_cop_mic) = .false. 
           initial_cn_ratio(i_cop_mic) = 10._r8  ! MIMICS may use this
           initial_stock(i_cop_mic) = params_inst%mimicsplus_initial_Cstocks(i_cop_mic)
           is_metabolic(i_cop_mic) = .false.
@@ -684,18 +775,54 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
           is_microbe(i_oli_mic) = .true.
           is_litter(i_oli_mic) = .false.
           is_soil(i_oli_mic) = .false.
-          is_cwd(i_oli_mic) = .false. !this is a catogory, invent new catogory for mycorrhiza!!!!!!!_____
-          initial_cn_ratio(i_oli_mic) = 10._r8  ! MIMICS may use this
+          is_cwd(i_oli_mic) = .false.
+          is_mycorrhiza(i_oli_mic) = .false. 
+          initial_cn_ratio(i_oli_mic) = 10._r8
           initial_stock(i_oli_mic) = params_inst%mimicsplus_initial_Cstocks(i_oli_mic)
           is_metabolic(i_oli_mic) = .false.
           is_cellulose(i_oli_mic) = .false.
           is_lignin(i_oli_mic) = .false.
+
+          i_ecm_myc = i_oli_mic + 1                                                     ! Ectomycorrhiza
+          floating_cn_ratio_decomp_pools(i_ecm_myc) = .true.
+          decomp_cascade_con%decomp_pool_name_restart(i_ecm_myc) = 'myc1'
+          decomp_cascade_con%decomp_pool_name_history(i_ecm_myc) = 'MYC_ECM'
+          decomp_cascade_con%decomp_pool_name_long(i_ecm_myc) = 'ectomycorrhiza'
+          decomp_cascade_con%decomp_pool_name_short(i_ecm_myc) = 'MYC1'
+          is_microbe(i_ecm_myc) = .false.
+          is_litter(i_ecm_myc) = .false.
+          is_soil(i_ecm_myc) = .false.
+          is_cwd(i_ecm_myc) = .false.
+          is_mycorrhiza(i_ecm_myc) = .true.
+          initial_cn_ratio(i_ecm_myc) = 10._r8
+          initial_stock(i_ecm_myc) = params_inst%mimicsplus_initial_Cstocks(i_ecm_myc)
+          is_metabolic(i_ecm_myc) = .false.
+          is_cellulose(i_ecm_myc) = .false.
+          is_lignin(i_ecm_myc) = .false.
+
+          i_am_myc = i_ecm_myc + 1                                                       ! Arbuscular Mycorrhiza
+          floating_cn_ratio_decomp_pools(i_am_myc) = .true.
+          decomp_cascade_con%decomp_pool_name_restart(i_am_myc) = 'myc2'
+          decomp_cascade_con%decomp_pool_name_history(i_am_myc) = 'MYC_AM'
+          decomp_cascade_con%decomp_pool_name_long(i_am_myc) = 'arbuscular mycorrhiza '
+          decomp_cascade_con%decomp_pool_name_short(i_am_myc) = 'MYC2'
+          is_microbe(i_am_myc) = .false.
+          is_litter(i_am_myc) = .false.
+          is_soil(i_am_myc) = .false.
+          is_cwd(i_am_myc) = .false. 
+          is_mycorrhiza(i_am_myc) = .true. !I invented this new catogory, for mycorrhiza! 
+          initial_cn_ratio(i_am_myc) = 10._r8  ! MIMICS may use this
+          initial_stock(i_am_myc) = params_inst%mimicsplus_initial_Cstocks(i_am_myc)
+          is_metabolic(i_am_myc) = .false.
+          is_cellulose(i_am_myc) = .false.
+          is_lignin(i_am_myc) = .false.
+          
+          !ECW maybe I have to do sth in SoilBiogeochemCarbonFluxType, not sure maybe thats just for heterotropic respiration
     
-          ! B- HERE I HAVE TO ADD ADDITIONAL POOLS (I think)
     
           if (.not. use_fates) then
              ! CWD
-             i_cwd = i_oli_mic + 1
+             i_cwd = i_am_myc + 1
              floating_cn_ratio_decomp_pools(i_cwd) = .true.
              decomp_cascade_con%decomp_pool_name_restart(i_cwd) = 'cwd'
              decomp_cascade_con%decomp_pool_name_history(i_cwd) = 'CWD'
@@ -728,6 +855,10 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
           ! micr1,2
           spinup_factor(i_cop_mic) = 1._r8
           spinup_factor(i_oli_mic) = 1._r8
+
+          !ecm, am
+          spinup_factor(i_ecm_myc) = 1._r8
+          spinup_factor(i_am_myc) = 1._r8
     
           ! B- also add pools here
     
@@ -737,8 +868,7 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
           end if
     
           !----------------  list of transitions and their time-independent coefficients  ---------------!
-          ! B- What are those numbers 1-14?
-          ! Fluxes in beteen pools, also Nitrogen?
+          
           i_l1m1 = 1
           decomp_cascade_con%cascade_step_name(i_l1m1) = 'L1M1'
           cascade_donor_pool(i_l1m1) = i_met_lit
@@ -822,12 +952,46 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
           cascade_donor_pool(i_m2s3) = i_oli_mic
           cascade_receiver_pool(i_m2s3) = i_phys_som
           nue_decomp_cascade(i_m2s3) = 1.0_r8
-    
-          ! B- add fluxes
-          ! B- pay attention to numbers
-    
+
+          i_myc1s1 = 15                                                       ! EcM to SOMa, necromass
+          decomp_cascade_con%cascade_step_name(i_myc1s1) = 'MYC1S1'
+          cascade_donor_pool(i_myc1s1) = i_ecm_myc
+          cascade_receiver_pool(i_myc1s1) = i_avl_som
+          nue_decomp_cascade(i_myc1s1) = 1.0_r8
+
+          i_myc1s2 = 16                                                       ! EcM to SOMc, necromass
+          decomp_cascade_con%cascade_step_name(i_myc1s2) = 'MYC1S2'
+          cascade_donor_pool(i_myc1s2) = i_ecm_myc
+          cascade_receiver_pool(i_myc1s2) = i_chem_som
+          nue_decomp_cascade(i_myc1s2) = 1.0_r8
+
+          i_myc1s3 = 17                                                       ! EcM to SOMp, necromass
+          decomp_cascade_con%cascade_step_name(i_myc1s3) = 'MYC1S3'
+          cascade_donor_pool(i_myc1s3) = i_ecm_myc
+          cascade_receiver_pool(i_myc1s3) = i_phys_som
+          nue_decomp_cascade(i_myc1s3) = 1.0_r8
+
+          i_myc2s1 = 18                                                       ! AM to SOMa, necromass
+          decomp_cascade_con%cascade_step_name(i_myc2s1) = 'MYC2S1'
+          cascade_donor_pool(i_myc2s1) = i_am_myc
+          cascade_receiver_pool(i_myc2s1) = i_avl_som
+          nue_decomp_cascade(i_myc2s1) = 1.0_r8
+
+          i_myc2s2 = 19                                                       ! AM to SOMc, necromass
+          decomp_cascade_con%cascade_step_name(i_myc2s2) = 'MYC2S2'
+          cascade_donor_pool(i_myc2s2) = i_am_myc
+          cascade_receiver_pool(i_myc2s2) = i_chem_som
+          nue_decomp_cascade(i_myc2s2) = 1.0_r8
+
+          i_myc2s3 = 20                                                       ! AM to SOMp, necromass
+          decomp_cascade_con%cascade_step_name(i_myc1s3) = 'MYC2S3'
+          cascade_donor_pool(i_myc2s3) = i_am_myc
+          cascade_receiver_pool(i_myc2s3) = i_phys_som
+          nue_decomp_cascade(i_myc2s3) = 1.0_r8
+
+         
           if (.not. use_fates) then
-             i_cwdl2 = 15
+             i_cwdl2 = 21
              decomp_cascade_con%cascade_step_name(i_cwdl2) = 'CWDL2'
              cascade_donor_pool(i_cwdl2) = i_cwd
              cascade_receiver_pool(i_cwdl2) = i_str_lit
@@ -1181,7 +1345,7 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
                 c = filter_bgc_soilc(fc)
                 ! Using fixed e-folding depth as in
                 ! SoilBiogeochemDecompCascadeBGCMod.F90
-    !           depth_scalar(c,j) = exp(-zsoi(j) / decomp_depth_efolding)
+                ! depth_scalar(c,j) = exp(-zsoi(j) / decomp_depth_efolding)
                 depth_scalar(c,j) = 1.0_r8
              end do
           end do
@@ -1266,9 +1430,9 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
              !      replace pool_to_litter terms with ann or other long term mean
              !      in CNVegCarbonFluxType.
              fmet = mimicsplus_fmet_p1 * (mimicsplus_fmet_p2 - mimicsplus_fmet_p3 * &
-                min(mimicsplus_fmet_p4, ligninNratioAvg(c)))
+               min(mimicsplus_fmet_p4, ligninNratioAvg(c)))
              tau_mod = min(mimicsplus_tau_mod_max, max(mimicsplus_tau_mod_min, &
-                sqrt(mimicsplus_tau_mod_factor * annsum_npp_col_scalar)))
+               sqrt(mimicsplus_tau_mod_factor * annsum_npp_col_scalar)))
     
              ! tau_m1 is tauR and tau_m2 is tauK in Wieder et al. 2015
              ! tau ends up in units of per hour but is expected
