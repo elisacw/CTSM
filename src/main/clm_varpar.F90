@@ -85,6 +85,9 @@ module clm_varpar
   integer, public            :: i_cop_mic     = -9    ! index of copiotrophic microbial pool; overwritten in SoilBiogeochemDecompCascade*Mod | -9 is a placeholder for pools
   integer, public            :: i_oli_mic     = -9    ! index of oligotrophic microbial pool; overwritten in SoilBiogeochemDecompCascade*Mod
   
+  integer, public            :: i_phys_som    = -9    ! index of physically protected soil organic matter pool
+  integer, public            :: i_chem_som    = -9    ! index of chemically protected soil organic matter pool
+  integer, public            :: i_avl_som     = -9    ! index of availible soil organic matter pool
   integer, public            :: i_ecm_myc     = -9    ! index of ecto mycorrhizal pool; overwritten in SoilBiogeochemDecompCascade*Mod !ECW
   integer, public            :: i_am_myc      = -9    ! index of abruscular pool; overwritten in SoilBiogeochemDecompCascade*Mod
   

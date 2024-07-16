@@ -21,6 +21,7 @@ module CNFUNMod
   use shr_kind_mod                    , only : r8 => shr_kind_r8
   use shr_log_mod                     , only : errMsg => shr_log_errMsg
   use clm_varctl                      , only : iulog
+  use clm_varpar                      , only : i_phys_som, i_chem_som, i_avl_som, i_ecm_myc, i_am_myc
   use PatchType                       , only : patch
   use ColumnType                      , only : col
   use pftconMod                       , only : pftcon, npcropmin
@@ -35,8 +36,10 @@ module CNFUNMod
   use CNVegnitrogenfluxType           , only : cnveg_nitrogenflux_type
   use SoilBiogeochemNitrogenFluxType  , only : soilbiogeochem_nitrogenflux_type
   use SoilBiogeochemNitrogenStateType  , only : soilbiogeochem_nitrogenstate_type
-
+  
   use SoilBiogeochemCarbonFluxType    , only : soilbiogeochem_carbonflux_type
+  use SoilBiogeochemCarbonStateType   , only : soilbiogeochem_carbonstate_type
+  use SoilBiogeochemDecompCascadeConType, only : mimicsplus_decomp, decomp_method
   use WaterStateBulkType                  , only : waterstatebulk_type
   use WaterFluxBulkType                   , only : waterfluxbulk_type
   use TemperatureType                 , only : temperature_type
@@ -208,7 +211,7 @@ module CNFUNMod
        &,cnveg_nitrogenflux_inst                ,&
        & soilbiogeochem_nitrogenflux_inst&
        &,soilbiogeochem_carbonflux_inst,canopystate_inst,&
-       & soilbiogeochem_nitrogenstate_inst)
+       & soilbiogeochem_nitrogenstate_inst,soilbiogeochem_carbonstate_inst)
 
 ! !USES:
    use clm_time_manager, only : get_step_size_real, get_curr_date
@@ -238,6 +241,7 @@ module CNFUNMod
    type(soilbiogeochem_carbonflux_type)    , intent(inout) :: soilbiogeochem_carbonflux_inst 
    type(canopystate_type)                  , intent(inout) :: canopystate_inst  
    type(soilbiogeochem_nitrogenstate_type) , intent(inout) :: soilbiogeochem_nitrogenstate_inst
+   type(soilbiogeochem_carbonstate_type) , intent(inout) :: soilbiogeochem_carbonstate_inst
   !
   ! !LOCAL VARIABLES:
   ! local pointers to implicit in arrays
@@ -712,8 +716,9 @@ module CNFUNMod
          !   liquid water (kg/m2) (new) (-nlevsno+1:nlevgrnd)
          t_soisno               => temperature_inst%t_soisno_col                                 , & ! Input:   [real(r8) (:,:)]
          !   soil temperature (Kelvin)  (-nlevsno+1:nlevgrnd)
-         crootfr                => soilstate_inst%crootfr_patch                                    & ! Input:   [real(r8) (:,:)]
-         !   fraction of roots for carbon in each soil layer  (nlevgrnd)
+         crootfr                => soilstate_inst%crootfr_patch                                  ,  & ! Input:   [real(r8) (:,:)]  fraction of roots for carbon in each soil layer  (nlevgrnd)
+         decomp_cpools_vr                 =>    soilbiogeochem_carbonstate_inst%decomp_cpools_vr_col, & ! Input:  [real(r8) (:,:,:) ]  (gC/m3)  vertically-resolved decomposing (litter, cwd, soil) c pools
+         decomp_npools_vr                 =>    soilbiogeochem_nitrogenstate_inst%decomp_npools_vr_col & ! Input:  [real(r8) (:,:,:) ]  (gC/m3)  vertically-resolved decomposing (litter, cwd, soil) N pools
          )
   !--------------------------------------------------------------------
   !-----------
@@ -1083,7 +1088,9 @@ stp:  do istp = ecm_step, am_step        ! TWO STEPS
             !          Costs of active uptake.
             !--------------------------------------------------------------------
             !------------
-            !------Mycorrhizal Uptake Cost-----------------!
+            !ECW This should be the "first eqaution" in FUN description: Ncost activej = kn,active/Nsminj + kc,actice/crootj
+            !ECW Calculationg the cost of N uptake in g/C for this pathway
+            !------Mycorrhizal Uptake Cost-----------------
             do j = 1,nlevdecomp
                rootc_dens_step            = rootc_dens(p,j) *  permyc(p,istp)
                costNit(j,icostActiveNO3)  = fun_cost_active(sminn_no3_layer_step(p,j,istp) &
@@ -1141,7 +1148,8 @@ fix_loop:   do FIX =plants_are_fixing, plants_not_fixing !loop around percentage
                   ! Method changed from FUN-resistors method to a method which 
                   ! allocates fluxs based on conductance. rosief
                   !----------!
-             
+
+                  !ECW This is "Resolving N costs across simulatneous uptake streams" in FUN description
                   ! Sum the conductances             
                   total_N_conductance  = total_N_conductance + 1._r8/ &
                                          cost_active_no3(p,j) + 1._r8/cost_active_nh4(p,j) &
@@ -1156,9 +1164,9 @@ fix_loop:   do FIX =plants_are_fixing, plants_not_fixing !loop around percentage
                 do j = 1, nlevdecomp     
                   ! Calculate npp allocation to pathways proportional to their exchange rate (N/C) 
                 
-                  npp_frac_to_active_nh4(j) = (1._r8/cost_active_nh4(p,j)) / total_N_conductance
-                  npp_frac_to_nonmyc_nh4(j) = (1._r8/cost_nonmyc_nh4(p,j)) / total_N_conductance
-                  npp_frac_to_active_no3(j) = (1._r8/cost_active_no3(p,j)) / total_N_conductance
+                  npp_frac_to_active_nh4(j) = (1._r8/cost_active_nh4(p,j)) / total_N_conductance!ECW this variable as the maximum carbon to active pathways?
+                  npp_frac_to_nonmyc_nh4(j) = (1._r8/cost_nonmyc_nh4(p,j)) / total_N_conductance 
+                  npp_frac_to_active_no3(j) = (1._r8/cost_active_no3(p,j)) / total_N_conductance!ECW
                   npp_frac_to_nonmyc_no3(j) = (1._r8/cost_nonmyc_no3(p,j)) / total_N_conductance
                   if(FIX==plants_are_fixing)then
                     npp_frac_to_fixation(j)   = (1.0_r8 * 1._r8/cost_fix(p,j)) / total_N_conductance
@@ -1166,20 +1174,20 @@ fix_loop:   do FIX =plants_are_fixing, plants_not_fixing !loop around percentage
                     npp_frac_to_fixation(j)   = 0.0_r8 
                   end if
                      
-                  ! Calculate hypothetical N uptake from each source   
+                  ! Calculate hypothetical N uptake from each source
                   if(FIX==plants_are_fixing)then
                     n_exch_fixation(j)   = npp_frac_to_fixation(j)   / cost_fix(p,j)
                   else
                     n_exch_fixation(j)   = 0.0_r8 
                   end if                   
               
-                  n_exch_active_nh4(j) = npp_frac_to_active_nh4(j) / cost_active_nh4(p,j) 
+                  n_exch_active_nh4(j) = npp_frac_to_active_nh4(j) / cost_active_nh4(p,j) !ECW and this the amount of Nitrogen MIMICS+ gives back?
                   n_exch_nonmyc_nh4(j) = npp_frac_to_nonmyc_nh4(j) / cost_nonmyc_nh4(p,j) 
                   n_exch_active_no3(j) = npp_frac_to_active_no3(j) / cost_active_no3(p,j) 
                   n_exch_nonmyc_no3(j) = npp_frac_to_nonmyc_no3(j) / cost_nonmyc_no3(p,j) 
                
                   ! Total N aquired from one unit of carbon  (N/C)
-                  sum_n_acquired        =  sum_n_acquired  + n_exch_active_nh4(j) +&
+                  sum_n_acquired        =  sum_n_acquired  + n_exch_active_nh4(j) +&      !ECW guess here I have to make sure FUN can access N from MIMICS+
                                         n_exch_nonmyc_nh4(j)+ n_exch_active_no3(j) + n_exch_nonmyc_no3(j)
                                           
                   if(FIX==plants_are_fixing)then
@@ -1279,7 +1287,7 @@ fix_loop:   do FIX =plants_are_fixing, plants_not_fixing !loop around percentage
                      ! RF How much of this NPP carbon do we allocate to the different pathways? fraction x gC/m2/s?
                      ! Could this code now be put in a matrix? 
 
-                     npp_to_active_nh4(j) = npp_frac_to_active_nh4(j) * dNPP
+                     npp_to_active_nh4(j) = npp_frac_to_active_nh4(j) * dNPP !ECW this goes to MIMICS+ in repones to ccost
                      npp_to_nonmyc_nh4(j) = npp_frac_to_nonmyc_nh4(j) * dNPP
                      npp_to_active_no3(j) = npp_frac_to_active_no3(j) * dNPP
                      npp_to_nonmyc_no3(j) = npp_frac_to_nonmyc_no3(j) * dNPP 
@@ -1290,7 +1298,7 @@ fix_loop:   do FIX =plants_are_fixing, plants_not_fixing !loop around percentage
                        npp_to_fixation(j) = 0.0_r8
                      end if    
 
-                     n_from_active_nh4(j) = npp_to_active_nh4(j)  / cost_active_nh4(p,j)
+                     n_from_active_nh4(j) = npp_to_active_nh4(j)  / cost_active_nh4(p,j) !ECW nitrogen return flux
                      n_from_nonmyc_nh4(j) = npp_to_nonmyc_nh4(j)  / cost_nonmyc_nh4(p,j)
                      n_from_active_no3(j) = npp_to_active_no3(j)  / cost_active_no3(p,j)
                      n_from_nonmyc_no3(j) = npp_to_nonmyc_no3(j)  / cost_nonmyc_no3(p,j)
@@ -1302,7 +1310,8 @@ fix_loop:   do FIX =plants_are_fixing, plants_not_fixing !loop around percentage
                      end if
                                                                      
                  end do
-              
+
+                 !ECW either this is important or I have to turn it off and MIMICS+ does it??? 
                  ! did we exceed the limits of uptake for any of these pools?
                  do j = 1,nlevdecomp    
                   
@@ -1735,7 +1744,7 @@ fix_loop:   do FIX =plants_are_fixing, plants_not_fixing !loop around percentage
 
    !  ------------------ Free uptake ------------------ 
    free_n_retrans  = max(falling_leaf_n -  (falling_leaf_c/min_falling_leaf_cn),0.0_r8)
-   falling_leaf_n = falling_leaf_n -  free_n_retrans 
+   falling_leaf_n = falling_leaf_n -  free_n_retrans  
 
    ! ------------------ Initial CN ratio and costs ------------------!  
    falling_leaf_cn      = falling_leaf_c/falling_leaf_n 

@@ -380,7 +380,7 @@ contains
                       waterfluxbulk_inst,temperature_inst,soilstate_inst,cnveg_state_inst,cnveg_carbonstate_inst,&
                       cnveg_carbonflux_inst,cnveg_nitrogenstate_inst,cnveg_nitrogenflux_inst                ,&
                       soilbiogeochem_nitrogenflux_inst,soilbiogeochem_carbonflux_inst,canopystate_inst,      &
-                      soilbiogeochem_nitrogenstate_inst)
+                      soilbiogeochem_nitrogenstate_inst, soilbiogeochem_carbonstate_inst)
             call p2c(bounds, nlevdecomp, &
                       cnveg_nitrogenflux_inst%sminn_to_plant_fun_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp),&
                       soilbiogeochem_nitrogenflux_inst%sminn_to_plant_fun_vr_col(bounds%begc:bounds%endc,1:nlevdecomp), &
@@ -758,7 +758,7 @@ contains
                       waterfluxbulk_inst,temperature_inst,soilstate_inst,cnveg_state_inst,cnveg_carbonstate_inst,&
                       cnveg_carbonflux_inst,cnveg_nitrogenstate_inst,cnveg_nitrogenflux_inst                ,&
                       soilbiogeochem_nitrogenflux_inst,soilbiogeochem_carbonflux_inst,canopystate_inst,      &
-                      soilbiogeochem_nitrogenstate_inst)
+                      soilbiogeochem_nitrogenstate_inst, soilbiogeochem_carbonstate_inst)
                       
             ! sminn_to_plant_fun is output of actual N uptake from FUN
             call p2c(bounds,nlevdecomp, &

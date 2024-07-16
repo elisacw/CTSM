@@ -3,25 +3,23 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
   !-----------------------------------------------------------------------
   ! DESCRIPTION:
 
-  ! Sets the coeffiecients used in the decomposition cascade submodel. 
-
-  ! ECW
+  ! MIMICS+ soil decomposition model based on Aas et al (2023)
+  
   ! This module is based on: SoilBiogeochemDecompCascadeMIMICSMod 
-  ! It is modified to couple MIMICS+ (Aas et al. 2023) into CLMv
-
-  ! Changes:
-  ! - searching through modules and whereever an option for mimics was, created same option for mimicsplus
-  ! - renaming mimics to mimicsplus inside SoilBiogeochemDecompCascadeMIMICSplusMod
+  ! Changes
+  ! - Creating the option to use mimicsplus as a soil decomposition method
   ! - created folders for century, mimicsplus and mimicsplusFatesCold in: /ctsm/cime_config/testdefs/testmods_dirs/clm/
+
+  ! Additions inside SoilBiogeochemDecompCascadeMIMICSplusMod
+  ! - EcM and AM pools
+  ! - modified parameter equations for soil microbes
+  ! - added parameters / parameter equations for mycorrhiza
+  ! - relpacing w_d_o_scalar with moisture function 
+  ! - TO DO add mycorrhizal modifier
 
   ! Parameters
   ! - new parameter file including updated MIMICS parameters & new parameters, saved under /cluster/home/elisacw/parameter_mimicsplus
   ! - added read in method for new created parameters in SoilBiogeochemDecompCascadeMIMICSplusMod
-
-  ! Adding EcM and AM pools
-  ! - 
-
-  ! relpacing w_d_o_scalar with moisture function 
 
 
   ! 
@@ -30,7 +28,8 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
   use shr_const_mod                      , only : SHR_CONST_TKFRZ
   use shr_log_mod                        , only : errMsg => shr_log_errMsg
   use clm_varpar                         , only : nlevdecomp, ndecomp_pools_max
-  use clm_varpar                         , only : i_met_lit, i_cop_mic, i_oli_mic, i_cwd, i_ecm_myc, i_am_myc
+  use clm_varpar                         , only : i_met_lit, i_cop_mic, i_oli_mic, i_cwd
+  use clm_varpar                         , only : i_phys_som, i_chem_som, i_avl_som, i_ecm_myc, i_am_myc
   use clm_varpar                         , only : i_litr_min, i_litr_max, i_cwdl2
   use clm_varctl                         , only : iulog, spinup_state, anoxia, use_lch4, use_fates
   use clm_varcon                         , only : zsoi
@@ -51,8 +50,11 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
   use SoilBiogeochemStateType            , only : get_spinup_latitude_term
   use CLMFatesInterfaceMod               , only : hlm_fates_interface_type
   use WaterStateBulkType                 , only : waterstatebulk_type
-
-  !
+  !use CNFUNMod                           , only : npp_to_active_nh4, npp_to_active_no3 ! Carbon from NPP (FUN) allocated to active NH4 & NO3 uptake
+  !use CNFUNMod                           , only : npp_frac_to_active_nh4, npp_frac_to_active_no3 ! Max amount of carbon allocated to active NH4 & NO3 uptake !ASKELIN
+  !use SoilBiogeochemNitrogenStateType    , only : soilbiogeochem_nitrogenstate_type
+  !use SoilBiogeochemNitrogenStateType    , only : smin_nh4_col, smin_no3_col                     ! col (gN/m2) soil mineral NH4/NO3 pool 
+  
   implicit none
   private
   !
@@ -71,10 +73,10 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
 
 
   !PUBLIC MEMBER FUNCTIONS:
-  public :: readParams                      ! Read in parameters from params file
+  public :: readParams                          ! Read in parameters from params file
   public :: init_decompcascade_mimicsplus       ! Initialization
   public :: decomp_rates_mimicsplus             ! Figure out decomposition rates
-  private :: r_moist   ! calculate moisture modifier according to CORPSE
+  private :: r_moist                            ! calculates moisture modifier according to CORPSE
   !
   ! !PUBLIC DATA MEMBERS 
   !
@@ -162,14 +164,14 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
   type, private :: params_type
       real(r8) :: mimicsplus_nue_into_mic  ! microbial N use efficiency for N fluxes
       real(r8) :: mimicsplus_desorpQ10
-      real(r8) :: mimicsplus_densdep  ! exponent controling the density dependence of microbial turnover
+      real(r8) :: mimicsplus_densdep       ! exponent controling the density dependence of microbial turnover
       real(r8) :: mimicsplus_tau_mod_factor  ! (1 / tauModDenom) from testbed code
       real(r8) :: mimicsplus_tau_mod_min
       real(r8) :: mimicsplus_tau_mod_max
-      real(r8) :: mimicsplus_ko_r
-      real(r8) :: mimicsplus_ko_k
-      real(r8) :: mimicsplus_cn_r  ! C:N of MICr
-      real(r8) :: mimicsplus_cn_k  ! C:N of MICk
+      real(r8) :: mimicsplus_ko_r  ! increase in half-saturation constant for oxidation (SOMc -> SOMa) microbial bacteria
+      real(r8) :: mimicsplus_ko_k  ! increase in half-saturation constant for oxidation (SOMc -> SOMa) microbial fungi
+      real(r8) :: mimicsplus_cn_r  ! C:N of microbial bacteria
+      real(r8) :: mimicsplus_cn_k  ! C:N of microbial fungi
       real(r8) :: mimicsplus_cn_mod_num  ! adjusts microbial CN based on fmet
       real(r8) :: mimicsplus_t_soi_ref  ! reference soil temperature (degC)
       real(r8) :: mimicsplus_initial_Cstocks_depth  ! Soil depth for initial C stocks for a cold-start (m)
@@ -201,7 +203,7 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
       real(r8), allocatable :: mimicsplus_tau_r(:)
       real(r8), allocatable :: mimicsplus_tau_k(:)
       
-      !ECW Mycorrhoiza parameter:
+      !Mycorrhoiza parameter:
       real(r8) :: mimicsplus_k_myc_som   ! 'Turnover rate for Mycorrhiza', 'units': 'h⁻1'
       real(r8) :: mimicsplus_k_mo        ! 'Mycorrhizal decay rate', 'units': 'm²gC⁻¹hr⁻¹'
       real(r8) :: mimicsplus_vmax_myc    ! 'Max. mycorrhizal uptake up inorg. N', 'units': 'g x g⁻¹h⁻¹'
@@ -398,9 +400,6 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
       if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
       params_inst%mimicsplus_cn_k = tempr
 
-
-      !ECW add new parameters:
-
       tString='mimicsplus_k_myc_som'
       call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
       if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
@@ -473,11 +472,6 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
 
   end subroutine readParams  
 
-
-  !ECW in this subroutine:
-  ! - Pools are created
-  ! - Direction of transitions in between pools are fixed
-
   !-----------------------------------------------------------------------
   subroutine init_decompcascade_mimicsplus(bounds, soilbiogeochem_state_inst, soilstate_inst)
       !
@@ -507,9 +501,9 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
       real(r8) :: mimicsplus_nue_into_mic
       real(r8) :: mimicsplus_p_scalar_p1     !physical protection scalar
       real(r8) :: mimicsplus_p_scalar_p2
-      real(r8) :: mimicsplus_fphys_r_p1      !SAPb to SOMp
+      real(r8) :: mimicsplus_fphys_r_p1      !microbial bacteria -> SOMp
       real(r8) :: mimicsplus_fphys_r_p2
-      real(r8) :: mimicsplus_fphys_k_p1      !SAPf to SOMp
+      real(r8) :: mimicsplus_fphys_k_p1      !microbial fungi -> SOMp
       real(r8) :: mimicsplus_fphys_k_p2
       real(r8) :: mimicsplus_desorp_p1       !Desorption rate !ECW parameters and equation needs to be edited
       real(r8) :: mimicsplus_desorp_p2
@@ -573,12 +567,6 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
         rf_l2m2 = 1.0_r8 - params_inst%mimicsplus_mge(5)
         rf_s1m2 = 1.0_r8 - params_inst%mimicsplus_mge(6)
 
-        !ECW set respiration fraction for fluxes between vegetation and mycorhizza 
-        !There is respiration between:
-        !Veg & EcM
-        !Veg & AM
-        !Elins code mycmimMof L 676
-
         ! vmod = "old" vmod * av  AND  kmod = ak / "old" kmod
         ! Table B1 Wieder et al. (2015) and MIMICS params file give diff
         ! ak and av values. I used the params file values.
@@ -633,11 +621,11 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
               ! some non-soil columns here that contain cellclay = 1e36.
               clay_frac = pct_to_frac * &
                           dmin1(100.0_r8, cellclay(c,j))  ! conv. % to fraction
-              desorp(c,j) = mimicsplus_desorp_p1 * dexp(mimicsplus_desorp_p2 * clay_frac)  !ECW this function & parameter mimicsplus_desorp needs to be changed!
+              desorp(c,j) = mimicsplus_desorp_p1 * dexp(mimicsplus_desorp_p2 * clay_frac)  
               fphys_m1(c,j) = dmin1(1.0_r8, mimicsplus_fphys_r_p1 * &
-                                            dexp(mimicsplus_fphys_r_p2 * clay_frac))       !ECW parameter equation for SAPb to SOMp
+                                            dexp(mimicsplus_fphys_r_p2 * clay_frac))       !parameter equation for microbial necromass SAPb -> SOMp
               fphys_m2(c,j) = dmin1(1.0_r8, mimicsplus_fphys_k_p1 * &
-                                            dexp(mimicsplus_fphys_k_p2 * clay_frac))       !ECW parameter equation for SAPf to SOMp
+                                            dexp(mimicsplus_fphys_k_p2 * clay_frac))       !parameter equation for microbial necromass SAPf -> SOMp
               p_scalar(c,j) = 1.0_r8 / (mimicsplus_p_scalar_p1 * &
                                       dexp(mimicsplus_p_scalar_p2 * dsqrt(clay_frac)))
             end do
@@ -741,7 +729,7 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
         is_cellulose(i_phys_som) = .false.
         is_lignin(i_phys_som) = .false.
 
-        i_cop_mic = i_phys_som + 1                                                   ! SAP bacteria
+        i_cop_mic = i_phys_som + 1                                                   ! micribial bacteria
         floating_cn_ratio_decomp_pools(i_cop_mic) = .true.
         decomp_cascade_con%decomp_pool_name_restart(i_cop_mic) = 'micr1'
         decomp_cascade_con%decomp_pool_name_history(i_cop_mic) = 'MIC_COP'
@@ -758,7 +746,7 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
         is_cellulose(i_cop_mic) = .false.
         is_lignin(i_cop_mic) = .false.
 
-        i_oli_mic = i_cop_mic + 1                                                     ! SAP fungi
+        i_oli_mic = i_cop_mic + 1                                                     ! microbial fungi
         floating_cn_ratio_decomp_pools(i_oli_mic) = .true.
         decomp_cascade_con%decomp_pool_name_restart(i_oli_mic) = 'micr2'
         decomp_cascade_con%decomp_pool_name_history(i_oli_mic) = 'MIC_OLI'
@@ -776,7 +764,7 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
         is_lignin(i_oli_mic) = .false.
 
         i_ecm_myc = i_oli_mic + 1                                                     ! Ectomycorrhiza
-        floating_cn_ratio_decomp_pools(i_ecm_myc) = .true.
+        floating_cn_ratio_decomp_pools(i_ecm_myc) = .true.                            
         decomp_cascade_con%decomp_pool_name_restart(i_ecm_myc) = 'myc1'
         decomp_cascade_con%decomp_pool_name_history(i_ecm_myc) = 'MYC_ECM'
         decomp_cascade_con%decomp_pool_name_long(i_ecm_myc) = 'ectomycorrhiza'
@@ -809,9 +797,6 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
         is_cellulose(i_am_myc) = .false.
         is_lignin(i_am_myc) = .false.
         
-        !ECW maybe I have to do sth in SoilBiogeochemCarbonFluxType, not sure maybe thats just for heterotropic respiration
-        !Does mycorrhizal respiration goes there then?
-
 
         if (.not. use_fates) then
             ! CWD
@@ -1012,7 +997,7 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
         num_soilp, filter_soilp, clm_fates, &
         soilstate_inst, temperature_inst, cnveg_carbonflux_inst, &
         ch4_inst, soilbiogeochem_carbonflux_inst, waterstatebulk_inst, &
-        soilbiogeochem_state_inst, soilbiogeochem_carbonstate_inst)
+        soilbiogeochem_state_inst, soilbiogeochem_carbonstate_inst) !ASKM soilbiogeochem_nitrogenstate_inst
       !
       ! !DESCRIPTION:
       ! Calculate rates and decomposition pathways for the MIMICS+
@@ -1047,8 +1032,8 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
       real(r8), parameter :: eps = 1.e-6_r8
       real(r8), parameter :: min_modifier = 0.1     ! minimum value in microbial turnover
       real(r8):: frw(bounds%begc:bounds%endc) ! rooting fraction weight
-      real(r8), allocatable:: fr(:,:)         ! column-level rooting fraction by soil depth !EW
-      real(r8), allocatable:: norm_froot_prof(:,:) ! normalized fine root profile !ECW
+      real(r8), allocatable:: fr(:,:)         ! column-level rooting fraction by soil depth
+      real(r8), allocatable:: norm_froot_prof(:,:) ! normalized fine root profile
       real(r8):: min_froot !minimum root fraction in column
       real(r8):: max_froot !maximum root fraction in column
       real(r8):: psi                          ! temporary soilpsi for water scalar
@@ -1075,10 +1060,13 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
       real(r8):: tau_m2  ! Mircobial turnover rate fungi
       real(r8):: tau_myc ! Mycorrhizal turnover rate for EcM & AM
       real(r8):: tau_mod
-      real(r8):: m1_conc  !
-      real(r8):: m2_conc  !
-      real(r8):: myc1_conc  !
-      real(r8):: myc2_conc  !
+      real(r8):: m1_conc       ! Carbon concentration in microbial barteria pool
+      real(r8):: m2_conc       ! Carbon concentration in microbial fungi pool
+      real(r8):: myc1_conc     ! Carbon concentration in ectomycorrhiza pool
+      real(r8):: myc2_conc     ! Carbon concentration in abruscular mycorrhiza pool
+      real(r8):: avl_som_conc  ! Carbon concentration in avaliable SOM pool
+      real(r8):: chem_som_conc ! Carbon concentration in chemically protected SOM pool
+      real(r8):: phys_som_conc ! Carbon concentration in physically protected SOM pool
       real(r8):: term_1  !
       real(r8):: term_2  !
       real(r8):: t_soi_degC
@@ -1141,9 +1129,7 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
       real(r8):: fphys_myc2
 
       real(r8):: fphys_avl       ! desorpion
-      real(r8):: fmyc_phys_avl   ! desorption
       real(r8):: fchem_avl       ! oxidation
-      real(r8):: fmyc_chem_avl   ! oxidation
 
       !--------------------------------------------
 
@@ -1280,11 +1266,12 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
               spinup_geogterm_s3(c) = 1._r8
               spinup_geogterm_m1(c) = 1._r8
               spinup_geogterm_m2(c) = 1._r8
-              spinup_geogterm_myc1(c) = 1._r8 !ECW
-              spinup_geogterm_myc2(c) = 1._r8 !ECW
+              spinup_geogterm_myc1(c) = 1._r8 
+              spinup_geogterm_myc2(c) = 1._r8 
             end do
         endif
 
+        ! root fraction is used for calculating microbial tunrover rate, it functions as a sort of depth profile
         ! get root fraction from patch to column level
         call p2c(bounds, nlevdecomp_full, &
                  froot_prof(bounds%begp:bounds%endp,1:nlevdecomp_full), &
@@ -1449,7 +1436,7 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
         mimicsplus_tau_k_p1 = params_inst%mimicsplus_tau_k(1)
         mimicsplus_tau_k_p2 = params_inst%mimicsplus_tau_k(2)
 
-        !ECW assign parameters 
+        !assign parameters 
         !some parameters have several values in the parameter file:
         !then it has to be specified (x) which one is taken, otherwise just assigned
         mimicsplus_fphys_ecm = params_inst%mimicsplus_fphys_ecm
@@ -1536,16 +1523,6 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
             tau_mod = min(mimicsplus_tau_mod_max, max(mimicsplus_tau_mod_min, &
             sqrt(mimicsplus_tau_mod_factor * annsum_npp_col_scalar)))
 
-            ! tau_m1 is tauR and tau_m2 is tauK in Wieder et al. 2015
-            ! tau ends up in units of per hour but is expected
-            ! in units of per second, so convert here; alternatively
-            ! place the conversion once in w_d_o_scalars
-            !tau_m1 = mimicsplus_tau_r_p1 * exp(mimicsplus_tau_r_p2 * fmet) * tau_mod / &
-            !         secsphr
-            !tau_m2 = mimicsplus_tau_k_p1 * exp(mimicsplus_tau_k_p2 * fmet) * tau_mod / &
-            !         secsphr
-
-
             ! These two get used in SoilBiogeochemPotentialMod.F90
             ! cn(c,i_cop_mic), cn(c,i_oli_mic) are CN_r, CN_k in the testbed code
             ! cn_r, cn_k are CNr, CNk in the testbed code
@@ -1553,19 +1530,12 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
             cn_col(c,i_cop_mic) = mimicsplus_cn_r * sqrt(mimicsplus_cn_mod_num / fmet)
             cn_col(c,i_oli_mic) = mimicsplus_cn_k * sqrt(mimicsplus_cn_mod_num / fmet)
 
-            ! Used in the update of certain pathfrac terms that vary with time
-            ! in the next loop
-            !fchem_m1 = min(1._r8, max(0._r8, mimicsplus_fchem_r_p1 * &                 !ECW parameter equation SAPb&f to SOMc (here 3 values, in MIMICS+ only 2)
-             !       exp(mimicsplus_fchem_r_p2 * fmet) * mimicsplus_fchem_r_p3))
-            !fchem_m2 = min(1._r8, max(0._r8, mimicsplus_fchem_k_p1 * &
-             !       exp(mimicsplus_fchem_k_p2 * fmet) * mimicsplus_fchem_k_p3))
-
+            
             ! Parameter equation microbial necromass to chemically protected SOM
-            ! !ECW changed equation
             fchem_m1 = min(1._r8, max(0._r8, mimicsplus_fchem_r_p1 * &
-                    exp(mimicsplus_fchem_r_p2 * fmet)))
+                    exp(mimicsplus_fchem_r_p2 * fmet)))                       !parameter equation for microbial necromass SAPb -> SOMc
             fchem_m2 = min(1._r8, max(0._r8, mimicsplus_fchem_k_p1 * &
-                    exp(mimicsplus_fchem_k_p2 * fmet)))
+                    exp(mimicsplus_fchem_k_p2 * fmet)))                       !parameter equation for microbial necromass SAPb -> SOMc
 
             do j = 1,nlevdecomp
               ! vmax ends up in units of per hour but is expected
@@ -1615,13 +1585,23 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
               m2_conc = (decomp_cpools_vr(c,j,i_oli_mic) / col%dz(c,j)) * &
                         g_to_mg * cm3_to_m3
 
-              !ECW Mycorrhizal concentration with necerssary unit conversions
+              ! Mycorrhizal concentration with necerssary unit conversions
                         ! mgC/cm3 = gC/m3 * (1e3 mg/g) / (1e6 cm3/m3)
-              myc1_conc = (decomp_cpools_vr(c,j,i_ecm_myc) / col%dz(c,j)) * & 
+              myc1_conc = (decomp_cpools_vr(c,j,i_ecm_myc) / col%dz(c,j)) * & !ECW is this what goes into ROI function (see end of module)
                         g_to_mg * cm3_to_m3
               myc2_conc = (decomp_cpools_vr(c,j,i_am_myc) / col%dz(c,j)) * &
                         g_to_mg * cm3_to_m3
 
+             ! Soil organic matter concentration with necerssary unit conversions
+                        ! mgC/cm3 = gC/m3 * (1e3 mg/g) / (1e6 cm3/m3)
+              avl_som_conc = (decomp_cpools_vr(c,j,i_avl_som) / col%dz(c,j)) * & !ECW This is for Baskaram N mining
+                        g_to_mg * cm3_to_m3
+              chem_som_conc = (decomp_cpools_vr(c,j,i_chem_som) / col%dz(c,j)) * &
+                        g_to_mg * cm3_to_m3
+              phys_som_conc = (decomp_cpools_vr(c,j,i_phys_som) / col%dz(c,j)) * &
+                        g_to_mg * cm3_to_m3
+
+            
               tau_myc = mimicsplus_k_myc_som / secsphr ! Turnover rate mycorrhiza with unit conversions (hourly -> second)
 
               ! Product of w_scalar * depth_scalar * o_scalar
@@ -1642,10 +1622,14 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
                         secsphr
               end if
 
+              ! RATE calculatons: depending on how much C is avaliable, the rate changes 
+              ! rate = the part of the flux equation which is multiplied by the donor pool
+              ! C amount from the donor pool is only added later, because it will still change over time
+
               ! decomp_k used in SoilBiogeochemPotentialMod.F90
               ! also updating pathfrac terms that vary with time
-              term_1 = vmax_l1_m1 * m1_conc / (km_l1_m1 + m1_conc)                     !LITm tp SAPb
-              term_2 = vmax_l1_m2 * m2_conc / (km_l1_m2 + m2_conc)                     !LITm to SAPf
+              term_1 = vmax_l1_m1 * m1_conc / (km_l1_m1 + m1_conc)                     ! rate: metabolic litter -> microbial bacteria
+              term_2 = vmax_l1_m2 * m2_conc / (km_l1_m2 + m2_conc)                     ! rate: metabolic litter -> microbial fungi
               decomp_k(c,j,i_met_lit) = (term_1 + term_2) * moist_mod !w_d_o_scalars
               if (term_1 + term_2 /= 0._r8) then
                   pathfrac_decomp_cascade(c,j,i_l1m1) = term_1 / (term_1 + term_2)
@@ -1655,8 +1639,8 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
                   pathfrac_decomp_cascade(c,j,i_l1m2) = 0._r8
               end if
               
-              term_1 = vmax_l2_m1 * m1_conc / (km_l2_m1 + m1_conc)                      !LITs to SAPb
-              term_2 = vmax_l2_m2 * m2_conc / (km_l2_m2 + m2_conc)                      !LITs to SAPf
+              term_1 = vmax_l2_m1 * m1_conc / (km_l2_m1 + m1_conc)                      !rate: structural litter -> microbial bacteria
+              term_2 = vmax_l2_m2 * m2_conc / (km_l2_m2 + m2_conc)                      !rate: structural litter -> microbial fungi
               decomp_k(c,j,i_str_lit) = (term_1 + term_2) * moist_mod !w_d_o_scalars
               if (term_1 + term_2 /= 0._r8) then
                   pathfrac_decomp_cascade(c,j,i_l2m1) = term_1 / (term_1 + term_2)
@@ -1667,8 +1651,8 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
               end if
 
             !Microbes can access SOMa- (not SOMc and SOMp)
-              term_1 = vmax_s1_m1 * m1_conc / (km_s1_m1 + m1_conc)                      !SOMa to SAPb
-              term_2 = vmax_s1_m2 * m2_conc / (km_s1_m2 + m2_conc)                      !SOMa to SAPf
+              term_1 = vmax_s1_m1 * m1_conc / (km_s1_m1 + m1_conc)                      ! rate: avaliable SOM -> microbial bacteria
+              term_2 = vmax_s1_m2 * m2_conc / (km_s1_m2 + m2_conc)                      ! rate: avaliable SOM -> microbial fungi
               decomp_k(c,j,i_avl_som) = (term_1 + term_2) * moist_mod !w_d_o_scalars               !decomp_k calculates the rate of decomposition per second based on: c soil coulum filter | j soil layer | and the carbon in the pool
               if (term_1 + term_2 /= 0._r8) then
                   pathfrac_decomp_cascade(c,j,i_s1m1) = term_1 / (term_1 + term_2)
@@ -1680,34 +1664,32 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
 
               
               ! Desorption and Oxidation processes microbes & mycorrhiza
-              ! These are rate calculations: this means, that the C amount from the donor pool (SOMc) is only added later, because it will still change over time
-              !!!CHECK if depth scalar is the same as dz (in Elin) and why she uses dz in C25&26 but not in C11&12 
-              fphys_avl     = desorption * depth_scalar(c,j)                                                  !Rate for C12 SOMp to SOMa | desorption
-              fmyc_phys_avl = mimicsplus_k_mo * depth_scalar(c,j) * myc1_conc * mimicsplus_r_myc              !Rate for C25 
-              decomp_k(c,j,i_phys_som) = (fphys_avl + fmyc_phys_avl)                                          !Rate for C12 & C25
+              ! Here are Fluxes C11 & C12, further down under mining rates are C25 & C26, they need to be added to SOMa pool still!
+              !!!CHECK if depth_scalar(c,j) is the same as dz (in Elin):
+              ! dz is used in mycorrhizal equations, because parameter values come form Bashkaran et al. need to be transformed into C/m^3 
+              fphys_avl     = desorption * depth_scalar(c,j)                                   !Rate for microbial desorption SOMp -> SOMa
+              decomp_k(c,j,i_phys_som) = fphys_avl                                             
 
 
               term_1 = vmax_l2_m1 * m1_conc / (mimicsplus_ko_r * km_l2_m1 + m1_conc)     
               term_2 = vmax_l2_m2 * m2_conc / (mimicsplus_ko_k * km_l2_m2 + m2_conc)     
               ! The right hand side is OXIDAT in the testbed (line 1145)
-              fchem_avl = (term_1 + term_2) * moist_mod !w_d_o_scalars                                        !Rate for C11 SOMc to SOMa | oxidation
-
-              fmyc_chem_avl = mimicsplus_k_mo * depth_scalar(c,j) * myc1_conc * mimicsplus_r_myc              !Rate for C26
-              decomp_k(c,j,i_chem_som) = (fchem_avl + fmyc_chem_avl)                                          !Rate for C11 & C26
+              fchem_avl = (term_1 + term_2) * moist_mod !w_d_o_scalars                          !Rate for microbial oxidation SOMc -> SOMa
+              decomp_k(c,j,i_chem_som) = (fchem_avl)                           
 
                   
 
-              !Uses parameter equations
+              !Parameter equations microbial necromass
 
               decomp_k(c,j,i_cop_mic) = tau_m1 * &
-                    m1_conc**(mimicsplus_densdep - 1.0_r8) * moist_mod !w_d_o_scalars
-              favl = min(1.0_r8, max(0.0_r8, 1.0_r8 - fphys_m1(c,j) - fchem_m1))         !ECW parameter equation SAPb to SOMa
+                    m1_conc**(mimicsplus_densdep - 1.0_r8) * moist_mod !w_d_o_scalars    !decomposition rate for microbial bacteria
+              favl = min(1.0_r8, max(0.0_r8, 1.0_r8 - fphys_m1(c,j) - fchem_m1))         !parameter equation for microbial necromass SAPb -> SOMa
               pathfrac_decomp_cascade(c,j,i_m1s1) = favl                                 !stores parameter to be transferred in next module
               pathfrac_decomp_cascade(c,j,i_m1s2) = fchem_m1                             !stores parameter to be transferred in next module
 
               decomp_k(c,j,i_oli_mic) = tau_m2 * &
-                    m2_conc**(mimicsplus_densdep - 1.0_r8) * moist_mod !w_d_o_scalars
-              favl = min(1.0_r8, max(0.0_r8, 1.0_r8 - fphys_m2(c,j) - fchem_m2))         !ECW parameter equation SAPf to SOMa
+                    m2_conc**(mimicsplus_densdep - 1.0_r8) * moist_mod !w_d_o_scalars    !decomposition rate for microbial fungi
+              favl = min(1.0_r8, max(0.0_r8, 1.0_r8 - fphys_m2(c,j) - fchem_m2))         !parameter equation for microbial necromass SAPf -> SOMa
               pathfrac_decomp_cascade(c,j,i_m2s1) = favl                                 !stores parameter to be transferred in next module
               pathfrac_decomp_cascade(c,j,i_m2s2) = fchem_m2                             !stores parameter to be transferred in next module
 
@@ -1722,21 +1704,18 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
               fphys_myc2 = min(1._r8, max(0._r8, mimicsplus_fphys_am))
               
               decomp_k(c,j,i_ecm_myc) = tau_myc * &
-                    myc1_conc**((mimicsplus_densdep - 1.0_r8) * moist_mod) !w_d_o_scalars)     !ECW absolutly not sure, just did it the way microbes are done
-              pathfrac_decomp_cascade(c,j,i_myc1s1) = tau_myc1
+                    myc1_conc**((mimicsplus_densdep - 1.0_r8) * moist_mod) !w_d_o_scalars)     !decomposition rate for ecm !not sure
+              pathfrac_decomp_cascade(c,j,i_myc1s1) = tau_myc1 !ECW should I add the enzyme flux here
               pathfrac_decomp_cascade(c,j,i_myc1s2) = fchem_myc1
               pathfrac_decomp_cascade(c,j,i_myc1s3) = fphys_myc1
 
               decomp_k(c,j,i_am_myc) = tau_myc * &
-                    myc2_conc**((mimicsplus_densdep - 1.0_r8) * moist_mod) !w_d_o_scalars)     !ECW absolutly not sure, just did it the way microbes are done
+                    myc2_conc**((mimicsplus_densdep - 1.0_r8) * moist_mod) !w_d_o_scalars)     !decomposition rate for am
               pathfrac_decomp_cascade(c,j,i_myc2s1) = tau_myc2
               pathfrac_decomp_cascade(c,j,i_myc2s2) = fchem_myc2
               pathfrac_decomp_cascade(c,j,i_myc2s3) = fphys_myc2
 
-              !ECW add also for mining EcM!!!
-              !C19-24 Think this happens somewhere else
-
-            
+              !ECW add also for mining EcM!!!           
 
 
 
@@ -1774,8 +1753,6 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
         rf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_m2s1) = 0.0_r8
         rf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_m2s2) = 0.0_r8
         rf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_m2s3) = 0.0_r8
-        
-        !ECW MYC to SOM fluxes (zero)
         rf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_myc1s1) = 0.0_r8
         rf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_myc1s2) = 0.0_r8
         rf_decomp_cascade(bounds%begc:bounds%endc,1:nlevdecomp,i_myc1s3) = 0.0_r8
@@ -1791,43 +1768,237 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
 
 end subroutine decomp_rates_mimicsplus
 
-            
+
+   
+
+   ! Variables for MIMICS+ FUN connection
+   real(r8), parameter :: smin_nh4_col= 2.0, smin_no3_col=2.0 !test
+   real(r8), parameter :: N_SOMp=15.0, N_SOMc=20.0
+   real(r8), parameter :: npp_to_active_nh4=5.0, npp_to_active_no3=5.0
+   real(r8), parameter :: npp_frac_to_active_nh4=10.0, npp_frac_to_active_no3=10.0
+   
+   subroutine calc_myc_roi(cpool_myc, npool_myc,cpool_somp,cpool_soma,cpool_somc, &
+                           npool_somp, npool_somc, sminn, vegc2myc,           &
+                           maxc_veg2myc, myc_type, dz, roi)
+      !
+      ! DESCRIPTION:
+      ! Calculates ROI (Return Of Investment) of nitrogen per carbon invested from vegetation to mycorrhiza
+
+      ! Contains:
+      ! - Mycorrhizal modifer (controls nitrogen flux to vegetaion, based on carbon flux to mycorrhiza)
+      ! - Connection to inorganic nitrogen cycle (mycorrhiza receive inorganic nitrogen)
+      ! 
+      ! !USES:
+      !
+      ! !ARGUMENTS:
+
+     real(r8), intent(in) :: cpool_myc    ! Carbon pool of mycorrhiza [gC/m2]
+     real(r8), intent(in) :: npool_myc    ! Nitrogen pool of mycorrhiza [gN/m2]
+     real(r8), intent(in) :: cpool_somp   ! physically protected SOM pool [gC/m2]
+     real(r8), intent(in) :: cpool_soma   ! available SOM pool [gC/m2]
+     real(r8), intent(in) :: cpool_somc   ! chemically protected SOM pool [gC/m2] 
+     real(r8), intent(in) :: npool_somp   ! physically protected SOM pool [gN/m2]
+     real(r8), intent(in) :: npool_somc   ! chemically protected SOM pool [gN/m2]]
+     real(r8), intent(in) :: sminn        ! soil mineral nitrogen (NO3+NH4) [gN/m2]
+     real(r8), intent(in) :: vegc2myc     ! Actual carbon flux from vegetation to mycorrhiza [gC/m2/s]
+     real(r8), intent(in) :: maxc_veg2myc ! Maximum possible carbon flux from vegetation to mycorrhiza [gC/m2/s]
+     real(r8), intent(in) :: myc_type     ! type of mycorrhiza EcM=1, AM=2
+     real(r8), intent(in) :: dz           ! layer thickness [m]
+     real(r8), intent(inout) :: roi       ! RoI nitrogen per carbon invested from vegetation to mycorrhiza [gN/gC]
+     ! Local variables
+     !real(r8) :: turnover, r_myc, N_inorg, N_inorg_myc, C_mining_s3, N_mining_s3, C_mining_s2, N_mining_s2, N_acquired
+     
+     real(r8) :: fc_myc2somp,fc_myc2soma,fc_myc2somc  ! carbon fluxes myc to som (necrormass) [gC/m2/s]
+     real(r8) :: fc_somp2soma,fc_somc2soma            ! carbon fluxes som to som due to mining [gC/m2/s]
+     real(r8) :: fn_myc2somp,fn_myc2soma,fn_myc2somc  ! nitrogen fluxes myc to som (necrormass) [gN/m2/s]
+     real(r8) :: fn_mining_somc,fn_mining_somp        ! nitrogen fluxes to som to myc (mining + scavenging) [gN/m2/s]
+     real(r8) :: fn_smin2myc                          ! nitrogen flux from mineral soil to myc [gN/m2/s]
+
+     real(r8),           :: r_myc ! mycorrhizal modifier (constrains mining and scavaging) [-]
+     real(r8), parameter :: small_flux = 1.e-14_r8
+     real(r8), parameter :: eps = 0.5
+     
+
+     ! Calculate the mycorrhizal modifier
+     if (maxc_veg2myc > small_flux) then
+       r_myc = c_veg2myc / maxc_veg2myc
+     else
+       r_myc=0.0_r8
+     endif
+
+     ! check if modifier is unrealistic
+     if (r_myc > 1.0_r8) then
+
+       call endrun(msg='Mycorrhizal modifier is > 1.0', additional_msg=additional_msg)
+     else if (r_myc < 0.0_r8) then
+      call endrun(msg='Mycorrhizal modifier is < 0.0', additional_msg=additional_msg)
+     end if
+ 
+     ! Calculate inorganic nitrogen uptake
+     !N_inorg = smin_nh4_col + smin_no3_col
+     !N_inorg_myc = mimicsplus_vmax_myc * N_inorg * (myc_conc / (myc_conc + mimicsplus_k_m_emyc / depth_scalar)) * r_myc
+     fn_smin2myc = params_inst%mimicsplus_vmax_myc * sminn &
+                    (cpool_myc / (cpool_myc + params_inst%mimicsplus_k_m_emyc)) * r_myc
+     ! Initialize mining rates
+     fc_somp2soma = 0.0_r8
+     fc_somc2soma = 0.0_r8
+     fn_mining_somp = 0.0_r8
+     fn_mining_somc = 0.0_r8
+     if (myc_type == 1) then
+      ! check units
+      call calc_myc_mining_rates(cpool_somp,cpool_myc, npool_myc,fc_somp2soma,fn_mining_somp,r_myc)
+      call calc_myc_mining_rates(cpool_somc,cpool_myc, npool_myc,fc_somc2soma,fn_mining_somc,r_myc)
+     endif
+     
+ 
+     ! Calculate ROI
+     if (params_inst%mimicsplus_k_myc_som < small_flux) then
+         call endrun(msg='k_myc_som in the parameter file is too small', additional_msg=additional_msg)
+     endif
+     if (myc_type == 1) then 
+      if (cpool_myc > 0.0_r8) then
+      roi = (fn_smin2myc + fn_mining_somc + fn_mining_somp) / (params_inst%mimicsplus_k_myc_som / secphr ) * &
+             params_inst%mimicsplus_mge_ecm / cpool_myc
+      else
+         roi = 0.0_r8
+      endif
+     else
+      if (cpool_myc > 0.0_r8) then
+         roi = fn_smin2myc/ (params_inst%mimicsplus_k_myc_som / secphr ) * &
+                params_inst%mimicsplus_mge_ecm / cpool_myc
+      else
+         roi = 0.0_r8
+      endif
+
+     endif
+ 
+   end subroutine ROI_function
+
+   subroutine calc_myc_mortality(cpool_myc, npool_myc, m_fr,fc_myc2som, fn_myc2som)
+   ! DESCRIPTION:
+   ! Calculates mortality of mycorrhiza, based on: carbon content in mycorrhizal pool, mycorrhizal turnover rate and 
+   ! fraction of necromass going from mycorrhizal pools into soil organic matter pools.
+   
+   ! USES
+
+   ! ARGUMENTS
+   real(r8), intent(in) :: cpool_myc     ! Carbon pool of mycorrhiza [gC/m2]
+   real(r8), intent(in) :: npool_myc     ! Nitrogen pool of mycorrhiza [gN/m2]
+   real(r8), intent(in) :: m_fr          ! mortality fraction
+   real(r8), intent(inout) :: fc_myc2som ! carbon flux to SOM pool [gC/m2/s]
+   real(r8), intent(inout) :: fn_myc2som ! nitrogen flux [gN/m2/s]
+
+   ! LOCAL VARIABLES
+   real(r8) :: secphr = 60._r8 * 60.0_r8
+   real(r8), parameter :: small_flux = 1.e-14_r8
+
+   fc_myc2som = cpool_myc * (params_inst%mimicsplus_k_myc_som / secphr ) * m_fr
+   if (cpool_myc > small_flux) then 
+      fn_myc2som = fc_myc2som * (npool_myc / cpool_myc)
+   else
+      fn_myc2som = 0.0_r8
+      fc_myc2som = 0.0_r8
+   endif
+
+   end subroutine calc_myc_mortality
+
+  subroutine calc_myc_mining_rates(cpool_som,cpool_myc, npool_myc, fc_som2soma,fn_mining_som,r_myc)
+   ! DESCRIPTION:
+   ! Calculates mining of ectomycorrhizal fungi for nitrogen in soil organic matter pools.
+   ! - (only!) Ectomycorrhizal fungi can a allocate fraction of the incoming carbon from vegetation (not in this subroutine) to the avaliable SOM pool.
+   ! - They mine for nitrogen in the chemmically and physically protected SOM pools and create nitrogen fluxes from theses to EcM.
+   ! - During this process carbon is release from the chemmically and physically protected SOM pools which enters the avaliable SOM pool.
+
+   ! USES:
+
+   ! ARGUMENTS:
+   real(r8), intent(in) :: cpool_som          ! SOM pool [gC/m2]
+   real(r8), intent(in) :: cpool_myc          ! Carbon pool of mycorrhiza [gC/m2]
+   real(r8), intent(in) :: npool_myc          ! Nitrogen pool of mycorrhiza [gC/m2]
+   real(r8), intent(in) :: r_myc              ! mycorrhizal modifier (constrains mining and scavaging) [-]
+   real(r8), intent(inout) :: fc_som2soma     ! carbon flux to available SOM pool [gC/m2/s]
+   real(r8), intent(inout) :: fn_mining_som   ! nitrogen mining flux [gN/m2/s]
+
+   ! LOCAL VARIABLES:
+   real(r8) :: secphr = 60.0_r8 * 60.0_r8
+   real(r8), parameter :: small_flux = 1.e-14_r8
+   
+   ! SOM carbon flux
+   fc_som2soma = (params_inst%mimicsplus_k_mo / secphr) * cpool_myc * cpool_som * r_myc
+   ! Nitrogen mining flux
+   if (cpool_myc > small_flux) then
+     fn_mining_som = fc_som2soma * (npool_myc / cpool_myc )
+   else 
+     fn_mining_som = 0.0_r8
+     fc_som2soma = 0.0_r8
+   endif
+
+   
+ ! Mycorrhizal concentration with necerssary unit conversions
+ !                       ! mgC/cm3 = gC/m3 * (1e3 mg/g) / (1e6 cm3/m3)
+ !  myc1_conc = (decomp_cpools_vr(c,j,i_ecm_myc) / col%dz(c,j)) * & !ECW is this what goes into ROI function (see end of module)
+ !  g_to_mg * cm3_to_m3
+ ! myc2_conc = (decomp_cpools_vr(c,j,i_am_myc) / col%dz(c,j)) * &
+ !  g_to_mg * cm3_to_m3
+
+ ! Soil organic matter concentration with necerssary unit conversions
+ !  ! mgC/cm3 = gC/m3 * (1e3 mg/g) / (1e6 cm3/m3)
+ !avl_som_conc = (decomp_cpools_vr(c,j,i_avl_som) / col%dz(c,j)) * & !ECW This is for Baskaram N mining
+ !  g_to_mg * cm3_to_m3
+ !chem_som_conc = (decomp_cpools_vr(c,j,i_chem_som) / col%dz(c,j)) * &
+ !  g_to_mg * cm3_to_m3
+ !phys_som_conc = (decomp_cpools_vr(c,j,i_phys_som) / col%dz(c,j)) * &
+ !  g_to_mg * cm3_to_m3
+  end subroutine calc_myc_mining_rates
+ 
+  !TO DO 
+  ! connection to FUN
+  ! add C27 flux (fraction of C28)
+  ! add heterotrophic respiration to flux C28 and C29
+  ! tell fluxes in which pool they go
+
+          
   !Moisture function, based on testbed code: https://github.com/wwieder/biogeochem_testbed/blob/957a5c634b9f2d0b4cdba0faa06b5a91216ace33/SOURCE_CODE/mimics_cycle.f90#L401-L419
   real(r8) function r_moist(h2osoi_liq,watsat, h2osoi_ice, dz) !As in testbed (and CLM) version of MIMICS            
-  
-  !  !USES
-  use clm_varcon, only: denh2o, denice
-  
-  ! !ARGUMENTS:
-  real(r8), intent(in)    :: h2osoi_liq ! liquid water content kg/m2
-  real(r8), intent(in)    :: watsat ! porosity m3/m3
-  real(r8), intent(in)    :: h2osoi_ice ! ice content kg/m2
-  real(r8), intent(in)    :: dz ! soil layer thickness  
+   
+   !  !USES
+   use clm_varcon, only: denh2o, denice
+   
+   ! !ARGUMENTS:
+   real(r8), intent(in)    :: h2osoi_liq ! liquid water content kg/m2
+   real(r8), intent(in)    :: watsat ! porosity m3/m3
+   real(r8), intent(in)    :: h2osoi_ice ! ice content kg/m2 
+   real(r8), intent(in)    :: dz ! soil layer thickness 
 
-  ! !LOCAL VARIABLES
-  real(r8):: wliq !water liquid
-  real(r8):: wice !water ice
+   ! !LOCAL VARIABLES
+   real(r8):: wliq !water liquid
+   real(r8):: wice !water ice
 
 
-  !NOTE: This moisture function represent both inhibition bc. very dry conditions, and very wet (anaerobic) conditions. 
-  !FROM mimics_cycle.f90 in testbed:
-  ! ! Read in soil moisture data as in CORPSE
-  !  theta_liq  = min(1.0, casamet%moistavg(npt)/soil%ssat(npt))     ! fraction of liquid water-filled pore space (0.0 - 1.0)
-  !  theta_frzn = min(1.0, casamet%frznmoistavg(npt)/soil%ssat(npt)) ! fraction of frozen water-filled pore space (0.0 - 1.0)
-  !  air_filled_porosity = max(0.0, 1.0-theta_liq-theta_frzn)
-  !
-  !  if (mimicsbiome%fWFunction .eq. CORPSE) then
-  !    ! CORPSE water scalar, adjusted to give maximum values of 1
-  !    fW = (theta_liq**3 * air_filled_porosity**2.5)/0.022600567942709
-  !    fW = max(0.05, fW)
-  wliq = h2osoi_liq / dz * denh2o
-  wice = h2osoi_ice / dz * denice
-  wliq  = min(1.0_r8, wliq/watsat)     ! fraction of liquid water-filled pore space (0.0 - 1.0)
-  wice = min(1.0_r8, wice/watsat)     ! fraction of frozen water-filled pore space (0.0 - 1.0)
-  !ECW check equations, find out how theta_l & theta_f are called in the rest of CTSM 
+   !NOTE: This moisture function represent both inhibition bc. very dry conditions, and very wet (anaerobic) conditions. 
+   !FROM mimics_cycle.f90 in testbed:
+   ! ! Read in soil moisture data as in CORPSE
+   !  theta_liq  = min(1.0, casamet%moistavg(npt)/soil%ssat(npt))     ! fraction of liquid water-filled pore space (0.0 - 1.0)
+   !  theta_frzn = min(1.0, casamet%frznmoistavg(npt)/soil%ssat(npt)) ! fraction of frozen water-filled pore space (0.0 - 1.0)
+   !  air_filled_porosity = max(0.0, 1.0-theta_liq-theta_frzn)
+   !
+   !  if (mimicsbiome%fWFunction .eq. CORPSE) then
+   !    ! CORPSE water scalar, adjusted to give maximum values of 1
+   !    fW = (theta_liq**3 * air_filled_porosity**2.5)/0.022600567942709
+   !    fW = max(0.05, fW)
+   wliq = h2osoi_liq / dz * denh2o
+   wice = h2osoi_ice / dz * denice
+   wliq  = min(1.0_r8, wliq/watsat)     ! fraction of liquid water-filled pore space (0.0 - 1.0)
+   wice = min(1.0_r8, wice/watsat)     ! fraction of frozen water-filled pore space (0.0 - 1.0)
+   !ECW check equations, find out how theta_l & theta_f are called in the rest of CTSM 
 
-  r_moist = ((wliq**3)*max(0.0_r8, 1.0_r8-wliq-wice)**2.5_r8)/0.022600567942709_r8
-  r_moist = max(0.05, r_moist) !ECW This is probably what I will replace w_d_o_scalar with
+   r_moist = ((wliq**3)*max(0.0_r8, 1.0_r8-wliq-wice)**2.5_r8)/0.022600567942709_r8
+   r_moist = max(0.05, r_moist) !ECW This is probably what I will replace w_d_o_scalar with
   end function r_moist
 
 end module SoilBiogeochemDecompCascadeMIMICSplusMod
+
+!Problems for future me:
+! - Elin had a function for mycorrhizal mortality, didn't includ ethat yet bc I think it's the same as the parameter
+
+

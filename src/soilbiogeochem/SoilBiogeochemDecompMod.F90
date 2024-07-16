@@ -137,7 +137,7 @@ contains
       ! column loop to calculate actual immobilization and decomp rates, following
       ! resolution of plant/heterotroph  competition for mineral N
 
-      ! calculate c:n ratios of applicable pools
+      ! calculate c:n ratios of applicable pools !ECW CN ratio calculated based on pool sizes
       do l = 1, ndecomp_pools
          if ( floating_cn_ratio_decomp_pools(l) ) then
             do j = 1,nlevdecomp

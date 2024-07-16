@@ -29,7 +29,7 @@ module SoilBiogeochemNitrogenStateType
 
   type, public :: soilbiogeochem_nitrogenstate_type
 
-     real(r8), pointer :: decomp_npools_vr_col         (:,:,:) ! col (gN/m3) vertically-resolved decomposing (litter, cwd, soil) N pools
+     real(r8), pointer :: decomp_npools_vr_col         (:,:,:) ! col (gN/m3) vertically-resolved decomposing (litter, cwd, soil) N pools !ECW
 
      real(r8), pointer :: decomp_soiln_vr_col          (:,:)   ! col (gN/m3) vertically-resolved decomposing total soil N pool
 
@@ -38,9 +38,9 @@ module SoilBiogeochemNitrogenStateType
 
      ! nitrif_denitrif
      real(r8), pointer :: smin_no3_vr_col              (:,:)   ! col (gN/m3) vertically-resolved soil mineral NO3
-     real(r8), pointer :: smin_no3_col                 (:)     ! col (gN/m2) soil mineral NO3 pool
+     real(r8), pointer :: smin_no3_col                 (:)     ! col (gN/m2) soil mineral NO3 pool                      !ECW get this for MIMICS+
      real(r8), pointer :: smin_nh4_vr_col              (:,:)   ! col (gN/m3) vertically-resolved soil mineral NH4
-     real(r8), pointer :: smin_nh4_col                 (:)     ! col (gN/m2) soil mineral NH4 pool
+     real(r8), pointer :: smin_nh4_col                 (:)     ! col (gN/m2) soil mineral NH4 pool                      !ECW get this for MIMICS+
 
      ! summary (diagnostic) state variables, not involved in mass balance
      real(r8), pointer :: decomp_npools_col            (:,:)   ! col (gN/m2)  decomposing (litter, cwd, soil) N pools
@@ -306,7 +306,7 @@ contains
          avgflag='A', long_name='total litter N', &
          ptr_col=this%totlitn_col)
 
-    if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
+    if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then !ECW do I need to do sth here? Do I need to add myc here?
        this%totmicn_col(begc:endc) = spval
        call hist_addfld1d (fname='TOTMICN', units='gN/m^2', &
          avgflag='A', long_name='total microbial N', &

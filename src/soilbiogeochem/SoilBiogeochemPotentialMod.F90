@@ -176,10 +176,10 @@ contains
             do fc = 1,num_bgc_soilc
                c = filter_bgc_soilc(fc)
 
-               if (decomp_cpools_vr(c,j,cascade_donor_pool(k)) > 0._r8 .and. &
+               if (decomp_cpools_vr(c,j,cascade_donor_pool(k)) > 0._r8 .and. &                 !If the doner pool and the decomposition coefficient are more than 0
                     decomp_k(c,j,cascade_donor_pool(k)) > 0._r8 ) then
-                  p_decomp_cpool_loss(c,j,k) = decomp_cpools_vr(c,j,cascade_donor_pool(k)) &
-                       * decomp_k(c,j,cascade_donor_pool(k))  * pathfrac_decomp_cascade(c,j,k)
+                  p_decomp_cpool_loss(c,j,k) = decomp_cpools_vr(c,j,cascade_donor_pool(k)) &   !Then Flux is calculated with: C doner pool * decomposition coefficesnt (k) * fraction C from donor to reciver 
+                       * decomp_k(c,j,cascade_donor_pool(k))  * pathfrac_decomp_cascade(c,j,k) !ECW This should be equal to Flux equations C13-C24
 
                   if ( .not. floating_cn_ratio_decomp_pools(cascade_receiver_pool(k)) ) then  !! not transition of cwd to litter
 

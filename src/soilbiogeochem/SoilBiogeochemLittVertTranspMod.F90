@@ -472,7 +472,7 @@ contains
                   end do
                end if  !soil_matrix
             else
-               ! for CWD pools, just add
+               ! for CWD pools, just add !ECW
                do j = 1,nlevdecomp
                   do fc = 1, num_bgc_soilc
                      c = filter_bgc_soilc (fc)
