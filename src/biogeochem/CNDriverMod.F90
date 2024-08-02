@@ -354,7 +354,8 @@ contains
        call decomp_rates_mimicsplus(bounds, num_bgc_soilc, filter_bgc_soilc, &            !ECW this calls decomp_rates_mimicsplus from MIMICSplusMod
             num_bgc_vegp, filter_bgc_vegp, clm_fates, &
             soilstate_inst, temperature_inst, cnveg_carbonflux_inst, ch4_inst, &
-            soilbiogeochem_carbonflux_inst, soilbiogeochem_carbonstate_inst)
+            soilbiogeochem_carbonflux_inst, waterstatebulk_inst, &
+            soilbiogeochem_state_inst, soilbiogeochem_carbonstate_inst)
     end if
     call t_stopf('DecompRate')
 
