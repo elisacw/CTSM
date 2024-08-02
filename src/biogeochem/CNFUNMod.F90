@@ -241,7 +241,7 @@ module CNFUNMod
    type(soilbiogeochem_carbonflux_type)    , intent(inout) :: soilbiogeochem_carbonflux_inst 
    type(canopystate_type)                  , intent(inout) :: canopystate_inst  
    type(soilbiogeochem_nitrogenstate_type) , intent(inout) :: soilbiogeochem_nitrogenstate_inst
-   type(soilbiogeochem_carbonstate_type) , intent(inout) :: soilbiogeochem_carbonstate_inst
+   type(soilbiogeochem_carbonstate_type)   , intent(inout) :: soilbiogeochem_carbonstate_inst
   !
   ! !LOCAL VARIABLES:
   ! local pointers to implicit in arrays

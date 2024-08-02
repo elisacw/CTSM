@@ -171,8 +171,8 @@ contains
                                          cnveg_state_inst,cnveg_carbonstate_inst,                                  &
                                          cnveg_carbonflux_inst,cnveg_nitrogenstate_inst,cnveg_nitrogenflux_inst,   &
                                          soilbiogeochem_carbonflux_inst,                                           &              
-                                         soilbiogeochem_state_inst, soilbiogeochem_nitrogenstate_inst,             &
-                                         soilbiogeochem_nitrogenflux_inst,canopystate_inst)
+                                         soilbiogeochem_state_inst, soilbiogeochem_nitrogenstate_inst, soilbiogeochem_carbonstate_inst, &
+                                         soilbiogeochem_nitrogenflux_inst, canopystate_inst)
     !
     ! !USES:
     use clm_varctl       , only: cnallocate_carbon_only, iulog
@@ -205,6 +205,7 @@ contains
     type(soilbiogeochem_carbonflux_type)    , intent(inout) :: soilbiogeochem_carbonflux_inst
     type(soilbiogeochem_state_type)         , intent(inout) :: soilbiogeochem_state_inst
     type(soilbiogeochem_nitrogenstate_type) , intent(inout) :: soilbiogeochem_nitrogenstate_inst
+    type(soilbiogeochem_carbonstate_type) , intent(inout)   :: soilbiogeochem_carbonstate_inst
     type(soilbiogeochem_nitrogenflux_type)  , intent(inout) :: soilbiogeochem_nitrogenflux_inst
     type(canopystate_type)                  , intent(inout) :: canopystate_inst   
 !

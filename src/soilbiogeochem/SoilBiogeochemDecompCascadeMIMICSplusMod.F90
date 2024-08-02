@@ -76,6 +76,9 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
   public :: readParams                          ! Read in parameters from params file
   public :: init_decompcascade_mimicsplus       ! Initialization
   public :: decomp_rates_mimicsplus             ! Figure out decomposition rates
+  public :: calc_myc_mining_rates
+  public :: calc_myc_mortality
+  public :: calc_myc_roi
   private :: r_moist                            ! calculates moisture modifier according to CORPSE
   !
   ! !PUBLIC DATA MEMBERS 
@@ -1772,13 +1775,17 @@ end subroutine decomp_rates_mimicsplus
    
 
    ! Variables for MIMICS+ FUN connection
-   real(r8), parameter :: smin_nh4_col= 2.0, smin_no3_col=2.0 !test
-   real(r8), parameter :: N_SOMp=15.0, N_SOMc=20.0
-   real(r8), parameter :: npp_to_active_nh4=5.0, npp_to_active_no3=5.0
-   real(r8), parameter :: npp_frac_to_active_nh4=10.0, npp_frac_to_active_no3=10.0
+   !real(r8), parameter :: smin_nh4_col= 2.0
+   !real(r8), parameter :: smin_no3_col=2.0
+   !real(r8), parameter :: N_SOMp=15.0
+   !real(r8), parameter :: N_SOMc=20.0
+   !real(r8), parameter :: npp_to_active_nh4=5.0
+   !real(r8), parameter :: npp_to_active_no3=5.0
+   !real(r8), parameter :: npp_frac_to_active_nh4=10.0
+   !real(r8), parameter :: npp_frac_to_active_no3=10.0
    
    subroutine calc_myc_roi(cpool_myc, npool_myc,cpool_somp,cpool_soma,cpool_somc, &
-                           npool_somp, npool_somc, sminn, vegc2myc,           &
+                           npool_somp, npool_somc, sminn, c_veg2myc,           &
                            maxc_veg2myc, myc_type, dz, roi)
       !
       ! DESCRIPTION:
@@ -1789,6 +1796,7 @@ end subroutine decomp_rates_mimicsplus
       ! - Connection to inorganic nitrogen cycle (mycorrhiza receive inorganic nitrogen)
       ! 
       ! !USES:
+      use clm_varcon       , only : secspday, secsphr, tfrz, spval
       !
       ! !ARGUMENTS:
 
@@ -1800,7 +1808,7 @@ end subroutine decomp_rates_mimicsplus
      real(r8), intent(in) :: npool_somp   ! physically protected SOM pool [gN/m2]
      real(r8), intent(in) :: npool_somc   ! chemically protected SOM pool [gN/m2]]
      real(r8), intent(in) :: sminn        ! soil mineral nitrogen (NO3+NH4) [gN/m2]
-     real(r8), intent(in) :: vegc2myc     ! Actual carbon flux from vegetation to mycorrhiza [gC/m2/s]
+     real(r8), intent(in) :: c_veg2myc     ! Actual carbon flux from vegetation to mycorrhiza [gC/m2/s]
      real(r8), intent(in) :: maxc_veg2myc ! Maximum possible carbon flux from vegetation to mycorrhiza [gC/m2/s]
      real(r8), intent(in) :: myc_type     ! type of mycorrhiza EcM=1, AM=2
      real(r8), intent(in) :: dz           ! layer thickness [m]
@@ -1814,9 +1822,10 @@ end subroutine decomp_rates_mimicsplus
      real(r8) :: fn_mining_somc,fn_mining_somp        ! nitrogen fluxes to som to myc (mining + scavenging) [gN/m2/s]
      real(r8) :: fn_smin2myc                          ! nitrogen flux from mineral soil to myc [gN/m2/s]
 
-     real(r8),           :: r_myc ! mycorrhizal modifier (constrains mining and scavaging) [-]
+     real(r8)            :: r_myc ! mycorrhizal modifier (constrains mining and scavaging) [-]
      real(r8), parameter :: small_flux = 1.e-14_r8
      real(r8), parameter :: eps = 0.5
+     
      
 
      ! Calculate the mycorrhizal modifier
@@ -1829,15 +1838,15 @@ end subroutine decomp_rates_mimicsplus
      ! check if modifier is unrealistic
      if (r_myc > 1.0_r8) then
 
-       call endrun(msg='Mycorrhizal modifier is > 1.0', additional_msg=additional_msg)
+       call endrun(msg='Mycorrhizal modifier is > 1.0')
      else if (r_myc < 0.0_r8) then
-      call endrun(msg='Mycorrhizal modifier is < 0.0', additional_msg=additional_msg)
+      call endrun(msg='Mycorrhizal modifier is < 0.0')
      end if
  
      ! Calculate inorganic nitrogen uptake
      !N_inorg = smin_nh4_col + smin_no3_col
      !N_inorg_myc = mimicsplus_vmax_myc * N_inorg * (myc_conc / (myc_conc + mimicsplus_k_m_emyc / depth_scalar)) * r_myc
-     fn_smin2myc = params_inst%mimicsplus_vmax_myc * sminn &
+     fn_smin2myc = params_inst%mimicsplus_vmax_myc * sminn  * &
                     (cpool_myc / (cpool_myc + params_inst%mimicsplus_k_m_emyc)) * r_myc
      ! Initialize mining rates
      fc_somp2soma = 0.0_r8
@@ -1853,18 +1862,18 @@ end subroutine decomp_rates_mimicsplus
  
      ! Calculate ROI
      if (params_inst%mimicsplus_k_myc_som < small_flux) then
-         call endrun(msg='k_myc_som in the parameter file is too small', additional_msg=additional_msg)
+         call endrun(msg='k_myc_som in the parameter file is too small')
      endif
      if (myc_type == 1) then 
       if (cpool_myc > 0.0_r8) then
-      roi = (fn_smin2myc + fn_mining_somc + fn_mining_somp) / (params_inst%mimicsplus_k_myc_som / secphr ) * &
+      roi = (fn_smin2myc + fn_mining_somc + fn_mining_somp) / (params_inst%mimicsplus_k_myc_som / secsphr ) * &
              params_inst%mimicsplus_mge_ecm / cpool_myc
       else
          roi = 0.0_r8
       endif
      else
       if (cpool_myc > 0.0_r8) then
-         roi = fn_smin2myc/ (params_inst%mimicsplus_k_myc_som / secphr ) * &
+         roi = fn_smin2myc/ (params_inst%mimicsplus_k_myc_som / secsphr ) * &
                 params_inst%mimicsplus_mge_ecm / cpool_myc
       else
          roi = 0.0_r8
@@ -1872,7 +1881,7 @@ end subroutine decomp_rates_mimicsplus
 
      endif
  
-   end subroutine ROI_function
+   end subroutine calc_myc_roi
 
    subroutine calc_myc_mortality(cpool_myc, npool_myc, m_fr,fc_myc2som, fn_myc2som)
    ! DESCRIPTION:
