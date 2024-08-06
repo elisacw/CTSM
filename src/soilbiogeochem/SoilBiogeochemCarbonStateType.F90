@@ -33,7 +33,7 @@ module SoilBiogeochemCarbonStateType
      ! summary (diagnostic) state variables, not involved in mass balance
      real(r8), pointer :: ctrunc_col              (:)   ! (gC/m2) column-level sink for C truncation
      real(r8), pointer :: totmicc_col             (:)   ! (gC/m2) total microbial carbon
-     real(r8), pointer :: totmycc_col             (:)   ! (gC/m2) total mycorrhizal carbon !ECW
+     real(r8), pointer :: totmycc_col             (:)   ! (gC/m2) total mycorrhizal carbon
      real(r8), pointer :: totlitc_col             (:)   ! (gC/m2) total litter carbon
      real(r8), pointer :: totlitc_1m_col          (:)   ! (gC/m2) total litter carbon to 1 meter
      real(r8), pointer :: totsomc_col             (:)   ! (gC/m2) total soil organic matter carbon
@@ -218,13 +218,11 @@ contains
        end if
 
        if (decomp_method == mimicsplus_decomp) then
-         this%totmycc_col(begc:endc) = spval !ECW ??? special value
-         call hist_addfld1d (fname='TOTMYCC', units='gC/m^2', & !ECW is this this automatic thing where output is written to hisory files
+         this%totmycc_col(begc:endc) = spval
+         call hist_addfld1d (fname='TOTMYCC', units='gC/m^2', &
            avgflag='A', long_name='total mycorrhizal carbon', &
            ptr_col=this%totmycc_col)
        end if
-
-       !ECW I think here Variable namnes for CLMoutut are definded, i should add the TOTMYCC here?
 
        ! Matrix solution history fields
        if(use_soil_matrixcn)then
@@ -326,7 +324,7 @@ contains
             ptr_col=this%totmicc_col)
        end if
 
-       if (decomp_method == mimicsplus_decomp) then !ECW
+       if (decomp_method == mimicsplus_decomp) then
          this%totmycc_col(begc:endc) = spval
          call hist_addfld1d (fname='C13_TOTMYCC', units='gC/m^2', &
            avgflag='A', long_name='C13 total mycorrhizal carbon', &
@@ -437,7 +435,7 @@ contains
             ptr_col=this%totmicc_col)
        end if
 
-       if (decomp_method == mimicsplus_decomp) then !ECW
+       if (decomp_method == mimicsplus_decomp) then
          this%totmycc_col(begc:endc) = spval 
          call hist_addfld1d (fname='C14_TOTMYCC', units='gC/m^2', &
            avgflag='A', long_name='C14 total mycorrhizal carbon', &
@@ -1119,7 +1117,7 @@ contains
        endif
     end do
 
-    ! total mycorrhizal carbon (TOTMYCC) !ECW
+    ! total mycorrhizal carbon (TOTMYCC)
     do fc = 1,num_allc
       c = filter_allc(fc)
       this%totmycc_col(c) = 0._r8
@@ -1196,7 +1194,7 @@ contains
        this%totecosysc_col(c) =   &
             this%cwdc_col(c)    + &
             this%totmicc_col(c) + &
-            this%totmycc_col(c) + & !ECW
+            this%totmycc_col(c) + &
             this%totlitc_col(c) + &
             this%totsomc_col(c) + &
             ecovegc_col
@@ -1204,7 +1202,7 @@ contains
        this%totc_col(c) =         &
             this%cwdc_col(c)    + &
             this%totmicc_col(c) + &
-            this%totmycc_col(c) + & !ECW
+            this%totmycc_col(c) + &
             this%totlitc_col(c) + &
             this%totsomc_col(c) + &
             this%ctrunc_col(c)  + &

@@ -261,7 +261,7 @@ module pftconMod
      real(r8), allocatable :: pftpar30      (:)   ! min growing degree days (>= 5 deg C)
      real(r8), allocatable :: pftpar31      (:)   ! upper limit of temperature of the warmest month (twmax)
      
-     ! pft parameters for FUN !ECW check this 
+     ! pft parameters for FUN 
      real(r8), allocatable :: a_fix         (:)   ! A BNF parameter
      real(r8), allocatable :: b_fix         (:)   ! A BNF parameter
      real(r8), allocatable :: c_fix         (:)   ! A BNF parameter
@@ -818,7 +818,7 @@ contains
 
     ! Three hardwired fr_f* and lf_f* values: We pass them to 2d arrays for use
     ! in do-loops. While executing the next few lines, we do not yet have access
-    ! to i_litr_min, i_litr_max. !ECW
+    ! to i_litr_min, i_litr_max.
     this%fr_f(:,1) = this%fr_flab
     this%lf_f(:,1) = this%lf_flab
     if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then

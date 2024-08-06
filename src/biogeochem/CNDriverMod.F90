@@ -138,7 +138,7 @@ contains
     use dynHarvestMod                     , only: CNHarvest
     use dynGrossUnrepMod                  , only: CNGrossUnrep
     use SoilBiogeochemDecompCascadeMIMICSMod, only: decomp_rates_mimics
-    use SoilBiogeochemDecompCascadeMIMICSplusMod, only: decomp_rates_mimicsplus !ECW decomp_rates_mimicsplus is created in SoilBiogeochemDecompCascadeMIMICSplusMod
+    use SoilBiogeochemDecompCascadeMIMICSplusMod, only: decomp_rates_mimicsplus
     use SoilBiogeochemDecompCascadeBGCMod , only: decomp_rate_constants_bgc
     use SoilBiogeochemCompetitionMod      , only: SoilBiogeochemCompetition
     use SoilBiogeochemDecompMod           , only: SoilBiogeochemDecomp
@@ -336,22 +336,19 @@ contains
          cnveg_carbonflux_inst, cnveg_nitrogenstate_inst)
     call t_stopf('CNMResp')
 
-    !--------------------------------------------
-    ! Soil Biogeochemistry !!B_!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !--------------------------------------------
-
+    
     call t_startf('SoilBiogeochem')
     call t_startf('DecompRate')
     if (decomp_method == century_decomp) then
        call decomp_rate_constants_bgc(bounds, num_bgc_soilc, filter_bgc_soilc, &
             soilstate_inst, temperature_inst, ch4_inst, soilbiogeochem_carbonflux_inst)
     else if (decomp_method == mimics_decomp) then
-       call decomp_rates_mimics(bounds, num_bgc_soilc, filter_bgc_soilc, &            ! MIMICS called
+       call decomp_rates_mimics(bounds, num_bgc_soilc, filter_bgc_soilc, &
             num_bgc_vegp, filter_bgc_vegp, clm_fates, &
             soilstate_inst, temperature_inst, cnveg_carbonflux_inst, ch4_inst, &
             soilbiogeochem_carbonflux_inst, soilbiogeochem_carbonstate_inst)
     else if (decomp_method == mimicsplus_decomp) then
-       call decomp_rates_mimicsplus(bounds, num_bgc_soilc, filter_bgc_soilc, &            !ECW this calls decomp_rates_mimicsplus from MIMICSplusMod
+       call decomp_rates_mimicsplus(bounds, num_bgc_soilc, filter_bgc_soilc, &
             num_bgc_vegp, filter_bgc_vegp, clm_fates, &
             soilstate_inst, temperature_inst, cnveg_carbonflux_inst, ch4_inst, &
             soilbiogeochem_carbonflux_inst, waterstatebulk_inst, &

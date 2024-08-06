@@ -226,7 +226,7 @@ contains
              avgflag='A', long_name='total heterotrophic respiration', &
              ptr_col=this%hr_col)
 
-        if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then !ECW
+        if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
            this%michr_col(begc:endc) = spval
            call hist_addfld1d (fname='MICC_HR', units='gC/m^2/s', &
              avgflag='A', long_name='microbial C heterotrophic respiration: donor-pool based, so expect zero with MIMICS', &
