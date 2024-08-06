@@ -1,14 +1,10 @@
 module SoilBiogeochemDecompCascadeMIMICSMod
 
 !-----------------------------------------------------------------------
-! DESCRIPTION:
-
+  ! !DESCRIPTION:
 ! Sets the coeffiecients used in the decomposition cascade submodel. 
-  
-! B- Modification to MIMICS+
-! B- At the momet this module uses the MIMICS parameters. - Have to create new parameter file with MIMICS+ parameters
-! B- Current parameter file for MIMICS under: /cluster/shared/noresm/inputdata/lnd/clm2/paramdata
-! 
+  ! This uses the MIMICS parameters.
+  ! test
 ! !USES:
   use shr_kind_mod                       , only : r8 => shr_kind_r8
   use shr_const_mod                      , only : SHR_CONST_TKFRZ
@@ -39,23 +35,7 @@ module SoilBiogeochemDecompCascadeMIMICSMod
   implicit none
   private
   !
-
-! B- Overview of different pool names:
-
-!                           | MIMICS+  | MIMICS 
-! 
-! Metabolic litter          | LITm     | l1        | i_met_lit |
-! Structural litter         | LITs     | l2        | i_str_lit |
-! Microbes                  | SAPb     | m1 (MICr) | i_cop_mic |
-! Microbes                  | SAPf     | m2 (MICk) | i_oli_mic |
-! Physically protected SOM  | SOMp     | s3        | i_phys_som |
-! Available SOM             | SOMa     | s1        | i_avl_som |
-! Chemically protected SOM  | SOMc     | s2        | i_chem_som |
-! Ectomycorrhiza            | EcM      | - 
-! Arbuscular Mycorrhiza     | AM       | - 
-  
-
-  !PUBLIC MEMBER FUNCTIONS:
+  ! !PUBLIC MEMBER FUNCTIONS:
   public :: readParams                      ! Read in parameters from params file
   public :: init_decompcascade_mimics       ! Initialization
   public :: decomp_rates_mimics             ! Figure out decomposition rates
@@ -64,60 +44,28 @@ module SoilBiogeochemDecompCascadeMIMICSMod
   !
   ! !PRIVATE DATA MEMBERS 
   ! next four 2d vars are dimensioned (columns,nlevdecomp)
-
-  ! B- in MIMICS+ this stuff is a real, ask Matvey!
-   
   real(r8), private, allocatable :: desorp(:,:)
   real(r8), private, allocatable :: fphys_m1(:,:)
   real(r8), private, allocatable :: fphys_m2(:,:)
-  real(r8), private, allocatable :: p_scalar(:,:)                                                        ! B- called in MIMICS+ 
-  integer, private :: i_phys_som    ! index of physically protected Soil Organic Matter (SOM)            ! SOMp
-  integer, private :: i_chem_som    ! index of chemically protected SOM                                  ! SOMc
-  integer, private :: i_avl_som     ! index of available (aka active) SOM                                ! SOMa
-  integer, private :: i_str_lit     ! index of structural litter pool                                    ! LITs
-  integer, private :: i_l1m1        ! indices of transitions, eg l1m1: litter 1 -> first microbial pool  ! C_LITmSAPb
-  integer, private :: i_l1m2                                                                             ! C_LITmSAPf
-  integer, private :: i_l2m1                                                                             ! C_LITsSAPb     
-  integer, private :: i_l2m2                                                                             ! C_LITsSAPf     
-  integer, private :: i_s1m1                                                                             ! C_SOMaSAPb     
-  integer, private :: i_s1m2                                                                             ! C_SOMaSAPf     
-  integer, private :: i_m1s1                                                                             ! C_SAPbSOMa     
-  integer, private :: i_m1s2                                                                             ! C_SAPbSOMc     
-  integer, private :: i_m2s1                                                                             ! C_SAPfSOMa     
-  integer, private :: i_m2s2                                                                             ! C_SAPfSOMc     
-  integer, private :: i_s2s1                                                                             ! C_SOMcSOMa    
-  integer, private :: i_s3s1                                                                             ! C_SOMpSOMa     
-  integer, private :: i_m1s3                                                                             ! C_SAPbSOMp     
-  integer, private :: i_m2s3                                                                             ! C_SAPfSOMp   
-  
-  ! B-
-  !adding additional Mycorrhiza pools for MIMICS+ ------- CAN I DO THAT?
-  !integer, private :: C_EcMSOMp
-  !integer, private :: C_EcMSOMa
-  !integer, private :: C_EcMSOMc
-  !integer, private :: C_AMSOMp
-  !integer, private :: C_AMSOMa
-  !integer, private :: C_AMSOMc
-
-  !not so sure what that is, see MIMICS+ mycmimMod line 33
-  !integer, private :: C_PlantSOMc
-  !integer, private :: C_PlantSOMp
-  !integer, private :: C_PlantEcM
-  !integer, private :: C_PlantAM
-  !integer, private :: C_PlantLITm
-  !integer, private :: C_PlantLITs
-  !integer, private :: C_EcMdecompSOMp
-  !integer, private :: C_EcMdecompSOMc
-  !integer, private :: Leaching
-  !integer, private :: Deposition
-  !integer, private :: nitrif_rate
-  !integer, private :: C_EcMenz_prod
-
-
-  ! B- MICHAELIS MENTEN?
-  ! B- I think this is further defined in the parameterfile (at least similar to paramMod in MIMICS+)
-  ! B- Just name the last part like its named in MIMICS+
-
+  real(r8), private, allocatable :: p_scalar(:,:)
+  integer, private :: i_phys_som  ! index of physically protected Soil Organic Matter (SOM)
+  integer, private :: i_chem_som  ! index of chemically protected SOM
+  integer, private :: i_avl_som  ! index of available (aka active) SOM
+  integer, private :: i_str_lit  ! index of structural litter pool
+  integer, private :: i_l1m1  ! indices of transitions, eg l1m1: litter 1 -> first microbial pool
+  integer, private :: i_l1m2
+  integer, private :: i_l2m1
+  integer, private :: i_l2m2
+  integer, private :: i_s1m1
+  integer, private :: i_s1m2
+  integer, private :: i_m1s1
+  integer, private :: i_m1s2
+  integer, private :: i_m2s1     
+  integer, private :: i_m2s2
+  integer, private :: i_s2s1
+  integer, private :: i_s3s1
+  integer, private :: i_m1s3
+  integer, private :: i_m2s3
   real(r8), private :: rf_l1m1  ! respiration fractions by transition
   real(r8), private :: rf_l1m2
   real(r8), private :: rf_l2m1
@@ -160,10 +108,6 @@ module SoilBiogeochemDecompCascadeMIMICSMod
   real(r8), private :: kslope_l1_m2
   real(r8), private :: kslope_l2_m2
   real(r8), private :: kslope_s1_m2
-
-
-  ! B- Those are all the parameters, that are also in the parameterfile
-  ! (I checked and they are all in the file and are defined here, great!)
 
   type, private :: params_type
      real(r8) :: mimics_nue_into_mic  ! microbial N use efficiency for N fluxes
@@ -217,8 +161,6 @@ module SoilBiogeochemDecompCascadeMIMICSMod
 
 contains
 
-  ! B- Parameters are read in from parameter file:
-  ! B- Parameters for mycorrhiza & inorganic nitrogen have to be added here & in file
   !-----------------------------------------------------------------------
   subroutine readParams ( ncid )
     !
@@ -389,21 +331,12 @@ contains
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%mimics_cn_k = tempr
 
-
-    ! B- How to: new parameters:
-    ! copy code & insert how parameter is called in parameter file:
-
     ! tString='name_parameter'
     ! call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     ! if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     ! params_inst%name_parameter = tempr
 
   end subroutine readParams
-
-
-
-!-------------------------------------WORK ON THIS--------------------------------
-
 
 
   !-----------------------------------------------------------------------
@@ -433,13 +366,13 @@ contains
      ! See allocate statements below for the size of each of the following
      ! vectors.
     real(r8) :: mimics_nue_into_mic
-    real(r8) :: mimics_p_scalar_p1     ! physical protection scalar
+    real(r8) :: mimics_p_scalar_p1
     real(r8) :: mimics_p_scalar_p2
-    real(r8) :: mimics_fphys_r_p1      ! B- Flux between MIC and SOMp? But why 4? there are only 2
+    real(r8) :: mimics_fphys_r_p1
     real(r8) :: mimics_fphys_r_p2
     real(r8) :: mimics_fphys_k_p1
     real(r8) :: mimics_fphys_k_p2
-    real(r8) :: mimics_desorp_p1       ! B- Desorption from SOMp or SOMc to SOMa
+    real(r8) :: mimics_desorp_p1
     real(r8) :: mimics_desorp_p2
 
     real(r8):: speedup_fac                  ! acceleration factor, higher when vertsoilc = .true.
@@ -447,10 +380,7 @@ contains
     real(r8) :: clay_frac  ! local copy of cellclay converted from % (fraction)
     integer  :: c, j  ! indices
     !-----------------------------------------------------------------------
-
-    ! B- associate construct yields simple abbreviations for more complex statements. 
-    ! B- It can be an alias for expressions or variables
-
+    
     associate(                                                                                     &
          nue_decomp_cascade             => soilbiogeochem_state_inst%nue_decomp_cascade_col      , & ! Output: [real(r8)          (:)     ]  N use efficiency for a given transition (gN going into microbe / gN decomposed)
 
@@ -499,8 +429,6 @@ contains
 
 
 
-      ! B- FLUXES between pools
-
       ! vmod = "old" vmod * av  AND  kmod = ak / "old" kmod
       ! Table B1 Wieder et al. (2015) and MIMICS params file give diff
       ! ak and av values. I used the params file values.
@@ -546,7 +474,6 @@ contains
       ! Time-dep params in subr. decomp_rates_mimics.
 
       
-      ! B- SOIL INETIALIZATION
       do c = bounds%begc, bounds%endc
          do j = 1, nlevdecomp
             ! The parameter values currently in the params files always lead to
@@ -684,14 +611,13 @@ contains
       is_microbe(i_oli_mic) = .true.
       is_litter(i_oli_mic) = .false.
       is_soil(i_oli_mic) = .false.
-      is_cwd(i_oli_mic) = .false. !this is a catogory, invent new catogory for mycorrhiza!!!!!!!_____
+      is_cwd(i_oli_mic) = .false.
       initial_cn_ratio(i_oli_mic) = 10._r8  ! MIMICS may use this
       initial_stock(i_oli_mic) = params_inst%mimics_initial_Cstocks(i_oli_mic)
       is_metabolic(i_oli_mic) = .false.
       is_cellulose(i_oli_mic) = .false.
       is_lignin(i_oli_mic) = .false.
 
-      ! B- HERE I HAVE TO ADD ADDITIONAL POOLS (I think)
 
       if (.not. use_fates) then
          ! CWD
@@ -729,7 +655,6 @@ contains
       spinup_factor(i_cop_mic) = 1._r8
       spinup_factor(i_oli_mic) = 1._r8
 
-      ! B- also add pools here
 
       if ( masterproc ) then
          write(iulog,*) 'Spinup_state ',spinup_state
@@ -737,8 +662,7 @@ contains
       end if
 
       !----------------  list of transitions and their time-independent coefficients  ---------------!
-      ! B- What are those numbers 1-14?
-      ! Fluxes in beteen pools, also Nitrogen?
+      
       i_l1m1 = 1
       decomp_cascade_con%cascade_step_name(i_l1m1) = 'L1M1'
       cascade_donor_pool(i_l1m1) = i_met_lit
@@ -823,8 +747,6 @@ contains
       cascade_receiver_pool(i_m2s3) = i_phys_som
       nue_decomp_cascade(i_m2s3) = 1.0_r8
 
-      ! B- add fluxes
-      ! B- pay attention to numbers
 
       if (.not. use_fates) then
          i_cwdl2 = 15
@@ -851,8 +773,6 @@ contains
 
   end subroutine init_decompcascade_mimics
 
-
-  ! B- ------FLUX CALCULATIONS--------------------------------------------
 
   !-----------------------------------------------------------------------
   subroutine decomp_rates_mimics(bounds, num_bgc_soilc, filter_bgc_soilc, &
