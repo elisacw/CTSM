@@ -103,7 +103,7 @@ contains
        if (decomp_method == mimics_decomp) then
           call readSoilBiogeochemDecompMimicsParams(ncid)
        else if (decomp_method == mimicsplus_decomp) then
-            call readSoilBiogeochemDecompMimicsplusParams(ncid) !ECW
+            call readSoilBiogeochemDecompMimicsplusParams(ncid)
        else if (decomp_method == century_decomp) then
           call readSoilBiogeochemDecompBgcParams(ncid)
        end if
