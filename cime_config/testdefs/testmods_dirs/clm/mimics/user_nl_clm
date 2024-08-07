@@ -1,1 +1,23 @@
 soil_decomp_method = 'MIMICSWieder2015'
+ hist_dov2xy    = .true., .true.
+! Even though only 2 history tapes are defined here, set ndens to 1 for up to 6 history
+! tapes, for the sake of mods that extend these default mods and may add other history tapes
+ hist_ndens     = 1,1,1,1,1,1
+ hist_nhtfrq    = 1,1
+ hist_mfilt     = 1,1
+ hist_fincl1    = 'TRAFFICFLUX', 'SNOWLIQ:A','SNOWICE:A'
+! Add FCO2 because few (if any) tests send this flux to the coupler, so it isn't checked via cpl hist files
+ hist_fincl1   += 'FCO2'
+ hist_fincl2    = 'LIT_MET_C_TO_MIC_COP', 'LIT_MET_C_TO_MIC_OLI', 'LIT_STR_C_TO_MIC_COP', 'LIT_STR_C_TO_MIC_OLI',
+                  'MIC_COP_C_TO_SOM_AVL', 'MIC_COP_C_TO_SOM_CHEM', 'MIC_COP_C_TO_SOM_PHYS',
+                  'MIC_OLI_C_TO_SOM_AVL', 'MIC_OLI_C_TO_SOM_CHEM', 'MIC_OLI_C_TO_SOM_PHYS',
+                  'SOM_CHEM_C_TO_SOM_AVL', 'SOM_PHYS_C_TO_SOM_AVL',
+                  'SOM_AVL_C_TO_MIC_COP', 'SOM_AVL_C_TO_MIC_OLI'
+                  
+ use_ssre = .true.
+ paramfile = '/cluster/projects/nn2806k/elisacw/parameters/clm_params_mimicsplus.nc'
+
+
+hist_fincl1 += 'SOILC_vr', 'TOTMICC', 'TOTLITC', 'TOTSOMC', 'TOTLITC_1m', 'TOTSOMC_1m',
+'DYN_COL_SOIL_ADJUSTMENTS_C', 'TOTCOLC', 'TOTECOSYSC', 'LIT_MET_C_vr', 'LIT_STR_C_vr', 'SOM_AVL_C_vr', 
+'SOM_CHEM_C_vr', 'SOM_PHYS_C_vr', 'MIC_COP_C_vr', 'MIC_OLI_C_vr'

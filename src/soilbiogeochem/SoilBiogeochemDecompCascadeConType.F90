@@ -141,7 +141,7 @@ contains
              ndecomp_cascade_transitions = 14
           else if (decomp_method == mimicsplus_decomp) then
              ndecomp_pools = 7
-             ndecomp_cascade_transitions = 14 !ECW change later !ECW is this double?
+             ndecomp_cascade_transitions = 14
           end if
        else
           if (decomp_method == century_decomp) then
@@ -152,7 +152,7 @@ contains
              ndecomp_cascade_transitions = 15
           else if (decomp_method == mimicsplus_decomp) then
              ndecomp_pools = 10
-             ndecomp_cascade_transitions = 21 !ECW 
+             ndecomp_cascade_transitions = 21
 
             end if
        endif
@@ -225,7 +225,7 @@ contains
        decomp_cascade_con%decomp_pool_name_long(ibeg:ndecomp_pools)          = ''
        decomp_cascade_con%decomp_pool_name_short(ibeg:ndecomp_pools)         = ''
        decomp_cascade_con%is_microbe(ibeg:ndecomp_pools)                     = .false.
-       decomp_cascade_con%is_mycorrhiza(ibeg:ndecomp_pools)                  = .false. !ECW
+       decomp_cascade_con%is_mycorrhiza(ibeg:ndecomp_pools)                  = .false.
        decomp_cascade_con%is_litter(ibeg:ndecomp_pools)                      = .false.
        decomp_cascade_con%is_soil(ibeg:ndecomp_pools)                        = .false.
        decomp_cascade_con%is_cwd(ibeg:ndecomp_pools)                         = .false.
