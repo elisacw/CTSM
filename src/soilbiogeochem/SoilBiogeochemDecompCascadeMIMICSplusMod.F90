@@ -1000,7 +1000,7 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
         num_soilp, filter_soilp, clm_fates, &
         soilstate_inst, temperature_inst, cnveg_carbonflux_inst, &
         ch4_inst, soilbiogeochem_carbonflux_inst, waterstatebulk_inst, &
-        soilbiogeochem_state_inst, soilbiogeochem_carbonstate_inst) !ASKM soilbiogeochem_nitrogenstate_inst
+        soilbiogeochem_state_inst, soilbiogeochem_carbonstate_inst)
       !
       ! !DESCRIPTION:
       ! Calculate rates and decomposition pathways for the MIMICS+
