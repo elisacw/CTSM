@@ -32,6 +32,7 @@ contains
     use CNGapMortalityMod                 , only : readCNGapMortParams                    => readParams
     use CNMRespMod                        , only : readCNMRespParams                      => readParams
     use CNFUNMod                          , only : readCNFUNParams                        => readParams
+    use CNFUNMIMICSplusMod                , only : readCNFUNMIMICSplusParams              => readParams
     use CNPhenologyMod                    , only : readCNPhenolParams                     => readParams
     use SoilBiogeochemCompetitionMod      , only : readSoilBiogeochemCompetitionParams    => readParams
     use SoilBiogeochemNLeachingMod        , only : readSoilBiogeochemNLeachingParams      => readParams
@@ -104,6 +105,7 @@ contains
           call readSoilBiogeochemDecompMimicsParams(ncid)
        else if (decomp_method == mimicsplus_decomp) then
             call readSoilBiogeochemDecompMimicsplusParams(ncid)
+            call readCNFUNMIMICSplusParams(ncid)
        else if (decomp_method == century_decomp) then
           call readSoilBiogeochemDecompBgcParams(ncid)
        end if

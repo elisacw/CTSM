@@ -67,13 +67,8 @@ module CNFUNMod
   real(r8) :: ndays_on        ! number of days to complete onset
   real(r8) :: ndays_off       ! number of days to complete offset
   
-  integer, private, parameter :: COST_METHOD = 2 !new way of doing the N uptake
-  ! resistances. see teamwork thread on over-cheap uptake in N
-  !  resistors. 
-  integer,  private, parameter :: nstp            = 2             ! Number of
-  !  calculation part
-  integer,  private, parameter :: ncost6          = 6             ! Number of
-  !  N transport pathways
+  integer,  private, parameter :: nstp            = 2             ! Number of calculation part
+  integer,  private, parameter :: ncost6          = 6             ! Number of  N transport pathways
 
   character(len=*), parameter, private :: sourcefile = &
        __FILE__
@@ -317,8 +312,8 @@ module CNFUNMod
   real(r8)  :: nt_uptake(bounds%begp:bounds%endp,1:nstp)             ! N uptake from retrans, active, and fix(gN/m2)
   real(r8)  :: npp_uptake(bounds%begp:bounds%endp,1:nstp)            ! NPP used by the uptakes               (gC/m2)
 
-  !----------NITRIF_DENITRIF-------------!
-
+  
+!----------NITRIF_DENITRIF-------------!
   real(r8)  :: sminn_no3_diff                                        ! A temporary limit for N uptake                  (gN/m2)
   real(r8)  :: sminn_nh4_diff                                        ! A temporary limit for N uptake                  (gN/m2)
   real(r8)  :: active_no3_limit1                                     ! A temporary limit for N uptake                  (gN/m2)
