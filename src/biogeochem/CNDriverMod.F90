@@ -123,6 +123,7 @@ contains
     use CNNDynamicsMod                    , only: CNNDeposition,CNNFixation, CNNFert, CNSoyfix,CNFreeLivingFixation
     use CNMRespMod                        , only: CNMResp
     use CNFUNMod                          , only: CNFUNInit  !, CNFUN 
+    use CNFUNMIMICSplusMod                , only: CNFUNMIMICSplusInit
     use CNPhenologyMod                    , only: CNPhenology
     use CNGRespMod                        , only: CNGResp
     use FireMethodType                    , only: fire_method_type

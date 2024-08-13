@@ -46,14 +46,15 @@ module CNFUNMIMICSplusMod
 
   ! !PUBLIC MEMBER FUNCTIONS:
   public:: readParams            ! Read in parameters needed for FUNMimicplus
+  public:: CNFUNMIMICSplusInit   ! FUNMIMICSplus calculation initialization
 
-  ! NOT SURE IF THIS SHOULD GO HERE
+  ! !LOCAL VARIABLES
   integer,  parameter :: icostFix        = 1             ! Process number for fixing.
   integer,  parameter :: icostRetrans    = 2             ! Process number for retranslocation.
   integer,  parameter :: icostActiveNO3  = 3             ! Process number for mycorrhizal uptake of NO3.
   integer,  parameter :: icostActiveNH4  = 4             ! Process number for mycorrhizal uptake of NH4
-  integer,  parameter :: icostnonmyc_no3 = 5            ! Process number for nonmyc uptake of NO3.
-  integer,  parameter :: icostnonmyc_nh4 = 6            ! Process number for nonmyc uptake of NH4.
+  integer,  parameter :: icostnonmyc_no3 = 5             ! Process number for nonmyc uptake of NO3.
+  integer,  parameter :: icostnonmyc_nh4 = 6             ! Process number for nonmyc uptake of NH4.
   
   real(r8), parameter :: big_cost        = 1000000000._r8! An arbitrarily large cost
  
@@ -275,6 +276,13 @@ contains
 
 
   subroutine Init (this, bounds)
+   !
+   ! !DESCRIPTION:
+   ! Initialize xxx
+   !
+   ! !USES:
+   !
+   ! !ARGUMENTS:
      class(cnfunmimicsplus_type)       :: this
      type(bounds_type) , intent(in)    :: bounds  
 
@@ -285,6 +293,13 @@ contains
 
 
   subroutine InitAllocate (this, bounds)
+   !
+   ! !DESCRIPTION:
+   ! Initialize module data structure
+   !
+   ! !USES:
+   !
+   ! !ARGUMENTS:
    class(cnfunmimicsplus_type)       :: this
    type(bounds_type) , intent(in)    :: bounds  
 
@@ -435,7 +450,13 @@ contains
   
 
   subroutine SetZeros (this, bounds)
-
+   !
+   ! !DESCRIPTION:
+   ! Sets module data structure to zero
+   !
+   ! !USES:
+   !
+   ! !ARGUMENTS:
    class(cnfunmimicsplus_type)       :: this
    type(bounds_type) , intent(in)    :: bounds  
 
@@ -520,10 +541,13 @@ contains
 
 
  subroutine readParams ( ncid )
+  ! 
+  ! !DESCRIPTION:
+  ! Read in parameters
   !
   ! !USES:
   use ncdio_pio , only : file_desc_t,ncd_io
-
+  !
   ! !ARGUMENTS:
   implicit none
   type(file_desc_t),intent(inout) :: ncid   ! pio netCDF file id
@@ -554,9 +578,10 @@ contains
  !--------------------------------------------------------------------
   !---
 
- subroutine CNFUNInit (bounds,cnveg_state_inst,cnveg_carbonstate_inst,cnveg_nitrogenstate_inst)
+ subroutine CNFUNMIMICSplusInit (bounds,cnveg_state_inst,cnveg_carbonstate_inst,cnveg_nitrogenstate_inst)
   !
   ! !DESCRIPTION:
+  ! Initialization of FUN for MIMICSplus
   !
   ! !USES:
   use clm_varcon      , only: secspday, fun_period
@@ -578,7 +603,7 @@ contains
   integer           :: nstep                    ! time step number
   integer           :: nstep_fun                ! Number of
   !  atmospheric timesteps between calls to FUN
-  character(len=32) :: subname = 'CNFUNInit'
+  character(len=32) :: subname = 'CNFUNMIMICSplusInit'
 !--------------------------------------------------------------------
   !---
 
@@ -625,7 +650,7 @@ contains
 !--------------------------------------------------------------------
   !---
   end associate
-  end subroutine CNFUNInit 
+  end subroutine CNFUNMIMICSplusInit 
 !--------------------------------------------------------------------
  
 

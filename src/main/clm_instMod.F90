@@ -83,6 +83,7 @@ module clm_instMod
   use SnowCoverFractionFactoryMod     , only : CreateAndInitSnowCoverFraction
   use SoilWaterRetentionCurveMod      , only : soil_water_retention_curve_type
   use NutrientCompetitionMethodMod    , only : nutrient_competition_method_type
+  use CNFUNMIMICSplusMod              , only : cnfunmimicsplus_type !ECW
   !
   use SoilStateInitTimeConstMod       , only : SoilStateInitTimeConst
   use SoilHydrologyInitTimeConstMod   , only : SoilHydrologyInitTimeConst
@@ -147,6 +148,7 @@ module clm_instMod
   type(soilbiogeochem_carbonflux_type)   , public :: c14_soilbiogeochem_carbonflux_inst
   type(soilbiogeochem_nitrogenstate_type), public :: soilbiogeochem_nitrogenstate_inst
   type(soilbiogeochem_nitrogenflux_type) , public :: soilbiogeochem_nitrogenflux_inst
+  type(cnfunmimicsplus_type)             , public :: cnfunmimicsplus_inst !ECW
 
   ! General biogeochem types
   type(ch4_type)      , public            :: ch4_inst
@@ -396,7 +398,7 @@ contains
 
        ! Initalize soilbiogeochem carbon types
 
-       call soilbiogeochem_carbonstate_inst%Init(bounds, carbon_type='c12', ratio=1._r8)
+       call soilbiogeochem_carbonstate_inst%Init(bounds, carbon_type='c12', ratio=1._r8) !ECW
        if (use_c13) then
           call c13_soilbiogeochem_carbonstate_inst%Init(bounds, carbon_type='c13', ratio=c13ratio, &
                c12_soilbiogeochem_carbonstate_inst=soilbiogeochem_carbonstate_inst)
@@ -426,6 +428,10 @@ contains
        ! Initialize precision control for soil biogeochemistry
        call SoilBiogeochemPrecisionControlInit( soilbiogeochem_carbonstate_inst, c13_soilbiogeochem_carbonstate_inst, &
                                                 c14_soilbiogeochem_carbonstate_inst, soilbiogeochem_nitrogenstate_inst)
+
+       if (decomp_method == mimicsplus_decomp ) then
+          call cnfunmimicsplus_inst%Init(bounds) !ECW
+       end if
 
     end if if_decomp
 
