@@ -688,7 +688,7 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
    waterstatebulk_inst, waterfluxbulk_inst, temperature_inst,soilstate_inst, &
    cnveg_state_inst,cnveg_carbonstate_inst, cnveg_carbonflux_inst,cnveg_nitrogenstate_inst,cnveg_nitrogenflux_inst, &
    soilbiogeochem_nitrogenflux_inst,soilbiogeochem_carbonflux_inst,canopystate_inst, soilbiogeochem_nitrogenstate_inst, &
-   soilbiogeochem_carbonstate_inst)
+   soilbiogeochem_carbonstate_inst, cnfunmimicsplus_inst)
    
 ! !USES:
    use clm_time_manager, only : get_step_size_real, get_curr_date
@@ -719,6 +719,7 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
    type(canopystate_type)                  , intent(inout) :: canopystate_inst  
    type(soilbiogeochem_nitrogenstate_type) , intent(inout) :: soilbiogeochem_nitrogenstate_inst
    type(soilbiogeochem_carbonstate_type)   , intent(inout) :: soilbiogeochem_carbonstate_inst
+   type(cnfunmimicsplus_type)              , intent(inout) :: cnfunmimicsplus_inst
   ! 
 
 end subroutine CNFUNMIMICSplus

@@ -939,7 +939,7 @@ contains
        wateratm2lndbulk_inst, canopystate_inst, soilstate_inst, temperature_inst, &
        soil_water_retention_curve, crop_inst, ch4_inst, &
        photosyns_inst, saturated_excess_runoff_inst, energyflux_inst,          &
-       nutrient_competition_method, fireemis_inst)
+       nutrient_competition_method, fireemis_inst, cnfunmimicsplus_inst)
     !
     ! !DESCRIPTION:
     ! Do the main science for biogeochemistry that needs to be done before hydrology-drainage
@@ -948,7 +948,7 @@ contains
     ! Will skip most vegetation patch calls for the latter
     !
     ! !USES:
-
+    use CNFUNMIMICSplusMod                , only: cnfunmimicsplus_type
     !
     ! !ARGUMENTS:
     class(cn_vegetation_type)               , intent(inout) :: this
@@ -996,6 +996,7 @@ contains
     class(nutrient_competition_method_type) , intent(inout) :: nutrient_competition_method
     type(fireemis_type)                     , intent(inout) :: fireemis_inst
     type(hlm_fates_interface_type)          , intent(inout) :: clm_fates
+    type(cnfunmimicsplus_type)              , intent(inout) :: cnfunmimicsplus_inst
     !
     ! !LOCAL VARIABLES:
 
@@ -1030,7 +1031,7 @@ contains
          wateratm2lndbulk_inst, canopystate_inst, soilstate_inst, temperature_inst, &
          soil_water_retention_curve, crop_inst, ch4_inst, &
          this%dgvs_inst, photosyns_inst, saturated_excess_runoff_inst, energyflux_inst,          &
-         nutrient_competition_method, this%cnfire_method, this%dribble_crophrv_xsmrpool_2atm)
+         nutrient_competition_method, this%cnfire_method, this%dribble_crophrv_xsmrpool_2atm, cnfunmimicsplus_inst)
 
     ! fire carbon emissions 
     call CNFireEmisUpdate(bounds, num_bgc_vegp, filter_bgc_vegp, &

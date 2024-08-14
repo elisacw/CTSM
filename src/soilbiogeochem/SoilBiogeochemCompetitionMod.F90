@@ -172,7 +172,8 @@ contains
                                          cnveg_carbonflux_inst,cnveg_nitrogenstate_inst,cnveg_nitrogenflux_inst,   &
                                          soilbiogeochem_carbonflux_inst,                                           &              
                                          soilbiogeochem_state_inst, soilbiogeochem_nitrogenstate_inst,             &
-                                         soilbiogeochem_nitrogenflux_inst,canopystate_inst, soilbiogeochem_carbonstate_inst)
+                                         soilbiogeochem_nitrogenflux_inst,canopystate_inst, soilbiogeochem_carbonstate_inst, &
+                                         cnfunmimicsplus_inst)
     !
     ! !USES:
     use clm_varctl       , only: cnallocate_carbon_only, iulog
@@ -181,7 +182,7 @@ contains
     use clm_varcon       , only: nitrif_n2o_loss_frac
     use CNSharedParamsMod, only: use_fun
     use CNFUNMod         , only: CNFUN
-    use CNFUNMIMICSplusMod, only: CNFUNMIMICSplus
+    use CNFUNMIMICSplusMod, only: CNFUNMIMICSplus, cnfunmimicsplus_type
     use subgridAveMod    , only: p2c
     use perf_mod         , only : t_startf, t_stopf
     use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con,  mimics_decomp, mimicsplus_decomp, decomp_method
@@ -208,7 +209,9 @@ contains
     type(soilbiogeochem_state_type)         , intent(inout) :: soilbiogeochem_state_inst
     type(soilbiogeochem_nitrogenstate_type) , intent(inout) :: soilbiogeochem_nitrogenstate_inst
     type(soilbiogeochem_nitrogenflux_type)  , intent(inout) :: soilbiogeochem_nitrogenflux_inst
-    type(canopystate_type)                  , intent(inout) :: canopystate_inst   
+    type(canopystate_type)                  , intent(inout) :: canopystate_inst
+    type(cnfunmimicsplus_type)              , intent(inout) :: cnfunmimicsplus_inst   
+    
 !
     !
     ! !LOCAL VARIABLES:
@@ -396,7 +399,7 @@ contains
                       waterfluxbulk_inst,temperature_inst,soilstate_inst,cnveg_state_inst,cnveg_carbonstate_inst,&
                       cnveg_carbonflux_inst,cnveg_nitrogenstate_inst,cnveg_nitrogenflux_inst                ,&
                       soilbiogeochem_nitrogenflux_inst,soilbiogeochem_carbonflux_inst,canopystate_inst,      &
-                      soilbiogeochem_nitrogenstate_inst, soilbiogeochem_carbonstate_inst)
+                      soilbiogeochem_nitrogenstate_inst, soilbiogeochem_carbonstate_inst, cnfunmimicsplus_inst)
             call p2c(bounds, nlevdecomp, &
                       cnveg_nitrogenflux_inst%sminn_to_plant_fun_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp),&
                       soilbiogeochem_nitrogenflux_inst%sminn_to_plant_fun_vr_col(bounds%begc:bounds%endc,1:nlevdecomp), &
@@ -795,7 +798,7 @@ contains
                       waterfluxbulk_inst,temperature_inst,soilstate_inst,cnveg_state_inst,cnveg_carbonstate_inst,&
                       cnveg_carbonflux_inst,cnveg_nitrogenstate_inst,cnveg_nitrogenflux_inst                ,&
                       soilbiogeochem_nitrogenflux_inst,soilbiogeochem_carbonflux_inst,canopystate_inst,      &
-                      soilbiogeochem_nitrogenstate_inst, soilbiogeochem_carbonstate_inst)
+                      soilbiogeochem_nitrogenstate_inst, soilbiogeochem_carbonstate_inst, cnfunmimicsplus_inst)
                       
             ! sminn_to_plant_fun is output of actual N uptake from FUN
             call p2c(bounds,nlevdecomp, &
