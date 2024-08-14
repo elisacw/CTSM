@@ -206,6 +206,7 @@ contains
     use shr_sys_mod      , only : shr_sys_flush
     use clm_varcon       , only : secspday, spval
     use CNSharedParamsMod    , only: use_fun
+    use SoilBiogeochemDecompCascadeConType, only : mimicsplus_decomp, decomp_method
     !
     ! !ARGUMENTS:
     integer                                , intent(in)    :: num_soilc       ! number of soil columns in filter
@@ -273,7 +274,7 @@ contains
             nfix_to_sminn(c) = max(0._r8,t)
          end do
       endif
-      if(use_fun)then
+      if(use_fun .or. decomp_method == mimicsplus_decomp)then
         nfix_to_sminn(c) = 0.0_r8
       end if
 

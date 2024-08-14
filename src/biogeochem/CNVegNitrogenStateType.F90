@@ -9,6 +9,7 @@ module CNVegNitrogenStateType
   use clm_varctl                         , only : iulog
   use clm_varctl                         , only : use_crop
   use CNSharedParamsMod                  , only : use_fun, use_matrixcn
+  use SoilBiogeochemDecompCascadeConType , only : mimicsplus_decomp, decomp_method
   use decompMod                          , only : bounds_type
   use pftconMod                          , only : npcropmin, noveg, pftcon
   use abortutils                         , only : endrun
@@ -250,7 +251,7 @@ contains
     if ( use_matrixcn )then
     end if
 
-    if ( use_fun ) then
+    if ( use_fun .or. decomp_method == mimicsplus_decomp ) then
        this%leafn_storage_xfer_acc_patch(begp:endp) = spval
        call hist_addfld1d (fname='LEAFN_STORAGE_XFER_ACC', units='gN/m^2', &
             avgflag='A', long_name='Accmulated leaf N transfer', &
@@ -640,7 +641,7 @@ contains
     if ( use_matrixcn )then
     end if
 
-    if ( use_fun ) then
+    if ( use_fun .or. decomp_method == mimicsplus_decomp ) then
         call restartvar(ncid=ncid, flag=flag, varname='leafn_storage_xfer_acc', xtype=ncd_double,  &
              dim1name='pft', long_name='', units='', &
             interpinic_flag='interp', readvar=readvar, data=this%leafn_storage_xfer_acc_patch)

@@ -306,7 +306,7 @@ contains
          atm2lnd_inst, soilbiogeochem_nitrogenflux_inst)
     call t_stopf('CNDeposition')
     
-    if(use_fun)then
+    if(use_fun .or. decomp_method == mimicsplus_decomp)then
         call t_startf('CNFLivFixation')
         call CNFreeLivingFixation( num_bgc_soilc, filter_bgc_soilc, &
              waterfluxbulk_inst, soilbiogeochem_nitrogenflux_inst)
@@ -420,6 +420,25 @@ contains
           
        end if
        
+       if ( decomp_method == mimicsplus_decomp) then
+          call t_startf('CNPhenology_phase1')
+          call CNPhenology (bounds, num_bgc_soilc, filter_bgc_soilc, num_bgc_vegp, &
+               filter_bgc_vegp, num_pcropp, filter_pcropp, &
+               waterdiagnosticbulk_inst, wateratm2lndbulk_inst, temperature_inst, atm2lnd_inst, &
+               crop_inst, canopystate_inst, soilstate_inst, dgvs_inst, &
+               cnveg_state_inst, cnveg_carbonstate_inst, cnveg_carbonflux_inst, &
+               cnveg_nitrogenstate_inst, cnveg_nitrogenflux_inst, &
+               c13_cnveg_carbonstate_inst, c14_cnveg_carbonstate_inst, &
+               leaf_prof_patch=soilbiogeochem_state_inst%leaf_prof_patch(begp:endp,1:nlevdecomp_full), &
+               froot_prof_patch=soilbiogeochem_state_inst%froot_prof_patch(begp:endp,1:nlevdecomp_full), &
+               phase=1)
+          call t_stopf('CNPhenology_phase1')
+          
+          call t_startf('CNFUNMIMICSplusInit')
+          call CNFUNMIMICSplusInit(bounds,cnveg_state_inst,cnveg_carbonstate_inst,cnveg_nitrogenstate_inst)
+          call t_stopf('CNFUNMIMICSplusInit')
+       end if
+
        call t_startf('cnalloc')
        call calc_gpp_mr_availc( &
             bounds, num_bgc_vegp, filter_bgc_vegp, &
@@ -485,7 +504,7 @@ contains
                                      cnveg_carbonflux_inst,cnveg_nitrogenstate_inst,cnveg_nitrogenflux_inst,   &
                                      soilbiogeochem_carbonflux_inst,&
                                      soilbiogeochem_state_inst,soilbiogeochem_nitrogenstate_inst,              &
-                                     soilbiogeochem_nitrogenflux_inst,canopystate_inst)
+                                     soilbiogeochem_nitrogenflux_inst,canopystate_inst, soilbiogeochem_carbonstate_inst)
      call t_stopf('soilbiogeochemcompetition')
 
     ! distribute the available N between the competing patches  on the basis of 

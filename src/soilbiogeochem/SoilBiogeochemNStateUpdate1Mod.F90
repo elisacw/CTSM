@@ -15,6 +15,7 @@ module SoilBiogeochemNStateUpdate1Mod
   use SoilBiogeochemNitrogenfluxType     , only : soilbiogeochem_nitrogenflux_type
   use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, use_soil_matrixcn
   use CNSharedParamsMod                  , only : use_fun
+  use SoilBiogeochemDecompCascadeConType , only : mimicsplus_decomp, decomp_method
   use ColumnType                         , only : col 
   !
   implicit none
@@ -65,7 +66,7 @@ contains
       do j = 1, nlevdecomp
          do fc = 1,num_bgc_soilc
             c = filter_bgc_soilc(fc)
-            if(use_fun)then !RF in FUN logic, the fixed N goes straight into the plant, and not into the SMINN pool. 
+            if(use_fun .or. decomp_method == mimicsplus_decomp)then !RF in FUN logic, the fixed N goes straight into the plant, and not into the SMINN pool. 
  	               ! N deposition and fixation (put all into NH4 pool)
 	               ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) + nf%ndep_to_sminn_col(c)*dt * ndep_prof(c,j)
 	               ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) + nf%ffix_to_sminn_col(c)*dt * nfixation_prof(c,j)

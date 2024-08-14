@@ -40,6 +40,7 @@ module controlMod
   use HumanIndexMod                    , only: HumanIndexReadNML
   use CNPrecisionControlMod            , only: CNPrecisionControlReadNML
   use CNSharedParamsMod                , only: use_fun
+  use SoilBiogeochemDecompCascadeConType , only : mimicsplus_decomp, decomp_method
   use CIsoAtmTimeseriesMod             , only: use_c14_bombspike, atm_c14_filename, use_c13_timeseries, atm_c13_filename
   use SoilBiogeochemCompetitionMod     , only: suplnitro, suplnNon
   use SoilBiogeochemLittVertTranspMod  , only: som_adv_flux, max_depth_cryoturb
@@ -560,7 +561,7 @@ contains
     ! Read in other namelists that are dependent on other namelist setttings
     ! ----------------------------------------------------------------------
 
-    if ( use_fun ) then
+    if ( use_fun .or. decomp_method == mimicsplus_decomp) then
        call CNMRespReadNML( NLFilename )
     end if
 

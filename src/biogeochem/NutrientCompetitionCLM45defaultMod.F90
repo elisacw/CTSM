@@ -136,6 +136,7 @@ contains
     use CNVegNitrogenFluxType , only : cnveg_nitrogenflux_type
     use CNVegNitrogenStateType, only : cnveg_nitrogenstate_type
     use CNSharedParamsMod     , only : use_fun, use_matrixcn
+    use SoilBiogeochemDecompCascadeConType , only : mimicsplus_decomp, decomp_method
     use shr_infnan_mod        , only : shr_infnan_isnan
 
     !
@@ -302,7 +303,7 @@ contains
             end if
          end if
 
-         if(use_fun)then ! if we are using FUN, we get the N available from there.
+         if(use_fun .or. decomp_method == mimicsplus_decomp )then ! if we are using FUN, we get the N available from there.
             sminn_to_npool(p) = sminn_to_plant_fun(p)
          else ! no FUN. :( we get N available from the FPG calculation in soilbiogeochemistry competition.
             sminn_to_npool(p) = plant_ndemand(p) * fpg(c)

@@ -172,7 +172,7 @@ contains
                                          cnveg_carbonflux_inst,cnveg_nitrogenstate_inst,cnveg_nitrogenflux_inst,   &
                                          soilbiogeochem_carbonflux_inst,                                           &              
                                          soilbiogeochem_state_inst, soilbiogeochem_nitrogenstate_inst,             &
-                                         soilbiogeochem_nitrogenflux_inst,canopystate_inst)
+                                         soilbiogeochem_nitrogenflux_inst,canopystate_inst, soilbiogeochem_carbonstate_inst)
     !
     ! !USES:
     use clm_varctl       , only: cnallocate_carbon_only, iulog
@@ -181,6 +181,7 @@ contains
     use clm_varcon       , only: nitrif_n2o_loss_frac
     use CNSharedParamsMod, only: use_fun
     use CNFUNMod         , only: CNFUN
+    use CNFUNMIMICSplusMod, only: CNFUNMIMICSplus
     use subgridAveMod    , only: p2c
     use perf_mod         , only : t_startf, t_stopf
     use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con,  mimics_decomp, mimicsplus_decomp, decomp_method
@@ -202,6 +203,7 @@ contains
     type(cnveg_carbonflux_type)             , intent(inout) :: cnveg_carbonflux_inst
     type(cnveg_nitrogenstate_type)          , intent(inout) :: cnveg_nitrogenstate_inst
     type(cnveg_nitrogenflux_type)           , intent(inout) :: cnveg_nitrogenflux_inst
+    type(soilbiogeochem_carbonstate_type)   , intent(inout) :: soilbiogeochem_carbonstate_inst
     type(soilbiogeochem_carbonflux_type)    , intent(inout) :: soilbiogeochem_carbonflux_inst
     type(soilbiogeochem_state_type)         , intent(inout) :: soilbiogeochem_state_inst
     type(soilbiogeochem_nitrogenstate_type) , intent(inout) :: soilbiogeochem_nitrogenstate_inst
@@ -388,12 +390,26 @@ contains
             call t_stopf( 'CNFUN' )
          end if
 
+         if ( decomp_method == mimicsplus_decomp ) then
+            call t_startf( 'CNFUNMIMICSplus' )
+            call CNFUNMIMICSplus(bounds,num_bgc_soilc,filter_bgc_soilc,num_bgc_vegp,filter_bgc_vegp,waterstatebulk_inst, &
+                      waterfluxbulk_inst,temperature_inst,soilstate_inst,cnveg_state_inst,cnveg_carbonstate_inst,&
+                      cnveg_carbonflux_inst,cnveg_nitrogenstate_inst,cnveg_nitrogenflux_inst                ,&
+                      soilbiogeochem_nitrogenflux_inst,soilbiogeochem_carbonflux_inst,canopystate_inst,      &
+                      soilbiogeochem_nitrogenstate_inst, soilbiogeochem_carbonstate_inst)
+            call p2c(bounds, nlevdecomp, &
+                      cnveg_nitrogenflux_inst%sminn_to_plant_fun_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp),&
+                      soilbiogeochem_nitrogenflux_inst%sminn_to_plant_fun_vr_col(bounds%begc:bounds%endc,1:nlevdecomp), &
+                      'unity')
+            call t_stopf( 'CNFUNMIMICSplus' )
+         end if
+
          ! sum up N fluxes to plant
          do j = 1, nlevdecomp
             do fc=1,num_bgc_soilc
                c = filter_bgc_soilc(fc)    
                sminn_to_plant(c) = sminn_to_plant(c) + sminn_to_plant_vr(c,j) * dzsoi_decomp(j)
-               if ( local_use_fun ) then
+               if ( local_use_fun .or. decomp_method == mimicsplus_decomp) then
                   if (sminn_to_plant_fun_vr(c,j).gt.sminn_to_plant_vr(c,j)) then
                       sminn_to_plant_fun_vr(c,j)  = sminn_to_plant_vr(c,j)
                   end if
@@ -649,7 +665,7 @@ contains
                      ! do we need this at all? 
                      smin_no3_to_plant_vr(c,j) = plant_ndemand(c)*nuptake_prof(c,j)
                      ! RF added new term. send rest of N to plant - which decides whether it should pay or not? 
-                     if ( local_use_fun ) then
+                     if ( local_use_fun .or. decomp_method == mimicsplus_decomp) then
                         smin_no3_to_plant_vr(c,j) = smin_no3_vr(c,j)/dt - actual_immob_no3_vr(c,j) - f_denit_vr(c,j)
                      end if
                   endif
@@ -771,6 +787,27 @@ contains
                        soilbiogeochem_nitrogenflux_inst%sminn_to_plant_fun_nh4_vr_col(bounds%begc:bounds%endc,1:nlevdecomp),&
                        'unity')
             call t_stopf( 'CNFUN' )
+         end if
+
+         if ( decomp_method == mimicsplus_decomp ) then
+            call t_startf( 'CNFUNMIMICSplus' )
+            call CNFUNMIMICSplus(bounds,num_bgc_soilc,filter_bgc_soilc,num_bgc_vegp,filter_bgc_vegp,waterstatebulk_inst,&
+                      waterfluxbulk_inst,temperature_inst,soilstate_inst,cnveg_state_inst,cnveg_carbonstate_inst,&
+                      cnveg_carbonflux_inst,cnveg_nitrogenstate_inst,cnveg_nitrogenflux_inst                ,&
+                      soilbiogeochem_nitrogenflux_inst,soilbiogeochem_carbonflux_inst,canopystate_inst,      &
+                      soilbiogeochem_nitrogenstate_inst, soilbiogeochem_carbonstate_inst)
+                      
+            ! sminn_to_plant_fun is output of actual N uptake from FUN
+            call p2c(bounds,nlevdecomp, &
+                       cnveg_nitrogenflux_inst%sminn_to_plant_fun_no3_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp),&
+                       soilbiogeochem_nitrogenflux_inst%sminn_to_plant_fun_no3_vr_col(bounds%begc:bounds%endc,1:nlevdecomp),&
+                       'unity')
+
+            call p2c(bounds,nlevdecomp, &
+                       cnveg_nitrogenflux_inst%sminn_to_plant_fun_nh4_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp),&
+                       soilbiogeochem_nitrogenflux_inst%sminn_to_plant_fun_nh4_vr_col(bounds%begc:bounds%endc,1:nlevdecomp),&
+                       'unity')
+            call t_stopf( 'CNFUNMIMICSplus' )
          end if
 
 

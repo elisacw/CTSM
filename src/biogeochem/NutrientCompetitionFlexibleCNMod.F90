@@ -209,6 +209,7 @@ contains
     use CNVegNitrogenStateType , only : cnveg_nitrogenstate_type
     use SoilBiogeochemNitrogenStateType , only : soilbiogeochem_nitrogenstate_type
     use CNSharedParamsMod     , only : use_fun
+    use SoilBiogeochemDecompCascadeConType , only : mimicsplus_decomp, decomp_method
     use CNPrecisionControlMod , only : n_min
     use clm_varcon            , only : spval
 
@@ -409,7 +410,7 @@ contains
          ! phenology algorithm.
 
 
-         if(use_fun)then ! if we are using FUN, we get the N available from there.
+         if(use_fun .or. decomp_method == mimicsplus_decomp )then ! if we are using FUN, we get the N available from there.
            sminn_to_npool(p) = sminn_to_plant_fun(p)
          else ! no FUN. :( we get N available from the FPG calculation in soilbiogeochemistry competition.
            sminn_to_npool(p) = plant_ndemand(p) * fpg(c)
@@ -423,7 +424,7 @@ contains
             ! Non-matrix equivalent for above is in CNNStateUpdateMod:NStateUpdate1
          end if
 
-         if(use_fun)then
+         if(use_fun .or. decomp_method == mimicsplus_decomp )then
             plant_calloc(p) = npp_growth(p)
 
             ! Assign npp_growth to matrix solution
@@ -1264,6 +1265,7 @@ contains
     use SoilBiogeochemNitrogenStateType, only : soilbiogeochem_nitrogenstate_type
     use EnergyFluxType         , only : energyflux_type     !
     use CNSharedParamsMod      , only : use_fun
+    use SoilBiogeochemDecompCascadeConType , only : mimicsplus_decomp, decomp_method
     use CNPrecisionControlMod  , only : n_min
     use clm_varcon             , only : spval
     ! !ARGUMENTS:
@@ -1408,7 +1410,7 @@ contains
          temp_scalar=t_scalar(c,1)
          temp_scalar = min( max(0.0_r8, temp_scalar), 1.0_r8 )
 
-         if(use_fun)then ! in FUN, plant_ndemand is just used as a maximum draw on soil N pools.
+         if(use_fun .or. decomp_method == mimicsplus_decomp )then ! in FUN, plant_ndemand is just used as a maximum draw on soil N pools.
              plant_ndemand(p) = availc(p)*(n_allometry(p)/c_allometry(p))
          else !FUN
             if (laisun(p)+laisha(p) > 0.0_r8) then

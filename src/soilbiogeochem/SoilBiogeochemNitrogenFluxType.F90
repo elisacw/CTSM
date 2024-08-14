@@ -14,6 +14,7 @@ module SoilBiogeochemNitrogenFluxType
   use LandunitType                       , only : lun                
   use ColumnType                         , only : col                
   use SparseMatrixMultiplyMod            , only : sparse_matrix_type, diag_matrix_type, vector_type
+  use SoilBiogeochemDecompCascadeConType , only : mimicsplus_decomp, decomp_method
   ! 
   ! !PUBLIC TYPES:
   implicit none
@@ -327,7 +328,7 @@ contains
          avgflag='A', long_name='atmospheric N deposition to soil mineral N', &
          ptr_col=this%ndep_to_sminn_col)
 
-    if (use_fun) then
+    if (use_fun .or. decomp_method == mimicsplus_decomp) then
        default = 'inactive'
     else
        default = 'active'
@@ -337,7 +338,7 @@ contains
          avgflag='A', long_name='symbiotic/asymbiotic N fixation to soil mineral N', &
          ptr_col=this%nfix_to_sminn_col, default=default)
 
-    if ( use_fun )then
+    if ( use_fun .or. decomp_method == mimicsplus_decomp)then
        this%ffix_to_sminn_col(begc:endc) = spval
        call hist_addfld1d (fname='FFIX_TO_SMINN', units='gN/m^2/s', &
             avgflag='A', long_name='free living  N fixation to soil mineral N', &

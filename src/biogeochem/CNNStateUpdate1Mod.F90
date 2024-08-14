@@ -103,6 +103,7 @@ contains
        clm_fates, clump_index)
     
      use CNSharedParamsMod               , only : use_fun
+     use SoilBiogeochemDecompCascadeConType, only : mimicsplus_decomp, decomp_method
     !
     ! !DESCRIPTION:
     ! On the radiation time step, update all the prognostic nitrogen state
@@ -258,7 +259,7 @@ contains
                ! this should likely be done more cleanly if it works, i.e. not update fluxes w/ states
                ! additional considerations for crop?
                ! Matrix version of this is in CNLivewoodTurnover
-               if (use_fun ) then
+               if (use_fun .or. decomp_method == mimicsplus_decomp) then
                   nf_veg%free_retransn_to_npool_patch(p) = nf_veg%free_retransn_to_npool_patch(p) + nf_veg%livestemn_to_retransn_patch(p)
                   nf_veg%free_retransn_to_npool_patch(p) = nf_veg%free_retransn_to_npool_patch(p) + nf_veg%livecrootn_to_retransn_patch(p)
                end if

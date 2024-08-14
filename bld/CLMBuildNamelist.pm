@@ -935,13 +935,16 @@ sub setup_cmdl_bgc {
   if ( ! defined($nl->get_value($var)) ) {
      add_default($opts, $nl_flags->{'inputdata_rootdir'}, $definition, $defaults, $nl, $var,
                  'phys'=>$nl_flags->{'phys'}, 'use_cn'=>$nl_flags->{'use_cn'},
-                 'use_nitrif_denitrif'=>$nl_flags->{'use_nitrif_denitrif'} );
+                 'use_nitrif_denitrif'=>$nl_flags->{'use_nitrif_denitrif'}, 'soil_decomp_method'=>$soil_decomp_method);
   }
   if ( (! &value_is_true($nl_flags->{'use_cn'}) ) && &value_is_true($nl->get_value('use_fun')) ) {
      $log->fatal_error("When FUN is on, use_cn MUST also be on!");
   }
   if ( (! &value_is_true($nl_flags->{'use_nitrif_denitrif'}) ) && &value_is_true($nl->get_value('use_fun')) ) {
      $log->fatal_error("When FUN is on, use_nitrif_denitrif MUST also be on!");
+  }
+  if ($soil_decomp_method eq "MIMICSplusAas2023" && &value_is_true($nl->get_value('use_fun')))  {
+     $log->fatal_error("When soil_decomp_method is MIMICSplusAas2023, use_fun MUST be off!");
   }
 } # end bgc
 

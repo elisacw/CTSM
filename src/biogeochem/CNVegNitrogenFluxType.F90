@@ -9,6 +9,7 @@ module CNVegNitrogenFluxType
   use clm_varcon                         , only : spval, ispval, dzsoi_decomp
   use clm_varctl                         , only : use_nitrif_denitrif, use_crop
   use CNSharedParamsMod                  , only : use_fun, use_matrixcn
+  use SoilBiogeochemDecompCascadeConType , only : mimicsplus_decomp, decomp_method
   use decompMod                          , only : bounds_type
   use abortutils                         , only : endrun
   use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con
@@ -1175,7 +1176,7 @@ contains
     if ( use_matrixcn )then
     end if
     
-    if ( use_fun ) then
+    if ( use_fun .or. decomp_method == mimicsplus_decomp ) then
        this%Nactive_patch(begp:endp)  = spval
        call hist_addfld1d (fname='NACTIVE', units='gN/m^2/s',       &
             avgflag='A', long_name='Mycorrhizal N uptake flux',     &
@@ -1363,7 +1364,7 @@ contains
        if (lun%itype(l) == istsoil .or. lun%itype(l) == istcrop) then
           this%fert_counter_patch(p)  = 0._r8
        end if
-       if ( use_fun ) then      !previously set to spval for special land units
+       if ( use_fun .or. decomp_method == mimicsplus_decomp) then      !previously set to spval for special land units
           if (lun%ifspecial(l)) then
              this%plant_ndemand_patch(p)        = 0._r8
              this%avail_retransn_patch(p)       = 0._r8
@@ -1534,7 +1535,7 @@ contains
          long_name='', units='', &
          interpinic_flag='interp', readvar=readvar, data=this%avail_retransn_patch) 
 
-     if ( use_fun ) then
+     if ( use_fun .or. decomp_method == mimicsplus_decomp) then
 !       set_missing_vals_to_constant for BACKWARDS_COMPATIBILITY(wrw, 2018-06-28) re. issue #426
 !       special land units previously set to spval, not 0
 !       modifications here should correct this 

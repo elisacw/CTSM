@@ -14,6 +14,7 @@ module WaterFluxBulkType
   use clm_varcon     , only : spval
   use decompMod      , only : bounds_type
   use CNSharedParamsMod           , only : use_fun
+  use SoilBiogeochemDecompCascadeConType , only : mimicsplus_decomp, decomp_method
   use WaterFluxType     , only : waterflux_type
   use WaterInfoBaseType, only : water_info_base_type
   use WaterTracerContainerType, only : water_tracer_container_type
@@ -285,7 +286,7 @@ contains
     type(bounds_type), intent(in) :: bounds  
     !---------------------------------------------------------------------
 
-    if (use_fun) then
+    if (use_fun .or. decomp_method == mimicsplus_decomp) then
    
        call init_accum_field (name='AnnET', units='MM H2O/S', &
             desc='365-day running mean of total ET', accum_type='runmean', accum_period=-365, &
@@ -326,7 +327,7 @@ contains
     ! Determine time step
     nstep = get_nstep()
 
-    if (use_fun) then
+    if (use_fun .or. decomp_method == mimicsplus_decomp) then
        call extract_accum_field ('AnnET', rbufslp, nstep)
        this%AnnEt(begc:endc) = rbufslp(begc:endc)
     end if
@@ -367,7 +368,7 @@ contains
     do c = begc,endc
        rbufslp(c) = this%qflx_evap_tot_col(c)
     end do
-    if (use_fun) then
+    if (use_fun .or. decomp_method == mimicsplus_decomp) then
        ! Accumulate and extract AnnET (accumulates total ET as 365-day running mean)
        call update_accum_field  ('AnnET', rbufslp, nstep)
        call extract_accum_field ('AnnET', this%AnnET, nstep)

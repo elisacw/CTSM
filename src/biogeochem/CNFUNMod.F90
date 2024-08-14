@@ -497,7 +497,7 @@ module CNFUNMod
   !  fixers, 2 for non fixers. This will become redundant with the
   !   'fixer' parameter if it works. 
   
-  !--------------------------------------------------------------------
+  !--------------------------------------------------------------------!ECW unitl here we have things in FUNMIMICS
   !---------------------------------
   associate(ivt                    => patch%itype                                          , & ! Input:   [integer  (:) ]  p
          leafcn                 => pftcon%leafcn                                        , & ! Input:   leaf C:N (gC/gN)
@@ -867,7 +867,7 @@ module CNFUNMod
            p = filter_soilp(fp)
            c = patch%column(p)
 
-           sminn_no3_layer_step(p,j,istp)  =   sminn_no3_layer(c,j) * permyc(p,istp)
+           sminn_no3_layer_step(p,j,istp)  =   sminn_no3_layer(c,j) * permyc(p,istp) !ECW turn into separate variabels for ecm am, get rid of loop
            sminn_nh4_layer_step(p,j,istp)  =   sminn_nh4_layer(c,j) * permyc(p,istp)
            sminn_no3_conc_step(p,j,istp)   =   sminn_no3_conc(c,j)  * permyc(p,istp)
            sminn_nh4_conc_step(p,j,istp)   =   sminn_nh4_conc(c,j)  * permyc(p,istp)
@@ -1461,7 +1461,7 @@ fix_loop:   do FIX =plants_are_fixing, plants_not_fixing !loop around percentage
       !Extract active uptake N from soil pools. 
       do j = 1, nlevdecomp
          !RF change. The N fixed doesn't actually come out of the soil mineral pools, it is 'new'... 
-         sminn_to_plant_fun_no3_vr(p,j)    = (n_passive_no3_vr(p,j)  + n_active_no3_vr(p,j) &
+         sminn_to_plant_fun_no3_vr(p,j)    = (n_passive_no3_vr(p,j)  + n_active_no3_vr(p,j) & !ECW from myc
                                              + n_nonmyc_no3_vr(p,j))/(dzsoi_decomp(j)*dt)
          sminn_to_plant_fun_nh4_vr(p,j)    = (n_passive_nh4_vr(p,j)  + n_active_nh4_vr(p,j) &
                                              + n_nonmyc_nh4_vr(p,j))/(dzsoi_decomp(j)*dt)

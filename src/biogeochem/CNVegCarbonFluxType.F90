@@ -890,6 +890,8 @@ contains
     ! !USES:
     use clm_varctl , only : hist_wrtch4diag
     use CNSharedParamsMod, only: use_fun
+    use SoilBiogeochemDecompCascadeConType, only : mimicsplus_decomp, decomp_method
+    
     use histFileMod, only : hist_addfld1d, hist_addfld2d, hist_addfld_decomp 
     !
     ! !ARGUMENTS:
@@ -1381,7 +1383,7 @@ contains
             avgflag='A', long_name='leaf C litterfall', &
             ptr_patch=this%leafc_to_litter_patch, default='inactive')
 
-       if ( use_fun ) then
+       if ( use_fun .or. decomp_method == mimicsplus_decomp ) then
           this%leafc_to_litter_fun_patch(begp:endp) = spval
           call hist_addfld1d (fname='LEAFC_TO_LITTER_FUN', units='gC/m^2/s', &
                avgflag='A', long_name='leaf C litterfall used by FUN', &
@@ -1737,7 +1739,7 @@ contains
              avgflag='A', long_name='total patch-level fire C loss for non-peat fires outside land-type converted region', &
              ptr_patch=this%fire_closs_patch)
 
-        if ( use_fun ) then
+        if ( use_fun .or. decomp_method == mimicsplus_decomp ) then
           this%npp_Nactive_patch(begp:endp)  = spval
           call hist_addfld1d (fname='NPP_NACTIVE', units='gC/m^2/s',     &
                avgflag='A', long_name='Mycorrhizal N uptake used C',     &
@@ -3652,6 +3654,7 @@ contains
     use clm_varcon       , only : c13ratio, c14ratio
     use clm_varctl       , only : use_lch4
     use CNSharedParamsMod, only : use_fun
+    use SoilBiogeochemDecompCascadeConType, only : mimicsplus_decomp, decomp_method
     use restUtilMod
     use ncdio_pio
     !
@@ -3871,7 +3874,7 @@ contains
          long_name='', units='', &
          interpinic_flag='interp', readvar=readvar, data=this%annsum_litfall_patch)
 
-    if ( use_fun ) then
+    if ( use_fun .or. decomp_method == mimicsplus_decomp ) then
        call restartvar(ncid=ncid, flag=flag, varname='leafc_to_litter_fun', xtype=ncd_double,  &
             dim1name='pft', &
             long_name='', units='', &
@@ -4369,6 +4372,7 @@ contains
     use subgridAveMod                      , only: p2c, c2g
     use SoilBiogeochemDecompCascadeConType , only: decomp_cascade_con
     use CNSharedParamsMod                  , only: use_fun
+    use SoilBiogeochemDecompCascadeConType , only : mimicsplus_decomp, decomp_method
     !
     ! !ARGUMENTS:
     class(cnveg_carbonflux_type)   :: this
@@ -4505,7 +4509,7 @@ contains
                   this%gr_patch(p)         
        end if
        
-       if (use_fun) then
+       if (use_fun .or. decomp_method == mimicsplus_decomp) then
           this%ar_patch(p) = this%ar_patch(p) + this%soilc_change_patch(p)
        end if
       

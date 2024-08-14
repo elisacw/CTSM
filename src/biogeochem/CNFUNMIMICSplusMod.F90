@@ -1,5 +1,7 @@
 module CNFUNMIMICSplusMod
 
+#include "shr_assert.h"
+
   !--------------------------------------------------------------------
   ! ! DESCRIPTION
   ! ! Updated version of theThe FUN model developed by Fisher et al. 2010
@@ -47,6 +49,7 @@ module CNFUNMIMICSplusMod
   ! !PUBLIC MEMBER FUNCTIONS:
   public:: readParams            ! Read in parameters needed for FUNMimicplus
   public:: CNFUNMIMICSplusInit   ! FUNMIMICSplus calculation initialization
+  public:: CNFUNMIMICSplus      ! FUNMIMICSplus calculation itself
 
   ! !LOCAL VARIABLES
   integer,  parameter :: icostFix        = 1             ! Process number for fixing.
@@ -73,6 +76,16 @@ module CNFUNMIMICSplusMod
 
 
   ! DATA STRUCTURES
+
+  type, private :: params_type
+   real(r8) :: ndays_on        ! number of days to complete leaf onset
+   real(r8) :: ndays_off       ! number of days to complete leaf offset
+  end type params_type   
+
+   
+  !
+  type(params_type), private :: params_inst  ! params_inst is
+  !  populated in readParamsMod
   
   type, public :: cnfunmimicsplus_type
   ! declare arrays and scalars here with pointers
@@ -227,51 +240,21 @@ module CNFUNMIMICSplusMod
   !------end of not_use_nitrif_denitrif------!
   !--------------------------------------------------------------------
   !------------
-  ! Local Integer variables
-  !--------------------------------------------------------------------
-  !------------
-  integer   :: fn                                ! number of values
-  !  in pft filter
-  integer   :: fp                                ! lake filter pft
-  !  index
-  integer   :: fc                                ! lake filter column
-  !  index
-  integer   :: p, c                              ! pft index
-  integer   :: g, l                              ! indices
-  integer   :: j, i, k                           ! soil/snow level
-  !  index
-  integer   :: istp                              ! Loop counters/work
-  integer   :: icost                             ! a local index
-  integer   :: fixer                             ! 0 = non-fixer, 1
-  ! =fixer 
-  logical   :: unmetDemand                       ! True while there
-  !  is still demand for N
-  logical   :: local_use_flexibleCN              ! local version of use_flexCN
-  integer   :: FIX                               ! for loop. 1 for
-  !  fixers, 2 for non fixers. This will become redundant with the
-  !   'fixer' parameter if it works. 
+
   
 
 
 contains
   procedure , public  :: Init
-  procedure , public  :: InitAllocate
-  procedure , public  :: SetZeros
+  procedure , private  :: InitAllocate
+  procedure , private :: SetZeros
    
-  end type cnfunmimicsplus_type
+end type cnfunmimicsplus_type
 
 
-  type, private :: params_type
-     real(r8) :: ndays_on        ! number of days to complete leaf onset
-     real(r8) :: ndays_off       ! number of days to complete leaf offset
-  end type params_type   
-
-   
-  !
-  type(params_type), private :: params_inst  ! params_inst is
-  !  populated in readParamsMod
   character(len=*), parameter, private :: sourcefile = &
        __FILE__
+
    contains
 
 
@@ -445,7 +428,48 @@ contains
 
      allocate(this%npp_nonmyc_retrans_total(bounds%begp:bounds%endp));       this%npp_nonmyc_retrans_total(:) = nan
 
-  end subroutine InitAllocate
+     allocate(this%costNit(1:nlevdecomp,ncost6));                            this%costNit(:,:) = nan
+
+    ! Uptake fluxes for COST_METHOD=2
+  ! actual npp to each layer for each uptake process
+     allocate(this%npp_to_fixation(1:nlevdecomp));                           this%npp_to_fixation(:) = nan
+
+     allocate(this%npp_to_retrans(1:nlevdecomp));                            this%npp_to_retrans(:) = nan
+
+     allocate(this%npp_to_active(1:nlevdecomp));                             this%npp_to_active(:) = nan
+
+     allocate(this%npp_to_nonmyc (1:nlevdecomp));                            this%npp_to_nonmyc(:) = nan  
+    
+     ! fraction of carbon to each uptake process 
+     allocate(this%npp_frac_to_fixation(1:nlevdecomp));                      this%npp_frac_to_fixation(:) = nan 
+
+     allocate(this%npp_frac_to_retrans(1:nlevdecomp));                       this%npp_frac_to_retrans(:) = nan
+
+     allocate(this%npp_frac_to_active(1:nlevdecomp));                        this%npp_frac_to_active(:) = nan
+
+     allocate(this%npp_frac_to_nonmyc (1:nlevdecomp));                       this%npp_frac_to_nonmyc(:) = nan  
+      
+     ! hypothetical fluxes on N in each layer 
+     allocate(this%n_exch_fixation(1:nlevdecomp));                           this%n_exch_fixation(:) = nan
+
+     allocate(this%n_exch_retrans(1:nlevdecomp));                            this%n_exch_retrans(:) = nan
+
+     allocate(this%n_exch_active(1:nlevdecomp));                             this%n_exch_active(:) = nan
+
+     allocate(this%n_exch_nonmyc(1:nlevdecomp));                             this%n_exch_nonmyc(:) = nan
+     
+      !actual fluxes of N in each layer
+     allocate(this%n_from_fixation(1:nlevdecomp));                           this%n_from_fixation(:) = nan
+
+     allocate(this%n_from_retrans(1:nlevdecomp));                            this%n_from_retrans(:) = nan
+
+     allocate(this%n_from_active(1:nlevdecomp));                             this%n_from_active(:) = nan
+
+     allocate(this%n_from_nonmyc(1:nlevdecomp));                             this%n_from_nonmyc(:) = nan
+    
+     allocate(this% free_Nretrans(bounds%begp:bounds%endp));                 this%free_Nretrans(:) = nan 
+  
+   end subroutine InitAllocate
 
   
 
@@ -467,7 +491,14 @@ contains
    begg = bounds%begg; endg = bounds%endg
    begc = bounds%begc; endc = bounds%endc
    begp = bounds%begp; endp = bounds%endp
-     
+   
+     !local_use_flexibleCN                = use_flexibleCN
+     !steppday                            = 48._r8
+     !big_cost
+     !qflx_tran_veg_layer                 = 0._r8
+     !rootc_dens_step                     = 0._r8
+     !plant_ndemand_pool                  = 0._r8
+
      this%rootc_dens(:,:)                = 0._r8
      this%rootC(:)                       = 0._r8
      this%kc_active(:,:)                 = 0._r8
@@ -538,7 +569,7 @@ contains
 
   end subroutine SetZeros
 
-
+!ECW move things from down
 
  subroutine readParams ( ncid )
   ! 
@@ -647,12 +678,50 @@ contains
      leafn_storage_xfer_acc(bounds%begp:bounds%endp) = 0._r8
      leafc_storage_xfer_acc(bounds%begp:bounds%endp) = 0._r8
   end if  
-!--------------------------------------------------------------------
-  !---
+
+
   end associate
   end subroutine CNFUNMIMICSplusInit 
-!--------------------------------------------------------------------
- 
+
+
+subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_soilp, &
+   waterstatebulk_inst, waterfluxbulk_inst, temperature_inst,soilstate_inst, &
+   cnveg_state_inst,cnveg_carbonstate_inst, cnveg_carbonflux_inst,cnveg_nitrogenstate_inst,cnveg_nitrogenflux_inst, &
+   soilbiogeochem_nitrogenflux_inst,soilbiogeochem_carbonflux_inst,canopystate_inst, soilbiogeochem_nitrogenstate_inst, &
+   soilbiogeochem_carbonstate_inst)
+   
+! !USES:
+   use clm_time_manager, only : get_step_size_real, get_curr_date
+   use clm_varpar      , only : nlevdecomp
+   use clm_varcon      , only : secspday, smallValue, fun_period, tfrz, dzsoi_decomp, spval
+   use clm_varctl      , only : use_nitrif_denitrif
+   use PatchType       , only : patch
+   use subgridAveMod   , only : p2c
+   use pftconMod       , only : npcropmin
+!
+! !ARGUMENTS: 
+   type(bounds_type)                       , intent(in)    :: bounds
+   integer                                 , intent(in)    :: num_soilc             ! number of soil columns in filter
+   integer                                 , intent(in)    :: filter_soilc(:)       ! filter for soil columns
+   integer                                 , intent(in)    :: num_soilp             ! number of soil patches in filter
+   integer                                 , intent(in)    :: filter_soilp(:)       ! filter for soil patches
+   type(waterstatebulk_type)               , intent(in)    :: waterstatebulk_inst
+   type(waterfluxbulk_type)                , intent(in)    :: waterfluxbulk_inst
+   type(temperature_type)                  , intent(in)    :: temperature_inst
+   type(soilstate_type)                    , intent(in)    :: soilstate_inst
+   type(cnveg_state_type)                  , intent(inout) :: cnveg_state_inst
+   type(cnveg_carbonstate_type)            , intent(inout) :: cnveg_carbonstate_inst
+   type(cnveg_carbonflux_type)             , intent(inout) :: cnveg_carbonflux_inst
+   type(cnveg_nitrogenstate_type)          , intent(inout) :: cnveg_nitrogenstate_inst
+   type(cnveg_nitrogenflux_type)           , intent(inout) :: cnveg_nitrogenflux_inst
+   type(soilbiogeochem_nitrogenflux_type)  , intent(inout) :: soilbiogeochem_nitrogenflux_inst 
+   type(soilbiogeochem_carbonflux_type)    , intent(inout) :: soilbiogeochem_carbonflux_inst 
+   type(canopystate_type)                  , intent(inout) :: canopystate_inst  
+   type(soilbiogeochem_nitrogenstate_type) , intent(inout) :: soilbiogeochem_nitrogenstate_inst
+   type(soilbiogeochem_carbonstate_type)   , intent(inout) :: soilbiogeochem_carbonstate_inst
+  ! 
+
+end subroutine CNFUNMIMICSplus
 
 
 end module CNFUNMIMICSplusMod

@@ -2955,6 +2955,7 @@ contains
     use pftconMod        , only : nmiscanthus, nirrig_miscanthus, nswitchgrass, nirrig_switchgrass
     
     use CNSharedParamsMod, only : use_fun
+    use SoilBiogeochemDecompCascadeConType, only : mimicsplus_decomp, decomp_method
     use clm_varctl       , only : CNratio_floating    
     !
     ! !ARGUMENTS:
@@ -3152,7 +3153,7 @@ contains
                end if !use_matrixcn
             end if
             
-            if ( use_fun ) then
+            if ( use_fun .or. decomp_method == mimicsplus_decomp ) then
                if(leafc_to_litter(p)*dt.gt.leafc(p))then
                    leafc_to_litter(p) = leafc(p)/dt + cpool_to_leafc(p)
 
@@ -3174,7 +3175,7 @@ contains
             end if
             
             
-            if ( use_fun ) then
+            if ( use_fun .or. decomp_method == mimicsplus_decomp) then
                leafc_to_litter_fun(p)      =  leafc_to_litter(p)
                leafn_to_retransn(p)        =  paid_retransn_to_npool(p) + free_retransn_to_npool(p)
                if (leafn(p).gt.0._r8) then
@@ -3256,7 +3257,7 @@ contains
                end if !use_matrixcn
             end if  
             
-            if ( use_fun ) then
+            if ( use_fun .or. decomp_method == mimicsplus_decomp ) then
                if(frootn_to_litter(p)*dt.gt.frootn(p))then
 
                   ! Send all frootn to litter
@@ -3303,6 +3304,7 @@ contains
     !
     ! !USES:
     use CNSharedParamsMod   , only : use_fun
+    use SoilBiogeochemDecompCascadeConType, only : mimicsplus_decomp, decomp_method
     use clm_varctl          , only : CNratio_floating    
     ! !ARGUMENTS:
     implicit none
@@ -3363,7 +3365,7 @@ contains
             if (use_matrixcn) then
             else
             end if
-            if ( use_fun ) then
+            if ( use_fun .or. decomp_method == mimicsplus_decomp ) then
                leafc_to_litter_fun(p)     = leafc_to_litter(p)
                leafn_to_retransn(p)       = paid_retransn_to_npool(p) + free_retransn_to_npool(p)
                if (leafn(p).gt.0._r8) then
@@ -3434,7 +3436,7 @@ contains
                 end if   
             end if    
 
-            if ( use_fun ) then
+            if ( use_fun .or. decomp_method == mimicsplus_decomp) then
                if(frootn_to_litter(p)*dt.gt.frootn(p))then
                     frootn_to_litter(p) = frootn(p)/dt
                endif
