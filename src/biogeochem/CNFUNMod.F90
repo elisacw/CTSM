@@ -397,7 +397,7 @@ module CNFUNMod
 
   ! Uptake fluxes for COST_METHOD=2
   ! actual npp to each layer for each uptake process
-  real(r8)  ::                   npp_to_fixation(1:nlevdecomp) 
+  real(r8)  ::                   npp_to_fixation(1:nlevdecomp)
   real(r8)  ::                   npp_to_retrans(1:nlevdecomp)
   real(r8)  ::                   npp_to_active_nh4(1:nlevdecomp)
   real(r8)  ::                   npp_to_nonmyc_nh4(1:nlevdecomp)
@@ -794,24 +794,24 @@ module CNFUNMod
   call t_startf('CNFUNcalcs1')
   !----------------------------
   do fp = 1,num_soilp        ! PFT Starts
-     p = filter_soilp(fp)
+   p = filter_soilp(fp)
 
-     litterfall_n(p) =  (leafc_to_litter_fun(p) / leafcn_offset(p))  * dt
-     rootC(p)        =  frootc(p)
+   litterfall_n(p) =  (leafc_to_litter_fun(p) / leafcn_offset(p))  * dt
+   rootC(p)        =  frootc(p)
 
-     plantN(p)       =  leafn(p) + frootn(p) + livestemn(p) + livecrootn(p)
-     if (n_allometry(p).gt.0._r8) then 
-         plantCN(p)  = c_allometry(p)/n_allometry(p) !changed RF.
-         ! above code gives CN ratio too low. 
-     else
-         plantCN(p)  = 0._r8 
-     end if
+   plantN(p)       =  leafn(p) + frootn(p) + livestemn(p) + livecrootn(p)
+   if (n_allometry(p).gt.0._r8) then 
+       plantCN(p)  = c_allometry(p)/n_allometry(p) !changed RF.
+       ! above code gives CN ratio too low. 
+   else
+       plantCN(p)  = 0._r8 
+   end if
   end do   ! PFT ends
   do istp = 1, nstp
      do fp = 1,num_soilp        ! PFT Starts
         p = filter_soilp(fp)
 
-        if (istp.eq.ecm_step) then
+        if (istp.eq.ecm_step) then !ECW this goes into Init
            permyc(p,istp)      = perecm(ivt(p))
            kc_active(p,istp)   = ekc_active(ivt(p))
            kn_active(p,istp)   = ekn_active(ivt(p))
@@ -867,7 +867,7 @@ module CNFUNMod
            p = filter_soilp(fp)
            c = patch%column(p)
 
-           sminn_no3_layer_step(p,j,istp)  =   sminn_no3_layer(c,j) * permyc(p,istp) !ECW turn into separate variabels for ecm am, get rid of loop
+           sminn_no3_layer_step(p,j,istp)  =   sminn_no3_layer(c,j) * permyc(p,istp)
            sminn_nh4_layer_step(p,j,istp)  =   sminn_nh4_layer(c,j) * permyc(p,istp)
            sminn_no3_conc_step(p,j,istp)   =   sminn_no3_conc(c,j)  * permyc(p,istp)
            sminn_nh4_conc_step(p,j,istp)   =   sminn_nh4_conc(c,j)  * permyc(p,istp)

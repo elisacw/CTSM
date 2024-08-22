@@ -296,10 +296,9 @@ contains
 
       sminn_to_plant_new(bounds%begc:bounds%endc)  =  0._r8
 
-      local_use_fun = use_fun
+      local_use_fun = (use_fun .or. decomp_method == mimicsplus_decomp)
 
       if_nitrif: if (.not. use_nitrif_denitrif) then
-
          ! init sminn_tot
          do fc=1,num_bgc_soilc
             c = filter_bgc_soilc(fc)
@@ -379,7 +378,8 @@ contains
             end do
          end do
 
-         if ( local_use_fun ) then
+         ! delete at some point bc mimicsfun can work without nitrification denitrification, but fund doesn't
+         if ( use_fun ) then
             call t_startf( 'CNFUN' )
             call CNFUN(bounds,num_bgc_soilc,filter_bgc_soilc,num_bgc_vegp,filter_bgc_vegp,waterstatebulk_inst, &
                       waterfluxbulk_inst,temperature_inst,soilstate_inst,cnveg_state_inst,cnveg_carbonstate_inst,&
@@ -771,7 +771,7 @@ contains
             end do
          end do
 
-         if ( local_use_fun ) then
+         if ( use_fun ) then
             call t_startf( 'CNFUN' )
             call CNFUN(bounds,num_bgc_soilc,filter_bgc_soilc,num_bgc_vegp,filter_bgc_vegp,waterstatebulk_inst,&
                       waterfluxbulk_inst,temperature_inst,soilstate_inst,cnveg_state_inst,cnveg_carbonstate_inst,&
@@ -838,10 +838,7 @@ contains
                                  sminn_to_plant_fun_no3_vr(c,j),smin_no3_to_plant_vr(c,j)
                       call endrun("too much NO3 uptake predicted by FUN")
                   end if
-!KO                  if ((sminn_to_plant_fun_nh4_vr(c,j)-smin_nh4_to_plant_vr(c,j)).gt.0.0000000000001_r8) then
-!KO
                   if ((sminn_to_plant_fun_nh4_vr(c,j)-smin_nh4_to_plant_vr(c,j)).gt.0.0000001_r8) then
-!KO
                       write(iulog,*) 'problem with limitations on nh4 uptake', &
                                   sminn_to_plant_fun_nh4_vr(c,j),smin_nh4_to_plant_vr(c,j)
                       call endrun("too much NH4 uptake predicted by FUN")
