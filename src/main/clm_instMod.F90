@@ -83,7 +83,7 @@ module clm_instMod
   use SnowCoverFractionFactoryMod     , only : CreateAndInitSnowCoverFraction
   use SoilWaterRetentionCurveMod      , only : soil_water_retention_curve_type
   use NutrientCompetitionMethodMod    , only : nutrient_competition_method_type
-  use CNFUNMIMICSplusMod              , only : cnfunmimicsplus_type !ECW
+  use CNFUNMIMICSplusMod              , only : cnfunmimicsplus_type
   !
   use SoilStateInitTimeConstMod       , only : SoilStateInitTimeConst
   use SoilHydrologyInitTimeConstMod   , only : SoilHydrologyInitTimeConst
@@ -148,7 +148,7 @@ module clm_instMod
   type(soilbiogeochem_carbonflux_type)   , public :: c14_soilbiogeochem_carbonflux_inst
   type(soilbiogeochem_nitrogenstate_type), public :: soilbiogeochem_nitrogenstate_inst
   type(soilbiogeochem_nitrogenflux_type) , public :: soilbiogeochem_nitrogenflux_inst
-  type(cnfunmimicsplus_type)             , public :: cnfunmimicsplus_inst !ECW
+  type(cnfunmimicsplus_type)             , public :: cnfunmimicsplus_inst
 
   ! General biogeochem types
   type(ch4_type)      , public            :: ch4_inst
