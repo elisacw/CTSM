@@ -1781,10 +1781,7 @@ end subroutine decomp_rates_mimicsplus
       ! 
       ! !USES:
       use clm_varcon       , only : secspday, secsphr, tfrz, spval
-      use clm_varcon       , only : g_to_mg, cm3_to_m3
-      use SoilBiogeochemNitrogenStateType , only : soilbiogeochem_nitrogenstate_type
-      use SoilBiogeochemCarbonStateType , only : soilbiogeochem_carbonstate_type
-      
+            
       !
       ! !ARGUMENTS:
       !ECW all of Elins things are in /m3
@@ -1813,54 +1810,6 @@ end subroutine decomp_rates_mimicsplus
      !real(r8)            :: r_myc ! mycorrhizal modifier (constrains mining and scavaging) [-]
      real(r8), parameter :: small_flux = 1.e-14_r8
      real(r8), parameter :: eps = 0.5
-
-     associate(   
-     decomp_cpools_vr => soilbiogeochem_carbonstate_inst%decomp_cpools_vr_col , &
-     decomp_npools_vr => soilbiogeochem_nitrogenstate_inst%decomp_npools_vr_col 
-     )
-
-
-     ! Mycorrhizal concentration with necerssary unit conversions
-        ! mgC/cm3 = gC/m3 * (1e3 mg/g) / (1e6 cm3/m3)
-      myc_conc = (cpool_myc/ col%dz(c,j)) * g_to_mg * cm3_to_m3
-  
-     ! Soil organic matter concentration with necerssary unit conversions
-        ! mgC/cm3 = gC/m3 * (1e3 mg/g) / (1e6 cm3/m3)
-     avl_som_conc = (decomp_cpools_vr(c,j,i_avl_som) / col%dz(c,j)) * g_to_mg * cm3_to_m3
-     chem_som_conc = (decomp_cpools_vr(c,j,i_chem_som) / col%dz(c,j)) * g_to_mg * cm3_to_m3
-     phys_som_conc = (decomp_cpools_vr(c,j,i_phys_som) / col%dz(c,j)) * g_to_mg * cm3_to_m3
-
-     ! Mycorrhizal Nirogen concentration with necerssary unit conversions
-        ! mgC/cm3 = gC/m3 * (1e3 mg/g) / (1e6 cm3/m3)
-     myc1_n_conc = (decomp_npools_vr(c,j,i_ecm_myc) / col%dz(c,j)) * g_to_mg * cm3_to_m3
-     myc2_n_conc = (decomp_npools_vr(c,j,i_am_myc) / col%dz(c,j)) * g_to_mg * cm3_to_m3
-
-     ! Soil organic matter Nirogen concentration with necerssary unit conversions
-     ! mgC/cm3 = gC/m3 * (1e3 mg/g) / (1e6 cm3/m3)
-     avl_som_n_conc = (decomp_npools_vr(c,j,i_avl_som) / col%dz(c,j)) * g_to_mg * cm3_to_m3
-     chem_som_n_conc = (decomp_npools_vr(c,j,i_chem_som) / col%dz(c,j)) * g_to_mg * cm3_to_m3
-     phys_som_n_conc = (decomp_npools_vr(c,j,i_phys_som) / col%dz(c,j)) * g_to_mg * cm3_to_m3
-        
-
-     ! Calculate the mycorrhizal modifier
-     !if (maxc_veg2myc > small_flux) then
-      ! r_myc = c_veg2myc / maxc_veg2myc
-     !else
-     !  r_myc=0.0_r8
-     !endif
-
-     ! check if modifier is unrealistic
-     !if (r_myc > 1.0_r8) then
-
-     !  call endrun(msg='Mycorrhizal modifier is > 1.0')
-     !else if (r_myc < 0.0_r8) then
-     ! call endrun(msg='Mycorrhizal modifier is < 0.0')
-     !end if
- 
-     ! Calculate inorganic nitrogen uptake
-     !N_inorg = smin_nh4_col + smin_no3_col
-     !N_inorg_myc = mimicsplus_vmax_myc * N_inorg * (myc_conc / (myc_conc + mimicsplus_k_m_emyc / depth_scalar)) * r_myc
-     sminn = 3
 
      fn_smin2myc = params_inst%mimicsplus_vmax_myc * sminn  * &
                     (cpool_myc / (cpool_myc + params_inst%mimicsplus_k_m_emyc)) !* r_myc
@@ -1896,8 +1845,6 @@ end subroutine decomp_rates_mimicsplus
       endif
 
      endif
-
-     end associate
  
    end subroutine calc_myc_roi
 

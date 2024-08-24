@@ -327,8 +327,6 @@ end type params_type
 
      allocate(this%n_exch_nonmyc(1:nlevdecomp));                             this%n_exch_nonmyc(:) = nan
      
-      !actual fluxes of N in each layer
-
      allocate(this%n_from_retrans(1:nlevdecomp));                            this%n_from_retrans(:) = nan
 
      allocate(this% free_Nretrans(bounds%begp:bounds%endp));                 this%free_Nretrans(:) = nan 
@@ -356,17 +354,10 @@ end type params_type
    begg = bounds%begg; endg = bounds%endg
    begc = bounds%begc; endc = bounds%endc
    begp = bounds%begp; endp = bounds%endp
-   
-
-     
+ 
      this%rootc_dens_step                 = 0._r8
-     
-     !this%excess_carbon_acc               = 0._r8
-     !this%burned_off_carbon               = 0._r8
      this%sminn_diff                      = 0._r8
      this%active_limit1                   = 0._r8
-    ! this%total_N_conductance             = 0._r8
-
      this%rootc_dens(:,:)                = 0._r8
      this%rootC(:)                       = 0._r8
      this%n_uptake_myc_frac(:,:)         = 0._r8
@@ -422,7 +413,6 @@ end type params_type
      this%n_exch_retrans(:)              = 0._r8
      this%n_exch_active(:)               = 0._r8
      this%n_exch_nonmyc(:)               = 0._r8
-     
      this%n_from_retrans(:)              = 0._r8
      this%free_Nretrans(:)               = 0._r8 
    
@@ -604,11 +594,9 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
    real(r8)  :: ndays_on        ! number of days to complete leaf onset
    real(r8)  :: ndays_off       ! number of days to complete leaf offset
    real(r8)  :: frac_ideal_C_use      ! How much less C do we use for 'buying' N than that needed to get to the ideal ratio?  fraction. 
-  
    real(r8)  ::                  N_acquired
    real(r8)  ::                  C_spent
    real(r8)  ::                  leaf_narea            ! leaf n per unit leaf area in gN/m2 (averaged across canopy, which is OK for the cost calculation)
-   
    real(r8)  ::                  sum_n_acquired        ! Sum N aquired from one unit of C (unitless)  
    real(r8)  ::                  burned_off_carbon     ! carbon wasted by poor allocation algorithm. If this is too big, we need a better iteration. 
    real(r8)  ::                  temp_n_flux  
@@ -622,13 +610,11 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
    real(r8) ::                    soil_n_extraction    ! calculates total N pullled from soil
    real(r8) ::                    total_N_conductance  !inverse of C to of N for whole soil-leaf pathway
    real(r8) ::                    total_N_resistance   ! C to of N for whole soil -leaf pathway
-   
    real(r8) ::                    paid_for_n_retrans
    real(r8) ::                    free_n_retrans
    real(r8) ::                    total_c_spent_retrans
    real(r8) ::                    total_c_accounted_retrans
  
-
    associate(ivt             => patch%itype                                          , & ! Input:   [integer  (:) ]  p
       leafcn                 => pftcon%leafcn                                        , & ! Input:   leaf C:N (gC/gN)
       season_decid           => pftcon%season_decid                                  , & ! Input:   binary flag for seasonal deciduous leaf habit (0 or 1)
@@ -736,14 +722,8 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
       h2osoi_liq             => waterstatebulk_inst%h2osoi_liq_col                            , & ! Input:   [real(r8) (:,:)] liquid water (kg/m2) (new) (-nlevsno+1:nlevgrnd)
       t_soisno               => temperature_inst%t_soisno_col                                 , & ! Input:   [real(r8) (:,:)] soil temperature (Kelvin)  (-nlevsno+1:nlevgrnd)
       crootfr                => soilstate_inst%crootfr_patch                                  , & ! Input:   [real(r8) (:,:)] fraction of roots for carbon in each soil layer  (nlevgrnd)
-
       active_limit1          => cnfunmimicsplus_inst%active_limit1                            , &
       !burned_off_carbon      => cnfunmimicsplus_inst%burned_off_carbon                        , &
-
-
-
-
-
       costs_paths            => cnfunmimicsplus_inst%costs_paths                              , &
       npp_to_paths           => cnfunmimicsplus_inst%npp_to_paths                             , &
       npp_frac_paths         => cnfunmimicsplus_inst%npp_frac_paths                           , &
@@ -803,10 +783,10 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
       sminn_diff             => cnfunmimicsplus_inst%sminn_diff                               , &
       sminn_layer_step       => cnfunmimicsplus_inst%sminn_layer_step                         , &
       sminn_to_plant         => cnfunmimicsplus_inst%sminn_to_plant                           , &
-      !total_N_conductance    => cnfunmimicsplus_inst%total_N_conductance                           , &
+      
       ! C and N soil pools:
-      decomp_cpools_vr      => soilbiogeochem_carbonstate_inst%decomp_cpools_vr_col          , &
-      decomp_npools_vr      => soilbiogeochem_nitrogenstate_inst%decomp_npools_vr_col          , &
+      decomp_cpools_vr      => soilbiogeochem_carbonstate_inst%decomp_cpools_vr_col           , &
+      decomp_npools_vr      => soilbiogeochem_nitrogenstate_inst%decomp_npools_vr_col         , &
       tc_soisno              => cnfunmimicsplus_inst%tc_soisno                                )
       
 
@@ -1003,8 +983,8 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
           endif 
           npp_to_spend = npp_remaining(p,imyc)  * fixerfrac !put parameter here.
           ! has to be zeroed since depend on accumula
-          n_from_active(1:nlevdecomp) = 0._r8 !ECW delete?
-          n_from_nonmyc(1:nlevdecomp) = 0._r8 !ECW delete?
+          !n_from_active(1:nlevdecomp) = 0._r8 !ECW delete?
+          !n_from_nonmyc(1:nlevdecomp) = 0._r8 !ECW delete?
           n_from_paths(p,:,ipano3:ipnmnh4) !act and nonmyc boths nh4 and no3
 
           !--------------------------------------------------------------------
@@ -1337,17 +1317,17 @@ end do stp
 
              ! Splitting Nitrogen fluxes again into NO3 and NH4
 
-             npp_NO3active(p)        = npp_Nactive(p) * sminfrc(c,j)
-             npp_NH4active(p)        = npp_Nactive(p) * (1.0_r8 - sminfrc(c,j))
+             !npp_NO3active(p)        = npp_Nactive(p) * sminfrc(c,j)
+             !npp_NH4active(p)        = npp_Nactive(p) * (1.0_r8 - sminfrc(c,j))
 
-             npp_NO3nonmyc(p)        = npp_Nnonmyc(p) * sminfrc(c,j)
-             npp_NH4nonmyc(p)        = npp_Nnonmyc(p) * (1.0_r8 - sminfrc(c,j))       
+             !npp_NO3nonmyc(p)        = npp_Nnonmyc(p) * sminfrc(c,j)
+             !npp_NH4nonmyc(p)        = npp_Nnonmyc(p) * (1.0_r8 - sminfrc(c,j))       
             
-             Nactive_no3(p)          = Nactive(p) * sminfrc(c,j)         
-             Nactive_nh4(p)          = Nactive(p) * * (1.0_r8 - sminfrc(c,j))                  
+             !Nactive_no3(p)          = Nactive(p) * sminfrc(c,j)         
+             !Nactive_nh4(p)          = Nactive(p) * * (1.0_r8 - sminfrc(c,j))                  
                                
-             Nnonmyc_no3(p)          = Nnonmyc(p) * sminfrc(c,j)
-             Nnonmyc_nh4(p)          = Nnonmyc(p) * * (1.0_r8 - sminfrc(c,j))
+             !Nnonmyc_no3(p)          = Nnonmyc(p) * sminfrc(c,j)
+             !Nnonmyc_nh4(p)          = Nnonmyc(p) * * (1.0_r8 - sminfrc(c,j))
 
             
 end do pft 
