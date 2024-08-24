@@ -27,7 +27,6 @@ module CNFUNMIMICSplusMod
   use CNVegnitrogenfluxType           , only : cnveg_nitrogenflux_type
   use SoilBiogeochemNitrogenFluxType  , only : soilbiogeochem_nitrogenflux_type
   use SoilBiogeochemNitrogenStateType  , only : soilbiogeochem_nitrogenstate_type
-     
   use SoilBiogeochemCarbonFluxType    , only : soilbiogeochem_carbonflux_type
   use SoilBiogeochemCarbonStateType   , only : soilbiogeochem_carbonstate_type
   use SoilBiogeochemDecompCascadeConType, only : mimicsplus_decomp, decomp_method
@@ -60,10 +59,10 @@ module CNFUNMIMICSplusMod
   ! DATA STRUCTURES
 
 
-  integer,  parameter :: ipano3    = 1             ! Process number for mycorrhizal uptake of NO3.
-  integer,  parameter :: ipanh4    = 2             ! Process number for mycorrhizal uptake of NH4
-  integer,  parameter :: ipnmno3    = 3             ! Process number for nonmyc uptake of NO3.
-  integer,  parameter :: ipnmnh4    = 4             ! Process number for nonmyc uptake of NH4.
+  integer,  parameter :: ipano3    = 1              ! Process number for active mycorrhizal uptake of NO3.
+  integer,  parameter :: ipanh4    = 2              ! Process number for active mycorrhizal uptake of NH4
+  integer,  parameter :: ipnmno3    = 3             ! Process number for active nonmyc uptake of NO3.
+  integer,  parameter :: ipnmnh4    = 4             ! Process number for active nonmyc uptake of NH4.
   integer,  parameter :: ipfix      = 5             ! Process number for fixing.                          orginal version in FUN: [icost...]
   integer,  parameter :: ipret      = 6             ! Process number for retranslocation.
   
@@ -102,7 +101,6 @@ module CNFUNMIMICSplusMod
   real(r8), pointer :: npp_remaining(:,:)                                     ! A temporary variable for npp_remaining(gC/m2) 
   real(r8), pointer :: n_passive_step(:,:)                                    ! N taken up by transpiration at substep(gN/m2)
   real(r8), pointer :: n_passive_acc(:)                                       ! N acquired by passive uptake (gN/m2)
-  real(r8), pointer :: cost_fix(:,:)                                          ! cost of fixation (gC/gN)
   real(r8), pointer :: n_fix_acc(:,:)                                         ! N acquired by fixation (gN/m2)
   real(r8), pointer :: n_fix_acc_total(:)                                     ! N acquired by fixation (gN/m2)
   real(r8), pointer :: npp_fix_acc(:,:)                                       ! Amount of NPP used by fixation (gC/m2)
@@ -125,10 +123,6 @@ module CNFUNMIMICSplusMod
   real(r8),  pointer  :: npp_frac_paths(:,:)                                 ! NPP fraction for all paths () [patch,nlev,ipath]
   real(r8),  pointer  :: npp_to_paths(:,:,:)                                 ! NPP spent all paths (gC/gN) [patch,nlev,ipath]
   real(r8),  pointer  :: n_from_paths(:,:,:)                                 ! NPP spent all paths (gC/gN) [patch,nlev,ipath]
-
-  real(r8),  pointer  :: cost_active(:,:) ! cost of mycorrhizal                             (gC/gN)
-  real(r8),  pointer  :: cost_nonmyc(:,:) ! cost of nonmyc                                  (gC/gN)
-
   real(r8),  pointer  :: sminn_layer(:,:)            ! Available N in each soil layer (gN/m2)
   real(r8),  pointer  :: sminn_layer_step(:,:,:)     ! A temporary variable for soil N (gN/m2) 
   real(r8),  pointer  :: n_am_acc(:)                            ! AM N uptake (gN/m2)
@@ -154,24 +148,13 @@ module CNFUNMIMICSplusMod
 
 
   ! Uptake fluxes for COST_METHOD=2
-  ! actual npp to each layer for each uptake process
-  real(r8),  pointer  ::                   npp_to_fixation(:) 
- ! real(r8),  pointer  ::                   npp_to_retrans(:)
-  real(r8),  pointer  ::                   npp_to_active(:)
 
-  ! fraction of carbon to each uptake process 
-  real(r8),  pointer  ::                   npp_frac_to_fixation(:) 
-  !real(r8),  pointer  ::                   npp_frac_to_retrans(:)
-  real(r8),  pointer  ::                   npp_frac_to_nonmyc (:)  
-   
   ! hypothetical fluxes on N in each layer 
   real(r8),  pointer  ::                  n_exch_fixation(:)        ! N aquired from one unit of C for fixation (unitless)
   real(r8),  pointer  ::                  n_exch_retrans(:)         ! N aquired from one unit of C for retrans (unitless)
   real(r8),  pointer  ::                  n_exch_active(:)          ! N aquired from one unit of C for act no3 (unitless)
   real(r8),  pointer  ::                  n_exch_nonmyc(:)          ! N aquired from one unit of C for nonmyc no3 (unitless) 
   
-   !actual fluxes of N in each layer
-  real(r8),  pointer  ::                  n_from_retrans(:)         ! N aquired in each layer of C for retrans (gN m-2 s-)
   real(r8),  pointer  ::                  free_Nretrans(:)          ! the total amount of NO3 and NH4                 (gN/m3/s) 
 
 contains
@@ -256,8 +239,6 @@ end type params_type
      
      allocate(this%n_passive_acc(bounds%begp:bounds%endp));                  this%n_passive_acc(:) = nan
      
-     allocate(this%cost_fix(bounds%begp:bounds%endp,1:nlevdecomp));          this%cost_fix(:,:) = nan
-     
      allocate(this%n_fix_acc(bounds%begp:bounds%endp,1:nmyc));               this%n_fix_acc(:,:) = nan
      
      allocate(this%n_fix_acc_total(bounds%begp:bounds%endp));                this%n_fix_acc_total(:) = nan
@@ -282,10 +263,6 @@ end type params_type
 
      allocate(this%costs_paths(bounds%begp:bounds%endp,1:nlevdecomp,1:npath6));  this%costs_paths(:,:,:) = nan
      
-     allocate(this%cost_active(bounds%begp:bounds%endp,1:nlevdecomp));       this%cost_active(:,:) = nan
-
-     allocate(this%cost_nonmyc(bounds%begp:bounds%endp,1:nlevdecomp));       this%cost_nonmyc(:,:) = nan
-
      allocate(this%sminn_layer(bounds%begc:bounds%endc,1:nlevdecomp));             this%sminn_layer(:,:) = nan
 
      allocate(this%sminn_layer_step(bounds%begp:bounds%endp,1:nlevdecomp,1:nmyc)); this%sminn_layer_step(:,:,:) = nan
@@ -341,19 +318,6 @@ end type params_type
 
      allocate(this%n_from_paths(bounds%begp:bounds%endp,1:nlevdecomp,1:npath6));  this%n_from_paths(:,:,:) = nan
 
-     allocate(this%npp_to_fixation(1:nlevdecomp));                           this%npp_to_fixation(:) = nan
-
-    ! allocate(this%npp_to_retrans(1:nlevdecomp));                            this%npp_to_retrans(:) = nan
-
-     allocate(this%npp_to_active(1:nlevdecomp));                             this%npp_to_active(:) = nan
-
-     ! fraction of carbon to each uptake process 
-     allocate(this%npp_frac_to_fixation(1:nlevdecomp));                      this%npp_frac_to_fixation(:) = nan 
-
-     !allocate(this%npp_frac_to_retrans(1:nlevdecomp));                       this%npp_frac_to_retrans(:) = nan
-
-     allocate(this%npp_frac_to_nonmyc (1:nlevdecomp));                       this%npp_frac_to_nonmyc(:) = nan  
-      
      ! hypothetical fluxes on N in each layer 
      allocate(this%n_exch_fixation(1:nlevdecomp));                           this%n_exch_fixation(:) = nan
 
@@ -416,16 +380,10 @@ end type params_type
      this%npp_remaining(:,:)             = 0._r8
      this%n_passive_step(:,:)            = 0._r8
      this%n_passive_acc(:)               = 0._r8
-
-
      this%costs_paths(:,:,:)              = big_cost
      this%npp_to_paths(:,:,:)             = 0.0_r8
      this%npp_frac_paths(:,:,:)           = 0.0_r8
      this%n_from_paths(:,:,:)             = 0.0_r8
-     
-     
-     
-     this%cost_fix(:,:)                  = 0._r8
      this%n_fix_acc(:,:)                 = 0._r8
      this%n_fix_acc_total(:)             = 0._r8
      this%npp_fix_acc(:,:)               = 0._r8
@@ -437,8 +395,6 @@ end type params_type
      this%npp_retrans_acc_total(:)       = 0._r8
      this%nt_uptake(:,:)                 = 0._r8
      this%npp_uptake(:,:)                = 0._r8
-     this%cost_active(:,:)               = 0._r8
-     this%cost_nonmyc(:,:)               = 0._r8
      this%sminn_layer(:,:)               = 0._r8
      this%sminn_layer_step(:,:,:)        = 0._r8
      this%n_am_acc                       = 0._r8
@@ -462,13 +418,6 @@ end type params_type
      this%npp_nonmyc_retrans_total(:)    = 0._r8
      this%sminfrc(:,:)                   = 0._r8
      this%sminn_to_plant(:,:)            = 0._r8
-
-     this%npp_to_fixation(:)             = 0._r8
-     this%npp_to_active(:)               = 0._r8
-     
-     this%npp_frac_to_fixation(:)        = 0._r8 
-     this%npp_frac_to_nonmyc(:)          = 0._r8  
-     
      this%n_exch_fixation(:)             = 0._r8
      this%n_exch_retrans(:)              = 0._r8
      this%n_exch_active(:)               = 0._r8
@@ -799,11 +748,6 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
       npp_to_paths           => cnfunmimicsplus_inst%npp_to_paths                             , &
       npp_frac_paths         => cnfunmimicsplus_inst%npp_frac_paths                           , &
       n_from_paths            => cnfunmimicsplus_inst%n_from_paths                             , &
-      
-      
-      cost_active            => cnfunmimicsplus_inst%cost_active                              , &
-      cost_fix               => cnfunmimicsplus_inst%cost_fix                                 , &
-      cost_nonmyc            => cnfunmimicsplus_inst%cost_nonmyc                              , &
       dn                     => cnfunmimicsplus_inst%dn                                       , &
       !excess_carbon_acc      => cnfunmimicsplus_inst%excess_carbon_acc                        , &
       free_Nretrans          => cnfunmimicsplus_inst%free_Nretrans                            , &
@@ -842,16 +786,12 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
       npp_active_retrans_total => cnfunmimicsplus_inst%npp_active_retrans_total               , &
       npp_fix_acc            => cnfunmimicsplus_inst%npp_fix_acc                              , &
       npp_fix_acc_total      => cnfunmimicsplus_inst%npp_fix_acc_total                        , &
-      npp_frac_to_fixation   => cnfunmimicsplus_inst%npp_frac_to_fixation                     , &
-      npp_frac_to_nonmyc     => cnfunmimicsplus_inst%npp_frac_to_nonmyc                       , &
       npp_nonmyc_acc         => cnfunmimicsplus_inst%npp_nonmyc_acc                           , &
       npp_nonmyc_acc_total   => cnfunmimicsplus_inst%npp_nonmyc_acc_total                     , &
       npp_nonmyc_retrans_total => cnfunmimicsplus_inst%npp_nonmyc_retrans_total               , &
       npp_remaining          => cnfunmimicsplus_inst%npp_remaining                            , &
       npp_retrans_acc        => cnfunmimicsplus_inst%npp_retrans_acc                          , &
       npp_retrans_acc_total  => cnfunmimicsplus_inst%npp_retrans_acc_total                    , &
-      npp_to_active          => cnfunmimicsplus_inst%npp_to_active                            , &
-      npp_to_fixation        => cnfunmimicsplus_inst%npp_to_fixation                          , &
       npp_uptake             => cnfunmimicsplus_inst%npp_uptake                               , &
       nt_uptake              => cnfunmimicsplus_inst%nt_uptake                                , &
       plant_ndemand_pool     => cnfunmimicsplus_inst%plant_ndemand_pool                       , &
@@ -1063,8 +1003,8 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
           endif 
           npp_to_spend = npp_remaining(p,imyc)  * fixerfrac !put parameter here.
           ! has to be zeroed since depend on accumula
-          n_from_active(1:nlevdecomp) = 0._r8
-          n_from_nonmyc(1:nlevdecomp) = 0._r8
+          n_from_active(1:nlevdecomp) = 0._r8 !ECW delete?
+          n_from_nonmyc(1:nlevdecomp) = 0._r8 !ECW delete?
           n_from_paths(p,:,ipano3:ipnmnh4) !act and nonmyc boths nh4 and no3
 
           !--------------------------------------------------------------------
@@ -1213,30 +1153,56 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
                  
                 ! Check if LIMITS of pools were exceeded:
           !!!!MVD THIS IS WHERE WE ENDED LAST TIME IN THE PROCESS OF REPLACING VARIABLES!!!
+          !!!ECW THIS IS WHERE I STARTED ALONE; SO YOU MIGHT WANNNA CHECK ON ME !!!
           do j = 1,nlevdecomp    
-            ! ACTIVE UPTAKE LIMIT 
-            active_limit1          = sminn_layer_step(p,j,imyc) * fixerfrac 
+            ! ACTIVE UPTAKE NO3 LIMIT 
+            active_limit1          = sminn_layer_step(p,j,imyc) * fixerfrac !ECW here sth must be done?
              ! trying to remove too much nh4 from soil. 
-             if (n_from_active(j) + n_from_nonmyc(j).gt.active_limit1) then 
-                sminn_diff          = n_from_active(j) + n_from_nonmyc(j) - active_limit1
-                temp_n_flux = n_from_active(j)
+             if (n_from_paths(p,j,ipano3) + n_from_paths(p,j,ipnmno3).gt.active_limit1) then
+                sminn_diff  = n_from_paths(p,j,ipano3) + n_from_paths(p,j,ipnmno3)
+                temp_n_flux = n_from_paths(p,j,ipano3)
+            
                 ! divide discrepancy between sources
-                n_from_active(j)     = n_from_active(j) - sminn_diff &
-                                           * (n_from_active(j) /(n_from_active(j) + n_from_nonmyc(j)))
-                n_from_nonmyc(j)     = n_from_nonmyc(j) - sminn_diff &
-                                      * (n_from_nonmyc(j) /(temp_n_flux + n_from_nonmyc(j)))
-                npp_to_active(j)     = n_from_active(j) * cost_active(p,j) 
-                npp_to_nonmyc(j)     = n_from_nonmyc(j) * cost_nonmyc(p,j)
-                           
+                n_from_paths(p,j,ipano3)  =  n_from_paths(p,j,ipano3) - sminn_diff &
+                                             * n_from_paths(p,j,ipano3) /  n_from_paths(p,j,ipano3) &
+                                             + n_from_paths(p,j,ipnmno3)
+
+                n_from_paths(p,j,ipnmno3) =  n_from_paths(p,j,ipnmno3) - sminn_diff &
+                                             * n_from_paths(p,j,ipnmno3) / (temp_n_flux + n_from_paths(p,j,ipnmno3))
+
+                npp_to_paths(p,j,ipano3:ipnmnh4) = n_from_paths(p,j,ipano3:ipnmnh4) * costs_paths(p,j,ipanh4:ipnmnh4) ! not : sth else saying AND
             end if
 
-                  
-            N_acquired     =  n_from_active(j)+n_from_nonmyc(j)          ! How much N did we end up with
-            C_spent        =   npp_to_active(j)+npp_to_nonmyc(j)         ! How much did it actually cost? 
+             ! ACTIVE UPTAKE NH4 LIMIT 
+            active_limit1          = sminn_layer_step(p,j,imyc) * fixerfrac !ECW here sth must be done?
+             ! trying to remove too much nh4 from soil. 
+             if (n_from_paths(p,j,ipanh4) + n_from_paths(p,j,ipnmnh4).gt.active_limit1) then
+                sminn_diff  = n_from_paths(p,j,ipanh4) + n_from_paths(p,j,ipnmnh4)
+                temp_n_flux = n_from_paths(p,j,ipanh4)
+            
+                ! divide discrepancy between sources
+                n_from_paths(p,j,ipanh4)  =  n_from_paths(p,j,ipanh4) - sminn_diff &
+                                             * n_from_paths(p,j,ipanh4) /  n_from_paths(p,j,ipanh4) &
+                                             + n_from_paths(p,j,ipnmnh4)
+
+                n_from_paths(p,j,ipnmnh4) =  n_from_paths(p,j,ipnmnh4) - sminn_diff &
+                                             * n_from_paths(p,j,ipnmnh4) / (temp_n_flux + n_from_paths(p,j,ipnmnh4))
+
+                npp_to_paths(p,j,ipanh4:ipnmnh4) = n_from_paths(p,j,ipanh4:ipnmnh4) * costs_paths(p,j,ipanh4:ipnmnh4) ! not : sth else saying AND
+            end if
+
+
+            N_acquired     =  n_from_paths(p,j,ipano3) + n_from_paths(p,j,ipanh4) &
+                              + n_from_paths(p,j,ipnmno3) + n_from_paths(p,j,ipnmnh4)         ! How much N did we end up with
+                              
+            C_spent        =   npp_to_paths(p,j,ipano3) + npp_to_paths(p,j,ipanh4) &
+                              + npp_to_paths(p,j,ipnmno3) + npp_to_paths(p,j,ipnmnh4)         ! How much did it actually cost? 
+
+
                          
             if(FIX==plants_are_fixing)then
-               N_acquired  = N_acquired + n_from_fixation(j)
-               C_spent     = C_spent + npp_to_fixation(j) 
+               N_acquired  = N_acquired + n_from_paths(p,j,ipfix)
+               C_spent     = C_spent + npp_to_paths(p,j,ipfix) 
             end if
             
             ! How much C did we allocate or spend in this layer? 
@@ -1248,15 +1214,15 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
 
 
             !-------------------- N flux accumulation------------!
-            n_active_acc(p,imyc)      = n_active_acc(p,imyc) + n_from_active(j)
-            n_nonmyc_acc(p,imyc)      = n_nonmyc_acc(p,imyc) + n_from_nonmyc(j)
+            n_active_acc(p,imyc)      = n_active_acc(p,imyc) + n_from_paths(p,j,ipano3:ipanh4)
+            n_nonmyc_acc(p,imyc)      = n_nonmyc_acc(p,imyc) + n_from_paths(p,j,ipnmno3:ipnmnh4)
             !-------------------- C flux accumulation------------!
-            npp_active_acc(p,imyc) = npp_active_acc(p,imyc)  + npp_to_active(j)
-            npp_nonmyc_acc(p,imyc) = npp_nonmyc_acc(p,imyc)  + npp_to_nonmyc(j)          
+            npp_active_acc(p,imyc) = npp_active_acc(p,imyc)  + npp_to_paths(p,j,ipano3:ipanh4)
+            npp_nonmyc_acc(p,imyc) = npp_nonmyc_acc(p,imyc)  + npp_to_paths(p,j,ipnmno3:ipnmnh4)          
        
             if(FIX == plants_are_fixing)then
-              n_fix_acc(p,imyc)          = n_fix_acc(p,imyc)         + n_from_fixation(j)
-              npp_fix_acc(p,imyc)        = npp_fix_acc(p,imyc)       + npp_to_fixation(j)
+              n_fix_acc(p,imyc)          = n_fix_acc(p,imyc)         + n_from_paths(p,j,ipfix)
+              npp_fix_acc(p,imyc)        = npp_fix_acc(p,imyc)       + npp_to_paths(p,j,ipfix)
             end if
        
             end do
@@ -1268,9 +1234,8 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
 
              ! add vertical fluxes to patch arrays 
             do j = 1,nlevdecomp
-               n_active_vr(p,j)      =  n_active_vr(p,j)      + n_from_active(j)
-               n_nonmyc_vr(p,j)      =  n_nonmyc_vr(p,j)      + n_from_nonmyc(j)
-            
+               n_active_vr(p,j)      =  n_active_vr(p,j)      + n_from_paths(p,j,ipano3:ipanh4)
+               n_nonmyc_vr(p,j)      =  n_nonmyc_vr(p,j)      + n_from_paths(p,j,ipnmno3:ipnmnh4)
             end do
           end if !unmet demand`
          
