@@ -79,53 +79,40 @@ module CNFUNMIMICSplusMod
   !  populated in readParamsMod
   type, public :: cnfunmimicsplus_type
   ! declare arrays and scalars here with pointers
-  real(r8)           :: rootc_dens_step                                       ! root C for each PFT in each soil layer(gC/m2)
-  real(r8)           :: dn                                                    ! Increment of N                        (gN/m2)  
-  real(r8), pointer  :: rootc_dens(:,:)                                       ! the root carbon density               (gC/m2)
-  real(r8), pointer  :: rootC(:)                                              ! root biomass                          (gC/m2)
-  real(r8), pointer  :: n_uptake_myc_frac(:,:)                                ! the arrary for the ECM and AM ratio   (-)       orginal version in FUN: [permyc]
-  real(r8), pointer  :: kc_active(:,:)                                        ! the kc_active parameter               (gC/m2)
-  real(r8), pointer  :: kn_active(:,:)                                        ! the kn_active parameter               (gC/m2)
-  real(r8), pointer :: plant_ndemand_pool(:)                                  ! The N demand pool (gN/m2)
-  real(r8), pointer :: plant_ndemand_pool_step(:,:)                           ! the N demand pool (gN/m2)
-  real(r8), pointer :: litterfall_n_step(:,:)                                 ! N loss based on the leafc to litter (gN/m2)
-  real(r8), pointer :: litterfall_c_step(:,:)                                 ! N loss based on the leafc to litter (gN/m2)
-  real(r8), pointer :: tc_soisno(:,:)                                         ! Soil temperature (degrees Celsius)
-  real(r8), pointer :: npp_remaining(:,:)                                     ! A temporary variable for npp_remaining(gC/m2) 
-  real(r8), pointer :: n_passive_step(:,:)                                    ! N taken up by transpiration at substep(gN/m2)
-  real(r8), pointer :: n_fix_acc(:,:)                                         ! N acquired by fixation (gN/m2)
-  real(r8), pointer :: npp_fix_acc(:,:)                                       ! Amount of NPP used by fixation (gC/m2)
-  real(r8), pointer :: n_retrans_acc(:,:)                                     ! N acquired by retranslocation (gN/m2)
-  real(r8), pointer :: free_nretrans_acc(:,:)                                 ! N acquired by retranslocation (gN/m2)
-  real(r8), pointer :: npp_retrans_acc(:,:)                                   ! NPP used for the extraction (gC/m2)
-  real(r8), pointer :: nt_uptake(:,:)                                         ! N uptake from retrans, active, and fix(gN/m2)
-  real(r8), pointer :: npp_uptake(:,:)                                        ! NPP used by the uptakes (gC/m2)
-  real(r8), pointer :: sminfrc(:,:)                                           ! fraction of N to handle NO3 / NH4 input 
-  real(r8), pointer :: sminn_to_plant(:,:)                                    ! Nitrogen to plant (to handle NO3 / NH4 input)
+  real(r8)          :: rootc_dens_step                                       ! root C for each PFT in each soil layer(gC/m2)
+  real(r8)          :: dn                                                    ! Increment of N                        (gN/m2)  
+  real(r8), pointer :: rootc_dens(:,:)                                       ! the root carbon density               (gC/m2)
+  real(r8), pointer :: rootC(:)                                              ! root biomass                          (gC/m2)
+  real(r8), pointer :: n_uptake_myc_frac(:,:)                                ! the arrary for the ECM and AM ratio   (-)       orginal version in FUN: [permyc]
+  real(r8), pointer :: kc_active(:,:)                                        ! the kc_active parameter               (gC/m2)
+  real(r8), pointer :: kn_active(:,:)                                        ! the kn_active parameter               (gC/m2)
+  real(r8), pointer :: plant_ndemand_pool(:)                                 ! The N demand pool (gN/m2)
+  real(r8), pointer :: plant_ndemand_pool_step(:,:)                          ! the N demand pool (gN/m2)
+  real(r8), pointer :: litterfall_n_step(:,:)                                ! N loss based on the leafc to litter (gN/m2)
+  real(r8), pointer :: litterfall_c_step(:,:)                                ! N loss based on the leafc to litter (gN/m2)
+  real(r8), pointer :: tc_soisno(:,:)                                        ! Soil temperature (degrees Celsius)
+  real(r8), pointer :: npp_remaining(:,:)                                    ! A temporary variable for npp_remaining(gC/m2) 
+  real(r8), pointer :: n_retrans_acc(:,:)                                    ! N acquired by retranslocation (gN/m2)
+  real(r8), pointer :: free_nretrans_acc(:,:)                                ! N acquired by retranslocation (gN/m2)
+  real(r8), pointer :: npp_retrans_acc(:,:)                                  ! NPP used for the extraction (gC/m2)
+  real(r8), pointer :: nt_uptake(:,:)                                        ! N uptake from retrans, active, and fix(gN/m2)
+  real(r8), pointer :: npp_uptake(:,:)                                       ! NPP used by the uptakes (gC/m2)
+  real(r8), pointer :: sminfrc(:,:)                                          ! fraction of N to handle NO3 / NH4 input 
+  real(r8), pointer :: sminn_to_plant(:,:)                                   ! Nitrogen to plant (to handle NO3 / NH4 input)
 
   !----------NITRIF_DENITRIF-------------!
   !REPLACE NO# with N
-  real(r8)            :: sminn_diff                                        ! A temporary limit for N uptake                  (gN/m2)
-  real(r8)            :: active_limit1                                     ! A temporary limit for N uptake                  (gN/m2)
-  real(r8),  pointer  :: costs_paths(:,:,:)                                ! Costs for all paths (gC/gN) [patch,nlev,ipath]
-  real(r8),  pointer  :: npp_frac_paths(:,:,:)                                 ! NPP fraction for all paths () [patch,nlev,ipath]
+  real(r8)            :: sminn_diff                                          ! A temporary limit for N uptake                  (gN/m2)
+  real(r8),  pointer  :: costs_paths(:,:,:)                                  ! Costs for all paths (gC/gN) [patch,nlev,ipath]
+  real(r8),  pointer  :: npp_frac_paths(:,:,:)                               ! NPP fraction for all paths () [patch,nlev,ipath]
   real(r8),  pointer  :: npp_to_paths(:,:,:)                                 ! NPP spent all paths (gC/m2) [patch,nlev,ipath]
   real(r8),  pointer  :: n_from_paths(:,:,:)                                 ! NPP spent all paths (gN/m2) [patch,nlev,ipath]
   real(r8),  pointer  :: n_paths_acc (:,:,:)                                 ! accumulated N spent all paths (gN/m2) [patch,nlev,ipath]
   real(r8),  pointer  :: npp_paths_acc (:,:,:)                               ! accumulated NPP spent all paths (gC/m2) [patch,nlev,ipath]
-  real(r8),  pointer  :: sminn_layer(:,:)            ! Available N in each soil layer (gN/m2)
-  real(r8),  pointer  :: sminn_layer_step(:,:,:)     ! A temporary variable for soil N (gN/m2) 
-  real(r8),  pointer  :: n_am_acc(:)                            ! AM N uptake (gN/m2)
-  real(r8),  pointer  :: n_ecm_acc(:)                           ! ECM N uptake (gN/m2)
-  real(r8),  pointer  :: n_active_acc(:,:)                 ! Mycorrhizal N uptake (gN/m2)
-  real(r8),  pointer  :: n_nonmyc_acc(:,:)                 ! Non-myc     N uptake (gN/m2)
-  real(r8),  pointer  :: npp_active_acc(:,:)               ! Mycorrhizal N uptake used C (gC/m2)
-  real(r8),  pointer  :: npp_nonmyc_acc(:,:)               ! Non-myc     N uptake used C (gC/m2)
-  real(r8),  pointer  :: n_am_retrans(:)                        ! AM N uptake for offset (gN/m2)
-  real(r8),  pointer  :: n_ecm_retrans(:)                       ! ECM N uptake for offset (gN/m2)
-  real(r8),  pointer  :: n_passive_vr(:,:)           ! Layer passive N uptake (gN/m2)
-  real(r8),  pointer  :: n_active_vr(:,:)            ! Layer mycorrhizal N uptake (gN/m2)
-  real(r8),  pointer  :: n_nonmyc_vr(:,:)            ! Layer non-myc     N uptake (gN/m2)
+  real(r8),  pointer  :: sminn_layer(:,:)                                    ! Available N in each soil layer (gN/m2)
+  real(r8),  pointer  :: sminn_layer_step(:,:,:)                             ! A temporary variable for soil N (gN/m2) 
+  real(r8),  pointer  :: n_active_vr(:,:)                                    ! Layer mycorrhizal N uptake (gN/m2)
+  real(r8),  pointer  :: n_nonmyc_vr(:,:)                                    ! Layer non-myc     N uptake (gN/m2)
   
   ! Uptake fluxes for COST_METHOD=2
 
@@ -146,11 +133,9 @@ module CNFUNMIMICSplusMod
   real(r8),  pointer ::  n_ecm_growth_vr_col(:,:)         ! nitrogen growth flux for ECM mycorrhiza
   real(r8),  pointer ::  c_ecm_enz_vr_col(:,:)            ! carbon enzyme production flux for ECM mycorrhiza
   real(r8),  pointer ::  sminno3_to_ecm_vr_col(:,:)       ! No3 flux from soil NO3 to ECM
-  real(r8),  pointer ::  sminno3_to_am_vr_col(:,:)       ! No3 flux from soil NO3 to AM
+  real(r8),  pointer ::  sminno3_to_am_vr_col(:,:)        ! No3 flux from soil NO3 to AM
   real(r8),  pointer ::  sminnh4_to_ecm_vr_col(:,:)       ! No3 flux from soil NO3 to ECM
-  real(r8),  pointer ::  sminnh4_to_am_vr_col(:,:)       ! No3 flux from soil NO3 to AM
-
-  
+  real(r8),  pointer ::  sminnh4_to_am_vr_col(:,:)        ! No3 flux from soil NO3 to AM
 
 contains
   procedure , public  :: Init
@@ -229,12 +214,6 @@ end type params_type
      
      allocate(this%npp_remaining(bounds%begp:bounds%endp,1:nmyc));           this%npp_remaining(:,:) = nan
      
-     allocate(this%n_passive_step(bounds%begp:bounds%endp,1:nmyc));          this%n_passive_step(:,:) = nan
-     
-     allocate(this%n_fix_acc(bounds%begp:bounds%endp,1:nmyc));               this%n_fix_acc(:,:) = nan
-     
-     allocate(this%npp_fix_acc(bounds%begp:bounds%endp,1:nmyc));             this%npp_fix_acc(:,:) = nan
-     
      allocate(this%n_retrans_acc(bounds%begp:bounds%endp,1:nmyc));           this%n_retrans_acc(:,:) = nan
      
      allocate(this%free_nretrans_acc(bounds%begp:bounds%endp,1:nmyc));       this%free_nretrans_acc(:,:) = nan
@@ -250,24 +229,6 @@ end type params_type
      allocate(this%sminn_layer(bounds%begc:bounds%endc,1:nlevdecomp));             this%sminn_layer(:,:) = nan
 
      allocate(this%sminn_layer_step(bounds%begp:bounds%endp,1:nlevdecomp,1:nmyc)); this%sminn_layer_step(:,:,:) = nan
-
-     allocate(this%n_am_acc(bounds%begp:bounds%endp));                       this%n_am_acc = nan
-
-     allocate(this%n_ecm_acc(bounds%begp:bounds%endp));                      this%n_ecm_acc = nan
-
-     allocate(this%n_active_acc(bounds%begp:bounds%endp, 1:nmyc));           this%n_active_acc = nan
-
-     allocate(this%n_nonmyc_acc(bounds%begp:bounds%endp, 1:nmyc));           this%n_nonmyc_acc = nan
-
-     allocate(this%npp_active_acc(bounds%begp:bounds%endp, 1:nmyc));         this%npp_active_acc(:,:) = nan
-
-     allocate(this%npp_nonmyc_acc(bounds%begp:bounds%endp, 1:nmyc));         this%npp_nonmyc_acc(:,:) = nan
-
-     allocate(this%n_am_retrans(bounds%begp:bounds%endp));                   this%n_am_retrans(:) = nan
-
-     allocate(this%n_ecm_retrans(bounds%begp:bounds%endp));                  this%n_ecm_retrans(:) = nan
-
-     allocate(this%n_passive_vr(bounds%begp:bounds%endp, 1:nlevdecomp));     this%n_passive_vr(:,:) = nan
 
      allocate(this%n_active_vr(bounds%begp:bounds%endp, 1:nlevdecomp));      this%n_active_vr(:,:) = nan
 
@@ -289,7 +250,6 @@ end type params_type
 
      allocate(this%npp_paths_acc(bounds%begp:bounds%endp,1:nlevdecomp,1:npath6));  this%npp_paths_acc(:,:,:) = nan
 
-
      ! hypothetical fluxes on N in each layer 
      allocate(this%n_exch_fixation(1:nlevdecomp));                           this%n_exch_fixation(:) = nan
 
@@ -302,7 +262,6 @@ end type params_type
      allocate(this% free_Nretrans(bounds%begp:bounds%endp));                 this%free_Nretrans(:) = nan 
 
      ! update fluxes
-
      allocate(this%c_am_resp_vr_col(bounds%begp:bounds%endp, 1:nlevdecomp));      this%c_am_resp_vr_col(:,:) = nan
 
      allocate(this%c_ecm_resp_vr_col(bounds%begp:bounds%endp, 1:nlevdecomp));     this%c_ecm_resp_vr_col(:,:) = nan
@@ -341,7 +300,6 @@ end type params_type
  
      this%rootc_dens_step                = 0._r8
      this%sminn_diff                     = 0._r8
-     this%active_limit1                  = 0._r8
      this%rootc_dens(:,:)                = 0._r8
      this%rootC(:)                       = 0._r8
      this%n_uptake_myc_frac(:,:)         = 0._r8
@@ -353,15 +311,12 @@ end type params_type
      this%litterfall_c_step(:,:)         = 0._r8
      this%tc_soisno(:,:)                 = 0._r8 
      this%npp_remaining(:,:)             = 0._r8
-     this%n_passive_step(:,:)            = 0._r8
      this%costs_paths(:,:,:)             = big_cost
      this%npp_to_paths(:,:,:)            = 0.0_r8
      this%npp_frac_paths(:,:,:)          = 0.0_r8
      this%n_from_paths(:,:,:)            = 0.0_r8
      this%n_paths_acc(:,:,:)             = 0.0_r8
      this%npp_paths_acc(:,:,:)           = 0.0_r8
-     this%n_fix_acc(:,:)                 = 0._r8
-     this%npp_fix_acc(:,:)               = 0._r8
      this%n_retrans_acc(:,:)             = 0._r8
      this%free_nretrans_acc(:,:)         = 0._r8
      this%npp_retrans_acc(:,:)           = 0._r8
@@ -369,15 +324,6 @@ end type params_type
      this%npp_uptake(:,:)                = 0._r8
      this%sminn_layer(:,:)               = 0._r8
      this%sminn_layer_step(:,:,:)        = 0._r8
-     this%n_am_acc                       = 0._r8
-     this%n_ecm_acc                      = 0._r8
-     this%n_active_acc(:,:)              = 0._r8
-     this%n_nonmyc_acc(:,:)              = 0._r8
-     this%npp_active_acc(:,:)            = 0._r8
-     this%npp_nonmyc_acc(:,:)            = 0._r8
-     this%n_am_retrans(:)                = 0._r8
-     this%n_ecm_retrans(:)               = 0._r8
-     this%n_passive_vr(:,:)              = 0._r8
      this%n_active_vr(:,:)               = 0._r8
      this%n_nonmyc_vr(:,:)               = 0._r8
      this%sminfrc(:,:)                   = 0._r8
@@ -517,7 +463,7 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
    use subgridAveMod   , only : p2c
    use pftconMod       , only : npcropmin
    use SoilBiogeochemDecompCascadeMIMICSplusMod , only : calc_myc_roi, decomp_rates_mimicsplus, calc_myc_mortality, &
-                                                         calc_myc_mining_rates, cost_FUN
+                                                         calc_myc_mining_rates, cost_FUN, fun_fluxes_myc_update1
 !
 ! !ARGUMENTS: 
    type(bounds_type)                       , intent(in)    :: bounds
@@ -569,6 +515,10 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
    real(r8)  :: delta_cn              ! difference between 'ideal' leaf CN ration and actual leaf C:N ratio. C/N
    real(r8)  :: excess_carbon         ! how much carbon goes into the leaf C pool on account of the flexibleCN modifications.   
    real(r8)  :: excess_carbon_acc     ! excess accumulated over layers.
+   real(r8)  :: roi_ecm               ! RoI nitrogen per carbon invested from vegetation to mycorrhiza [gN/gC]
+   real(r8)  :: roi_am                ! RoI nitrogen per carbon invested from vegetation to mycorrhiza [gN/gC]
+
+
    
    !  WITHOUT GROWTH RESP
    real(r8) ::                    fixerfrac            ! what fraction of plants can fix?
@@ -581,28 +531,31 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
    real(r8) ::                    total_c_spent_retrans
    real(r8) ::                    total_c_accounted_retrans
 
-  real(r8),  pointer ::  c_am_resp_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp)          ! carbon respiration flux for AM mycorrhiza
-  real(r8),  pointer ::  c_ecm_resp_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp)         ! carbon respiration flux for ECM mycorrhiza
-  real(r8),  pointer ::  c_am_growth_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp)        ! carbon growth flux for AM mycorrhiza
-  real(r8),  pointer ::  c_ecm_growth_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp)       ! carbon growth flux for ECM mycorrhiza
-  real(r8),  pointer ::  n_am_growth_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp)        ! nitrogen growth flux for AM mycorrhiza
-  real(r8),  pointer ::  n_ecm_growth_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp)       ! nitrogen growth flux for ECM mycorrhiza
-  real(r8),  pointer ::  c_ecm_enz_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp)          ! carbon enzyme production flux for ECM mycorrhiza
-  real(r8),  pointer ::  n_somc2ecm_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp)          ! nitrogen mining from ECM mycorrhiza
-  real(r8),  pointer ::  n_somp2ecm_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp)          ! nitrogen mining from ECM mycorrhiza
-  real(r8),  pointer ::  c_somc2soma_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp)          ! carbon release from mining from somc pool
-  real(r8),  pointer ::  c_somp2soma_vr_patch(:bounds%begp:bounds%endp,1:nlevdecomp)          ! carbon release from mining from somp pool
+   real(r8) :: frac_alloc_ecm(bounds%begp:bounds%endp,1:nmyc)                     ! fraction from ROI allocated to EcM
 
-   real(r8), pointer  :: n_active_no3_vr(bounds%begp:bounds%endp,1:nlevdecomp)            ! Layer mycorrhizal no3 uptake (gN/m2)
-   real(r8), pointer  :: n_nonmyc_no3_vr(bounds%begp:bounds%endp,1:nlevdecomp)            ! Layer non-myc     no3 uptake (gN/m2)
-   real(r8), pointer  :: n_active_nh4_vr(bounds%begp:bounds%endp,1:nlevdecomp)            ! Layer mycorrhizal nh4 uptake (gN/m2)
-   real(r8), pointer  :: n_nonmyc_nh4_vr(bounds%begp:bounds%endp,1:nlevdecomp)            ! Layer non-myc     nh4 uptake (gN/m2)
-   real(r8),  pointer ::  sminno3_to_ecm_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp)       ! No3 flux from soil to ECM
-   real(r8),  pointer ::  sminno3_to_am_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp)        ! No3 flux from soil to AM
-   real(r8),  pointer ::  sminnh4_to_ecm_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp)       ! NH4 flux from soil to ECM
-   real(r8),  pointer ::  sminnh4_to_am_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp)        ! NH4 flux from soil to AM
+   real(r8) :: c_am_resp_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)          ! carbon respiration flux for AM mycorrhiza
+   real(r8) :: c_ecm_resp_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)         ! carbon respiration flux for ECM mycorrhiza
+   real(r8) :: c_am_growth_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)        ! carbon growth flux for AM mycorrhiza
+   real(r8) :: c_ecm_growth_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)       ! carbon growth flux for ECM mycorrhiza
+   real(r8) :: n_am_growth_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)        ! nitrogen growth flux for AM mycorrhiza
+   real(r8) :: n_ecm_growth_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)       ! nitrogen growth flux for ECM mycorrhiza
+   real(r8) :: c_ecm_enz_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)          ! carbon enzyme production flux for ECM mycorrhiza
+   real(r8) :: n_somc2ecm_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)         ! nitrogen mining from ECM mycorrhiza
+   real(r8) :: n_somp2ecm_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)         ! nitrogen mining from ECM mycorrhiza
+   real(r8) :: c_somc2soma_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)        ! carbon release from mining from somc pool
+   real(r8) :: c_somp2soma_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)        ! carbon release from mining from somp pool
    
- 
+   real(r8) :: n_active_no3_vr(bounds%begp:bounds%endp, 1:nlevdecomp)             ! Layer mycorrhizal no3 uptake (gN/m2)
+   real(r8) :: n_nonmyc_no3_vr(bounds%begp:bounds%endp, 1:nlevdecomp)             ! Layer non-myc no3 uptake (gN/m2)
+   real(r8) :: n_active_nh4_vr(bounds%begp:bounds%endp, 1:nlevdecomp)             ! Layer mycorrhizal nh4 uptake (gN/m2)
+   real(r8) :: n_nonmyc_nh4_vr(bounds%begp:bounds%endp, 1:nlevdecomp)             ! Layer non-myc nh4 uptake (gN/m2)
+   real(r8) :: sminno3_to_ecm_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)     ! No3 flux from soil to ECM
+   real(r8) :: sminno3_to_am_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)      ! No3 flux from soil to AM
+   real(r8) :: sminnh4_to_ecm_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)     ! NH4 flux from soil to ECM
+   real(r8) :: sminnh4_to_am_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)      ! NH4 flux from soil to AM
+   
+
+
    associate(ivt             => patch%itype                                          , & ! Input:   [integer  (:) ]  p
       leafcn                 => pftcon%leafcn                                        , & ! Input:   leaf C:N (gC/gN)
       season_decid           => pftcon%season_decid                                  , & ! Input:   binary flag for seasonal deciduous leaf habit (0 or 1)
@@ -710,7 +663,6 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
       h2osoi_liq             => waterstatebulk_inst%h2osoi_liq_col                            , & ! Input:   [real(r8) (:,:)] liquid water (kg/m2) (new) (-nlevsno+1:nlevgrnd)
       t_soisno               => temperature_inst%t_soisno_col                                 , & ! Input:   [real(r8) (:,:)] soil temperature (Kelvin)  (-nlevsno+1:nlevgrnd)
       crootfr                => soilstate_inst%crootfr_patch                                  , & ! Input:   [real(r8) (:,:)] fraction of roots for carbon in each soil layer  (nlevgrnd)
-      active_limit1          => cnfunmimicsplus_inst%active_limit1                            , &
       costs_paths            => cnfunmimicsplus_inst%costs_paths                              , &
       npp_to_paths           => cnfunmimicsplus_inst%npp_to_paths                             , &
       npp_frac_paths         => cnfunmimicsplus_inst%npp_frac_paths                           , &
@@ -724,26 +676,14 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
       kn_active              => cnfunmimicsplus_inst%kn_active                                , &
       litterfall_c_step      => cnfunmimicsplus_inst%litterfall_c_step                        , &
       litterfall_n_step      => cnfunmimicsplus_inst%litterfall_n_step                        , &
-      n_active_acc           => cnfunmimicsplus_inst%n_active_acc                             , &
       n_active_vr            => cnfunmimicsplus_inst%n_active_vr                              , &
-      n_am_acc               => cnfunmimicsplus_inst%n_am_acc                                 , &
-      n_am_retrans           => cnfunmimicsplus_inst%n_am_retrans                             , &
-      n_ecm_acc              => cnfunmimicsplus_inst%n_ecm_acc                                , &
-      n_ecm_retrans          => cnfunmimicsplus_inst%n_ecm_retrans                            , &
       n_exch_active          => cnfunmimicsplus_inst%n_exch_active                            , &
       n_exch_fixation        => cnfunmimicsplus_inst%n_exch_fixation                          , &
       n_exch_nonmyc          => cnfunmimicsplus_inst%n_exch_nonmyc                            , &
       n_exch_retrans         => cnfunmimicsplus_inst%n_exch_retrans                           , &
-      n_fix_acc              => cnfunmimicsplus_inst%n_fix_acc                                , &
-      n_nonmyc_acc           => cnfunmimicsplus_inst%n_nonmyc_acc                             , &
       n_nonmyc_vr            => cnfunmimicsplus_inst%n_nonmyc_vr                              , &
-      n_passive_step         => cnfunmimicsplus_inst%n_passive_step                           , &
-      n_passive_vr           => cnfunmimicsplus_inst%n_passive_vr                             , &
       n_retrans_acc          => cnfunmimicsplus_inst%n_retrans_acc                            , &
       n_uptake_myc_frac      => cnfunmimicsplus_inst%n_uptake_myc_frac                        , &
-      npp_active_acc         => cnfunmimicsplus_inst%npp_active_acc                           , &
-      npp_fix_acc            => cnfunmimicsplus_inst%npp_fix_acc                              , &
-      npp_nonmyc_acc         => cnfunmimicsplus_inst%npp_nonmyc_acc                           , &
       npp_remaining          => cnfunmimicsplus_inst%npp_remaining                            , &
       npp_retrans_acc        => cnfunmimicsplus_inst%npp_retrans_acc                          , &
       npp_uptake             => cnfunmimicsplus_inst%npp_uptake                               , &
@@ -834,7 +774,7 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
          (smin_no3_to_plant_vr(c,j) + smin_nh4_to_plant_vr(c,j)) * dt, am_step , dzsoi_decomp(j),- big_cost, roi_am)
          frac_alloc_ecm=(roi_ecm)/(roi_ecm + roi_am) !
          if (crootfr(p,j)>0.0_r8) then
-            n_uptake_myc_frac(p,ecm_step) = n_uptake_myc_frac(p,ecm_step) + frac_alloc_ecm * crootfr
+            n_uptake_myc_frac(p,ecm_step) = n_uptake_myc_frac(p,ecm_step) + frac_alloc_ecm(p,imyc) * crootfr(p,j)
          endif
       end do
       n_uptake_myc_frac(p,am_step) = 1.0_r8 - n_uptake_myc_frac(p,ecm_step)
@@ -972,7 +912,7 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
       end do
 
       ! Remove C required to pair with N from passive uptake from the available pool. 
-      npp_remaining(p,imyc)  =   npp_remaining(p,imyc) - n_passive_step(p,imyc)*plantCN(p)
+      npp_remaining(p,imyc)  =   npp_remaining(p,imyc) * plantCN(p)
 
       total_N_conductance = 0.0_r8 
       fix_loop: do FIX =plants_are_fixing, plants_not_fixing !loop around percentages of fixers and nonfixers, with differnt costs. 
@@ -1133,7 +1073,7 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
                decomp_npools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_chem_som), &
                (sminn_layer_step(p,j,imyc) * fixerfrac), sminfrc(c,j), ecm_step, dzsoi_decomp(j), &
                npp_to_paths(p,j,ipano3), npp_to_paths(p,j,ipanh4), &
-               n_from_paths(p,j,ipnmno3), n_from_paths(p,j,ipnmnh4),n_from_paths(p,j,ipano3), n_from_paths(p,j,ipanh4) &
+               n_from_paths(p,j,ipnmno3), n_from_paths(p,j,ipnmnh4),n_from_paths(p,j,ipano3), n_from_paths(p,j,ipanh4), &
                sminno3_to_ecm_vr_patch(p,j), sminnh4_to_ecm_vr_patch(p,j), &
                c_ecm_resp_vr_patch(p,j), c_ecm_growth_vr_patch(p,j), n_ecm_growth_vr_patch(p,j), c_ecm_enz_vr_patch(p,j), &
                c_somp2soma_vr_patch(p,j), c_somc2soma_vr_patch(p,j), n_somp2ecm_vr_patch(p,j), n_somc2ecm_vr_patch(p,j))
@@ -1144,7 +1084,7 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
                decomp_npools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_chem_som), &
                (sminn_layer_step(p,j,imyc) * fixerfrac), sminfrc(c,j), ecm_step, dzsoi_decomp(j), &
                npp_to_paths(p,j,ipano3), npp_to_paths(p,j,ipanh4), &
-               n_from_paths(p,j,ipnmno3), n_from_paths(p,j,ipnmnh4),n_from_paths(p,j,ipano3), n_from_paths(p,j,ipanh4) &
+               n_from_paths(p,j,ipnmno3), n_from_paths(p,j,ipnmnh4),n_from_paths(p,j,ipano3), n_from_paths(p,j,ipanh4), &
                sminno3_to_am_vr_patch(p,j), sminnh4_to_am_vr_patch(p,j), &
                c_am_resp_vr_patch(p,j), c_am_growth_vr_patch(p,j), n_am_growth_vr_patch(p,j))
             endif
@@ -1180,11 +1120,6 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
                npp_paths_acc(p,imyc,ipath) = npp_paths_acc(p,imyc,ipath) + npp_to_paths(p,j,ipath)
             end do
                
-            !if(FIX == plants_are_fixing)then
-             ! n_fix_acc(p,imyc)          = n_fix_acc(p,imyc)         + n_from_paths(p,j,ipfix)
-              !npp_fix_acc(p,imyc)        = npp_fix_acc(p,imyc)       + npp_to_paths(p,j,ipfix)
-            !end if
-
             if(FIX == plants_are_fixing)then
                n_paths_acc(p,imyc,ipfix)     = n_paths_acc(p,imyc,ipfix)     + n_from_paths(p,j,ipfix)
                npp_paths_acc(p,imyc,ipfix)   = npp_paths_acc(p,imyc,ipfix)   + npp_to_paths(p,j,ipfix)
@@ -1223,7 +1158,7 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
              !Extract active uptake N from soil pools. 
              do j = 1, nlevdecomp
              !RF change. The N fixed doesn't actually come out of the soil mineral pools, it is 'new'... 
-             sminn_to_plant_fun_vr(p,j)    = (n_passive_vr(p,j)  + n_active_vr(p,j) + n_nonmyc_vr(p,j))/(dzsoi_decomp(j)*dt)
+             sminn_to_plant_fun_vr(p,j)    =  n_active_vr(p,j) + n_nonmyc_vr(p,j)/(dzsoi_decomp(j)*dt)
              end do
     
              !SPLIT TO NO3 and NH4 like in original fun
@@ -1292,7 +1227,10 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
              endif 
             
 end do pft 
-
+! go through all variables avove and see if they are used in a nothe rmodule from 1231
+! patch variables have to be p2c into col variables
+! compilable 
+! is everything in CN fun,  0red, allocated
 end associate
   
 end subroutine CNFUNMIMICSplus

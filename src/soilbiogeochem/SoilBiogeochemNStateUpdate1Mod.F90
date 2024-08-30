@@ -203,7 +203,7 @@ contains
                c = filter_bgc_soilc(fc)
                ! "bulk denitrification"
                ns%sminn_vr_col(c,j) = ns%sminn_vr_col(c,j) - nf%sminn_to_denit_excess_vr_col(c,j) * dt
-
+               !MVD substruct sminn flux to myc  here if mimcsplus
                ! total plant uptake from mineral N
                if ( .not. use_fun ) then
                   ns%sminn_vr_col(c,j) = ns%sminn_vr_col(c,j) - nf%sminn_to_plant_vr_col(c,j)*dt

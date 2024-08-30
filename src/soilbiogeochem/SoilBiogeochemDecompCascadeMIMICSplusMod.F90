@@ -75,6 +75,8 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
   public :: calc_myc_mining_rates
   public :: calc_myc_mortality
   public :: calc_myc_roi
+  public :: cost_FUN
+  public :: fun_fluxes_myc_update1
   private :: r_moist                            ! calculates moisture modifier according to CORPSE
   !
   ! !PUBLIC DATA MEMBERS 
@@ -1710,7 +1712,6 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
               pathfrac_decomp_cascade(c,j,i_myc2s2) = fchem_myc2
               pathfrac_decomp_cascade(c,j,i_myc2s3) = fphys_myc2
 
-              !ECW add also for mining EcM!!!           
 
 
 
@@ -1762,6 +1763,10 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
     end associate
 
 end subroutine decomp_rates_mimicsplus
+
+! add a new subroutine decomp_rates_after_FUN, will be called in FUN 
+! col variables, do we have corresponding patch variables
+! patch variables have to be p2c
 
 
    
@@ -2070,15 +2075,16 @@ end subroutine decomp_rates_mimicsplus
    real(r8)            :: dt                            ! timestep size (seconds)
    real(r8), parameter :: f_enz = 0.1_r8                ! [-]Fraction of C from vegetation to EcM, that goes into SOMa for mining
    real(r8), parameter :: f_growth = 0.5_r8             ! [-] Fraction of mycorrhizal N uptake that needs to stay within the fungi (not given to plant)
-   real(r8) :: fn_myc2veg                           ! nitrogen fluxes mycorrhiza to vegetation  [gN/m3/s]
+   real(r8) :: fc_veg2myc                               ! carbon flux vegetation to mycorrhiza []
+   real(r8) :: fn_myc2veg                               ! nitrogen fluxes mycorrhiza to vegetation  [gN/m3/s]
    real(r8) :: l_c_ecm_enz, l_fc_somp2soma, l_fc_somc2soma, l_fn_mining_somp, l_fn_mining_somc !locals of optional args
-   real(r8) :: N_uptake_myc                              ! [gN/m3/s]
-   real(r8) :: N_demand_myc                              ! [gN/m3/s]
-   real(r8) :: c_use_eff      ! carbon use efficiency [-]
-   real(r8) :: frac_no3_myc, frac_no3_nonmyc ! [-]
-   real(r8) :: fn_smin2myc, fno3_myc2veg,fnh4_myc2veg  ! local fluxes for balancing [gN/m3/s]
-   real(r8) :: no3_unpaid, nh4_unpaid ! nitrogen that did not actually reach the plant [gN/m2]
-   real(r8) :: smin_overflow        ! How much N mycorrhiza and non mycorrhiza promised to take out of soil and give to plant
+   real(r8) :: N_uptake_myc                             ! [gN/m3/s]
+   real(r8) :: N_demand_myc                             ! [gN/m3/s]
+   real(r8) :: c_use_eff                                ! carbon use efficiency [-]
+   real(r8) :: frac_no3_myc, frac_no3_nonmyc            ! [-]
+   real(r8) :: fn_smin2myc, fno3_myc2veg,fnh4_myc2veg   ! local fluxes for balancing [gN/m3/s]
+   real(r8) :: no3_unpaid, nh4_unpaid                   ! nitrogen that did not actually reach the plant [gN/m2]
+   real(r8) :: smin_overflow                            ! How much N mycorrhiza and non mycorrhiza promised to take out of soil and give to plant
    real(r8) :: l_no3_frac
 
    character(len=256) :: message
@@ -2138,7 +2144,7 @@ end subroutine decomp_rates_mimicsplus
    end if
 
    ! Soil mineral nitrogen flux to mycorrhiza, split into NO3 and NH4
-   fn_smin2myc = (params_inst%mimicsplus_vmax_myc / secphr) * sminn &  
+   fn_smin2myc = (params_inst%mimicsplus_vmax_myc / secphr) * sminn * &  
    (cpool_myc / (cpool_myc + params_inst%mimicsplus_k_m_emyc)) * dt ! multiplied by dt to get it in same units as no3_from_nonmyc
    fn_smin_no3_2myc = fn_smin2myc * sminfrc_no3
    fn_smin_nh4_2myc = fn_smin2myc * (1.0_r8 - sminfrc_no3)
