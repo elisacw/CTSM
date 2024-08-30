@@ -17,6 +17,7 @@ module SoilBiogeochemNStateUpdate1Mod
   use CNSharedParamsMod                  , only : use_fun
   use SoilBiogeochemDecompCascadeConType , only : mimicsplus_decomp, decomp_method
   use ColumnType                         , only : col 
+  use CNFUNMIMICSplusMod                 , only : cnfunmimicsplus_type
   !
   implicit none
   private
@@ -29,7 +30,7 @@ contains
 
   !-----------------------------------------------------------------------
   subroutine SoilBiogeochemNStateUpdate1(num_bgc_soilc, filter_bgc_soilc,  &
-       soilbiogeochem_state_inst, soilbiogeochem_nitrogenflux_inst, soilbiogeochem_nitrogenstate_inst)
+       soilbiogeochem_state_inst, soilbiogeochem_nitrogenflux_inst, soilbiogeochem_nitrogenstate_inst,cnfunmimicsplus_inst)
     !
     ! !DESCRIPTION:
     ! On the radiation time step, update all the prognostic nitrogen state
@@ -41,6 +42,7 @@ contains
     type(soilbiogeochem_state_type)         , intent(in)    :: soilbiogeochem_state_inst
     type(soilbiogeochem_nitrogenflux_type)  , intent(inout) :: soilbiogeochem_nitrogenflux_inst
     type(soilbiogeochem_nitrogenstate_type) , intent(inout) :: soilbiogeochem_nitrogenstate_inst
+    type(cnfunmimicsplus_type),               intent(in)    :: cnfunmimicsplus_inst
     !
     ! !LOCAL VARIABLES:
     integer :: c,p,j,l,k ! indices
@@ -239,6 +241,13 @@ contains
                   ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) - nf%smin_nh4_to_plant_vr_col(c,j)*dt
 
                   ns%smin_no3_vr_col(c,j) = ns%smin_no3_vr_col(c,j) - nf%smin_no3_to_plant_vr_col(c,j)*dt
+               else if (decomp_method == mimicsplus_decomp) then
+               ! we treat mycorrhiza differently in mimics plus
+                  ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) -  nf%sminn_to_plant_fun_nh4_vr_col(c,j)*dt - &
+                  (cnfunmimicsplus_inst%sminnh4_to_am_vr_col(c,j) + cnfunmimicsplus_inst%sminnh4_to_ecm_vr_col(c,j)) * dt
+
+                  ns%smin_no3_vr_col(c,j) = ns%smin_no3_vr_col(c,j) -  nf%sminn_to_plant_fun_no3_vr_col(c,j)*dt - &
+                  (cnfunmimicsplus_inst%sminno3_to_am_vr_col(c,j) + cnfunmimicsplus_inst%sminno3_to_ecm_vr_col(c,j)) * dt
                else 
                   ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) -  nf%sminn_to_plant_fun_nh4_vr_col(c,j)*dt
 

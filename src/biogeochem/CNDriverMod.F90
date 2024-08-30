@@ -699,7 +699,8 @@ contains
 
     call t_startf('SoilBiogeochemStateUpdate1')
     call SoilBiogeochemNStateUpdate1(num_bgc_soilc, filter_bgc_soilc,  &
-         soilbiogeochem_state_inst, soilbiogeochem_nitrogenflux_inst, soilbiogeochem_nitrogenstate_inst)
+         soilbiogeochem_state_inst, soilbiogeochem_nitrogenflux_inst, soilbiogeochem_nitrogenstate_inst, &
+         cnfunmimicsplus_inst)
     call t_stopf('SoilBiogeochemStateUpdate1')
 
 

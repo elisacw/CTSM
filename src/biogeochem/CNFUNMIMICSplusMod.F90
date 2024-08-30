@@ -1111,6 +1111,12 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
             npp_to_paths(p,j,ipnmno3) =  n_from_paths(p,j,ipnmno3) * costs_paths(p,j,ipnmno3)
             npp_to_paths(p,j,ipnmnh4) =  n_from_paths(p,j,ipnmnh4) * costs_paths(p,j,ipnmnh4)
 
+            ! switch units to gN/m3/s for use in other routines
+            sminno3_to_am_vr_patch(p,j)  = sminno3_to_am_vr_patch(p,j)/(dzsoi_decomp(j)*dt)
+            sminno3_to_ecm_vr_patch(p,j) = sminno3_to_ecm_vr_patch(p,j)/(dzsoi_decomp(j)*dt)
+            sminnh4_to_am_vr_patch(p,j)  = sminnh4_to_am_vr_patch(p,j)/(dzsoi_decomp(j)*dt)
+            sminnh4_to_ecm_vr_patch(p,j) = sminnh4_to_ecm_vr_patch(p,j)/(dzsoi_decomp(j)*dt)
+
             N_acquired     =  sum(n_from_paths(p,j,ipano3:ipnmnh4))        ! How much N did we end up with
                               
             C_spent        =   sum(npp_to_paths(p,j,ipano3:ipnmnh4))       ! How much did it actually cost? 
@@ -1156,6 +1162,10 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
             do j = 1,nlevdecomp
                n_active_vr(p,j)      =  n_active_vr(p,j)      + sum(n_from_paths(p,j,ipano3:ipanh4))
                n_nonmyc_vr(p,j)      =  n_nonmyc_vr(p,j)      + sum(n_from_paths(p,j,ipnmno3:ipnmnh4))
+               n_active_no3_vr(p,j)  =  n_active_no3_vr(p,j)  + n_from_paths(p,j,ipano3)
+               n_active_nh4_vr(p,j)  =  n_active_nh4_vr(p,j)  + n_from_paths(p,j,ipanh4)
+               n_nonmyc_n03_vr(p,j)  =  n_nonmyc_no3_vr(p,j)  + n_from_paths(p,j,ipnmno3)
+               n_nonmyc_nh4_vr(p,j)  =  n_nonmyc_nh4_vr(p,j)  + n_from_paths(p,j,ipnmnh4)
             end do
           end if !unmet demand`
          
@@ -1179,6 +1189,8 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
              do j = 1, nlevdecomp
              !RF change. The N fixed doesn't actually come out of the soil mineral pools, it is 'new'... 
              sminn_to_plant_fun_vr(p,j)    =  n_active_vr(p,j) + n_nonmyc_vr(p,j)/(dzsoi_decomp(j)*dt)
+             sminn_to_plant_fun_no3_vr(p,j)    = (n_nonmyc_no3_vr(p,j))/(dzsoi_decomp(j)*dt)
+             sminn_to_plant_fun_nh4_vr(p,j)    = (n_nonmyc_nh4_vr(p,j))/(dzsoi_decomp(j)*dt)
              end do
     
              !SPLIT TO NO3 and NH4 like in original fun
