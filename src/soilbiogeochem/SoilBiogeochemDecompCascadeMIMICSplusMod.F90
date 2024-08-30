@@ -1056,7 +1056,7 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
       real(r8):: km_s1_m2  !
       real(r8):: tau_m1  ! Microbial tunrnover rate bacteria
       real(r8):: tau_m2  ! Mircobial turnover rate fungi
-      real(r8):: tau_myc ! Mycorrhizal turnover rate for EcM & AM
+      real(r8):: tau_myc ! Mycorrhizal turnover rate for EcM & AM 
       real(r8):: tau_mod
       real(r8):: m1_conc       ! Carbon concentration in microbial barteria pool
       real(r8):: m2_conc       ! Carbon concentration in microbial fungi pool
@@ -1807,6 +1807,16 @@ subroutine decomp_rates_after_FUN (bounds, num_bgc_soilc, filter_bgc_soilc, &
    integer   :: p, c                  ! pft index
    integer   :: g, l                  ! indices
    integer   :: j, i, k               ! soil/snow level index
+   real(r8), parameter :: eps = 1.e-6_r8
+   real(r8):: tau_myc ! Mycorrhizal turnover rate for EcM & AM 
+   real(r8):: myc1_conc     ! Carbon concentration in ectomycorrhiza pool
+   real(r8):: myc2_conc     ! Carbon concentration in abruscular mycorrhiza pool
+   real(r8):: avl_som_conc  ! Carbon concentration in avaliable SOM pool
+   real(r8):: chem_som_conc ! Carbon concentration in chemically protected SOM pool
+   real(r8):: phys_som_conc ! Carbon concentration in physically protected SOM pool
+   real(r8):: term_1  !
+   real(r8):: term_2  !
+   real(r8):: t_soi_degC
 
    associate ( &
       ! Carbon
@@ -1818,17 +1828,80 @@ subroutine decomp_rates_after_FUN (bounds, num_bgc_soilc, filter_bgc_soilc, &
 
       )
 
+      ! prep
+      tau_myc = mimicsplus_k_myc_som / secsphr ! Turnover rate mycorrhiza with unit conversions (hourly -> second)
+      tau_myc1 = min(1._r8, max(0._r8, mimicsplus_tau_ecm))
+      fchem_myc1 = min(1._r8, max(0._r8, mimicsplus_fchem_ecm))
+      fphys_myc1 = min(1._r8, max(0._r8, mimicsplus_fphys_ecm))
+      tau_myc2 = min(1._r8, max(0._r8, mimicsplus_tau_am))
+      fchem_myc2 = min(1._r8, max(0._r8, mimicsplus_fchem_am))
+      fphys_myc2 = min(1._r8, max(0._r8, mimicsplus_fphys_am))
+      ! main column loop
+      do fc = 1,num_bgc_soilc
+         c = filter_bgc_soilc(fc)
+
+              ! Mycorrhizal concentration with necerssary unit conversions
+                        ! mgC/cm3 = gC/m3 * (1e3 mg/g) / (1e6 cm3/m3)
+         myc1_conc = (decomp_cpools_vr(c,j,i_ecm_myc) / col%dz(c,j)) * & !ECW is this what goes into ROI function (see end of module)
+         g_to_mg * cm3_to_m3
+         myc2_conc = (decomp_cpools_vr(c,j,i_am_myc) / col%dz(c,j)) * &
+         g_to_mg * cm3_to_m3
+
+         ! Soil organic matter concentration with necerssary unit conversions
+         ! mgC/cm3 = gC/m3 * (1e3 mg/g) / (1e6 cm3/m3)
+         avl_som_conc = (decomp_cpools_vr(c,j,i_avl_som) / col%dz(c,j)) * & !ECW This is for Baskaram N mining
+         g_to_mg * cm3_to_m3
+         chem_som_conc = (decomp_cpools_vr(c,j,i_chem_som) / col%dz(c,j)) * &
+         g_to_mg * cm3_to_m3
+         phys_som_conc = (decomp_cpools_vr(c,j,i_phys_som) / col%dz(c,j)) * &
+         g_to_mg * cm3_to_m3
+
+
+      ! FLUXES from SOMC 
+
+      ! FLUXES from SOMP
+
+      ! FLUXES from ECM
+      
+      ! FLUXES from AM
+
       ! CALCULATE MORTALITY FLUXES
 
 
       ! CALCULATE FLUXES CARBON FLUXES
 
       !
-
+      end do
    end associate
 end subroutine decomp_rates_after_FUN
 
+subroutine calc_myc_mortality(cpool_myc, npool_myc, m_fr,fc_myc2som, fn_myc2som)
+   ! DESCRIPTION:
+   ! Calculates mortality of mycorrhiza, based on: carbon content in mycorrhizal pool, mycorrhizal turnover rate and 
+   ! fraction of necromass going from mycorrhizal pools into soil organic matter pools.
+   
+   ! USES
 
+   ! ARGUMENTS
+   real(r8), intent(in) :: cpool_myc     ! Carbon pool of mycorrhiza [gC/m3]
+   real(r8), intent(in) :: npool_myc     ! Nitrogen pool of mycorrhiza [gN/m3]
+   real(r8), intent(in) :: m_fr          ! mortality fraction
+   real(r8), intent(inout) :: fc_myc2som ! carbon flux to SOM pool [gC/m3/s]
+   real(r8), intent(inout) :: fn_myc2som ! nitrogen flux [gN/m3/s]
+
+   ! LOCAL VARIABLES
+   real(r8) :: secphr = 60._r8 * 60.0_r8
+   real(r8), parameter :: small_flux = 1.e-14_r8
+
+   fc_myc2som = cpool_myc * (params_inst%mimicsplus_k_myc_som / secphr ) * m_fr
+   if (cpool_myc > small_flux) then 
+      fn_myc2som = fc_myc2som * (npool_myc / cpool_myc)
+   else
+      fn_myc2som = 0.0_r8
+      fc_myc2som = 0.0_r8
+   endif
+
+end subroutine calc_myc_mortality
    
    subroutine calc_myc_roi(cpool_myc, npool_myc,cpool_somp,cpool_soma,cpool_somc, &
                            npool_somp, npool_somc, sminn, myc_type, dz, big_roi, roi)
@@ -2015,34 +2088,6 @@ end subroutine decomp_rates_after_FUN
    end subroutine cost_FUN
 
 
-   subroutine calc_myc_mortality(cpool_myc, npool_myc, m_fr,fc_myc2som, fn_myc2som)
-   ! DESCRIPTION:
-   ! Calculates mortality of mycorrhiza, based on: carbon content in mycorrhizal pool, mycorrhizal turnover rate and 
-   ! fraction of necromass going from mycorrhizal pools into soil organic matter pools.
-   
-   ! USES
-
-   ! ARGUMENTS
-   real(r8), intent(in) :: cpool_myc     ! Carbon pool of mycorrhiza [gC/m3]
-   real(r8), intent(in) :: npool_myc     ! Nitrogen pool of mycorrhiza [gN/m3]
-   real(r8), intent(in) :: m_fr          ! mortality fraction
-   real(r8), intent(inout) :: fc_myc2som ! carbon flux to SOM pool [gC/m2/s]
-   real(r8), intent(inout) :: fn_myc2som ! nitrogen flux [gN/m2/s]
-
-   ! LOCAL VARIABLES
-   real(r8) :: secphr = 60._r8 * 60.0_r8
-   real(r8), parameter :: small_flux = 1.e-14_r8
-
-   fc_myc2som = cpool_myc * (params_inst%mimicsplus_k_myc_som / secphr ) * m_fr
-   if (cpool_myc > small_flux) then 
-      fn_myc2som = fc_myc2som * (npool_myc / cpool_myc)
-   else
-      fn_myc2som = 0.0_r8
-      fc_myc2som = 0.0_r8
-   endif
-
-   end subroutine calc_myc_mortality
-
 
   subroutine calc_myc_mining_rates(dz, cpool_som,cpool_myc, npool_myc, fc_som2soma,fn_mining_som)
 
@@ -2090,7 +2135,7 @@ end subroutine decomp_rates_after_FUN
    ! Updating Nitrogen and Carbon fluxes into mycorrhizal pools, to let them grow
    !
    ! ! USES:
-   use clm_time_manager, only: get_step_size_real,get_nstep,get_curr_date,get_curr_days_per_year
+   use clm_time_manager, only: get_step_size_real
 
    !
    ! !ARGUMENTS:
