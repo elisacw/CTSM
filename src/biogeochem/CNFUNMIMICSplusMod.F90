@@ -140,6 +140,10 @@ module CNFUNMIMICSplusMod
   real(r8),  pointer ::  sminno3_to_am_vr_col(:,:)        ! No3 flux from soil NO3 to AM
   real(r8),  pointer ::  sminnh4_to_ecm_vr_col(:,:)       ! No3 flux from soil NO3 to ECM
   real(r8),  pointer ::  sminnh4_to_am_vr_col(:,:)        ! No3 flux from soil NO3 to AM
+  real(r8),  pointer ::  sminno3_nonmyc_to_plant_col(:,:) ! No3 flux from min soil to plant (only nonmyc pathway can do this)
+  real(r8),  pointer ::  sminnh4_nonmyc_to_plant_col(:,:) ! NH4 flux from min soil to plant (only nonmyc pathway can do this)
+  real(r8),  pointer ::  no3_myc_to_plant_col(:,:)       ! No3 flux from min soil to plant  by mycorrhiza
+  real(r8),  pointer ::  nh4_myc_to_plant_col(:,:)       ! NH4 flux from min soil to plant by mycorrhiza
 
 contains
   procedure , public  :: Init
@@ -266,29 +270,34 @@ end type params_type
      allocate(this% free_Nretrans(bounds%begp:bounds%endp));                 this%free_Nretrans(:) = nan 
 
      ! update fluxes
-     allocate(this%c_am_resp_vr_col(bounds%begp:bounds%endp, 1:nlevdecomp));      this%c_am_resp_vr_col(:,:) = nan
+     allocate(this%c_am_resp_vr_col(bounds%begc:bounds%endc, 1:nlevdecomp));      this%c_am_resp_vr_col(:,:) = nan
 
-     allocate(this%c_ecm_resp_vr_col(bounds%begp:bounds%endp, 1:nlevdecomp));     this%c_ecm_resp_vr_col(:,:) = nan
+     allocate(this%c_ecm_resp_vr_col(bounds%begc:bounds%endc, 1:nlevdecomp));     this%c_ecm_resp_vr_col(:,:) = nan
 
-     allocate(this%c_am_growth_vr_col(bounds%begp:bounds%endp, 1:nlevdecomp));    this%c_am_growth_vr_col(:,:) = nan
+     allocate(this%c_am_growth_vr_col(bounds%begc:bounds%endc, 1:nlevdecomp));    this%c_am_growth_vr_col(:,:) = nan
 
-     allocate(this%c_ecm_growth_vr_col(bounds%begp:bounds%endp, 1:nlevdecomp));   this%c_ecm_growth_vr_col(:,:) = nan
+     allocate(this%c_ecm_growth_vr_col(bounds%begc:bounds%endc, 1:nlevdecomp));   this%c_ecm_growth_vr_col(:,:) = nan
 
-     allocate(this%n_am_growth_vr_col(bounds%begp:bounds%endp, 1:nlevdecomp));    this%n_am_growth_vr_col(:,:) = nan
+     allocate(this%n_am_growth_vr_col(bounds%begc:bounds%endc, 1:nlevdecomp));    this%n_am_growth_vr_col(:,:) = nan
 
-     allocate(this%n_ecm_growth_vr_col(bounds%begp:bounds%endp, 1:nlevdecomp));   this%n_ecm_growth_vr_col(:,:) = nan
+     allocate(this%n_ecm_growth_vr_col(bounds%begc:bounds%endc, 1:nlevdecomp));   this%n_ecm_growth_vr_col(:,:) = nan
 
-     allocate(this%c_ecm_enz_vr_col(bounds%begp:bounds%endp, 1:nlevdecomp));      this%c_ecm_enz_vr_col(:,:) = nan
+     allocate(this%c_ecm_enz_vr_col(bounds%begc:bounds%endc, 1:nlevdecomp));      this%c_ecm_enz_vr_col(:,:) = nan
 
-     allocate(this%n_somc2ecm_vr_col(bounds%begp:bounds%endp, 1:nlevdecomp));      this%n_somc2ecm_vr_col(:,:) = nan
-     allocate(this%n_somp2ecm_vr_col(bounds%begp:bounds%endp, 1:nlevdecomp));      this%n_somp2ecm_vr_col(:,:) = nan
-     allocate(this%c_somc2soma_vr_col(bounds%begp:bounds%endp, 1:nlevdecomp));      this%c_somc2soma_vr_col(:,:) = nan
-     allocate(this%c_somp2soma_vr_col(bounds%begp:bounds%endp, 1:nlevdecomp));      this%c_somp2soma_vr_col(:,:) = nan
-     allocate(this%sminno3_to_ecm_vr_col(bounds%begp:bounds%endp, 1:nlevdecomp));      this%sminno3_to_ecm_vr_col(:,:) = nan
-     allocate(this%sminno3_to_am_vr_col(bounds%begp:bounds%endp, 1:nlevdecomp));      this%sminno3_to_am_vr_col(:,:) = nan
-     allocate(this%sminnh4_to_ecm_vr_col(bounds%begp:bounds%endp, 1:nlevdecomp));      this%sminnh4_to_ecm_vr_col(:,:) = nan
-     allocate(this%sminnh4_to_am_vr_col(bounds%begp:bounds%endp, 1:nlevdecomp));      this%sminnh4_to_am_vr_col(:,:) = nan
+     allocate(this%n_somc2ecm_vr_col(bounds%begc:bounds%endc, 1:nlevdecomp));      this%n_somc2ecm_vr_col(:,:) = nan
+     allocate(this%n_somp2ecm_vr_col(bounds%begc:bounds%endc, 1:nlevdecomp));      this%n_somp2ecm_vr_col(:,:) = nan
+     allocate(this%c_somc2soma_vr_col(bounds%begc:bounds%endc, 1:nlevdecomp));      this%c_somc2soma_vr_col(:,:) = nan
+     allocate(this%c_somp2soma_vr_col(bounds%begc:bounds%endc, 1:nlevdecomp));      this%c_somp2soma_vr_col(:,:) = nan
+     allocate(this%sminno3_to_ecm_vr_col(bounds%begc:bounds%endc, 1:nlevdecomp));      this%sminno3_to_ecm_vr_col(:,:) = nan
+     allocate(this%sminno3_to_am_vr_col(bounds%begc:bounds%endc, 1:nlevdecomp));      this%sminno3_to_am_vr_col(:,:) = nan
+     allocate(this%sminnh4_to_ecm_vr_col(bounds%begc:bounds%endc, 1:nlevdecomp));      this%sminnh4_to_ecm_vr_col(:,:) = nan
+     allocate(this%sminnh4_to_am_vr_col(bounds%begc:bounds%endc, 1:nlevdecomp));      this%sminnh4_to_am_vr_col(:,:) = nan
 
+     allocate(this%sminno3_nonmyc_to_plant_col(bounds%begc:bounds%endc, 1:nlevdecomp)); this%sminno3_nonmyc_to_plant_col(:,:) = nan
+     allocate(this%sminnh4_nonmyc_to_plant_col(bounds%begc:bounds%endc, 1:nlevdecomp)); this%sminnh4_nonmyc_to_plant_col(:,:) = nan
+
+     allocate(this%no3_myc_to_plant_col(bounds%begc:bounds%endc, 1:nlevdecomp)); this%no3_myc_to_plant_col(:,:) = nan
+     allocate(this%nh4_myc_to_plant_col(bounds%begc:bounds%endc, 1:nlevdecomp)); this%nh4_myc_to_plant_col(:,:) = nan
 
   end subroutine InitAllocate
 
@@ -361,6 +370,10 @@ end type params_type
      this%sminno3_to_am_vr_col(:,:)      = 0._r8
      this%sminnh4_to_ecm_vr_col(:,:)     = 0._r8
      this%sminnh4_to_am_vr_col(:,:)      = 0._r8
+     this%sminno3_nonmyc_to_plant_col(:,:) = 0._r8
+     this%sminnh4_nonmyc_to_plant_col(:,:) = 0._r8
+     this%no3_myc_to_plant_col(:,:)        = 0._r8
+     this%nh4_myc_to_plant_col(:,:)        = 0._r8
 
   end subroutine SetZeros
 
@@ -1189,8 +1202,11 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
              do j = 1, nlevdecomp
              !RF change. The N fixed doesn't actually come out of the soil mineral pools, it is 'new'... 
              sminn_to_plant_fun_vr(p,j)    =  n_active_vr(p,j) + n_nonmyc_vr(p,j)/(dzsoi_decomp(j)*dt)
-             sminn_to_plant_fun_no3_vr(p,j)    = (n_nonmyc_no3_vr(p,j))/(dzsoi_decomp(j)*dt)
-             sminn_to_plant_fun_nh4_vr(p,j)    = (n_nonmyc_nh4_vr(p,j))/(dzsoi_decomp(j)*dt)
+             ! we have  these variable instead of smin*_to_plant_fun_vr, just need give them proper units
+             n_active_no3_vr(p,j)  =  n_active_no3_vr(p,j)/(dzsoi_decomp(j)*dt)
+             n_active_nh4_vr(p,j)  =  n_active_nh4_vr(p,j)/(dzsoi_decomp(j)*dt)
+             n_nonmyc_n03_vr(p,j)  =  n_nonmyc_no3_vr(p,j)/(dzsoi_decomp(j)*dt)
+             n_nonmyc_nh4_vr(p,j)  =  n_nonmyc_nh4_vr(p,j)/(dzsoi_decomp(j)*dt)
              end do
     
              !SPLIT TO NO3 and NH4 like in original fun
@@ -1270,7 +1286,8 @@ call updateCNFUNMIMICSplus (bounds, num_soilc, filter_soilc, cnveg_carbonflux_in
                            c_am_resp_vr_patch, c_ecm_resp_vr_patch, c_am_growth_vr_patch, c_ecm_growth_vr_patch, &
                            n_am_growth_vr_patch, n_ecm_growth_vr_patch, c_ecm_enz_vr_patch, &
                            n_somc2ecm_vr_patch, n_somp2ecm_vr_patch, c_somc2soma_vr_patch, c_somp2soma_vr_patch,&
-                           sminno3_to_ecm_vr_patch, sminno3_to_am_vr_patch, sminnh4_to_ecm_vr_patch, sminnh4_to_am_vr_patch &
+                           sminno3_to_ecm_vr_patch, sminno3_to_am_vr_patch, sminnh4_to_ecm_vr_patch, sminnh4_to_am_vr_patch, &
+                           n_active_no3_vr, n_nonmyc_no3_vr, n_active_nh4_vr, n_nonmyc_nh4_vr &
                                  )
 call t_stopf( 'updateCNFUNMIMICSplus' )
 end subroutine CNFUNMIMICSplus
@@ -1282,8 +1299,8 @@ subroutine updateCNFUNMIMICSplus (bounds, num_soilc, filter_soilc, &
                                  c_am_resp_vr_patch, c_ecm_resp_vr_patch, c_am_growth_vr_patch, c_ecm_growth_vr_patch, &
                                  n_am_growth_vr_patch, n_ecm_growth_vr_patch, c_ecm_enz_vr_patch, &
                                  n_somc2ecm_vr_patch, n_somp2ecm_vr_patch, c_somc2soma_vr_patch, c_somp2soma_vr_patch,&
-                                 sminno3_to_ecm_vr_patch, sminno3_to_am_vr_patch, sminnh4_to_ecm_vr_patch, sminnh4_to_am_vr_patch &
-
+                                 sminno3_to_ecm_vr_patch, sminno3_to_am_vr_patch, sminnh4_to_ecm_vr_patch, sminnh4_to_am_vr_patch, &
+                                 n_active_no3_vr, n_nonmyc_no3_vr, n_active_nh4_vr, n_nonmyc_nh4_vr &
                                  )
     !
     ! !DESCRIPTION:
@@ -1317,6 +1334,10 @@ subroutine updateCNFUNMIMICSplus (bounds, num_soilc, filter_soilc, &
    real(r8), intent(in) :: sminno3_to_am_vr_patch      ! No3 flux from soil to AM
    real(r8), intent(in) :: sminnh4_to_ecm_vr_patch     ! NH4 flux from soil to ECM
    real(r8), intent(in) :: sminnh4_to_am_vr_patch      ! NH4 flux from soil to AM
+   real(r8), intent(in) :: n_active_no3_vr             ! Layer mycorrhizal no3 uptake (gN/m2)
+   real(r8), intent(in) :: n_nonmyc_no3_vr             ! Layer non-myc no3 uptake (gN/m2)
+   real(r8), intent(in) :: n_active_nh4_vr             ! Layer mycorrhizal nh4 uptake (gN/m2)
+   real(r8), intent(in) :: n_nonmyc_nh4_vr             ! Layer non-myc nh4 uptake (gN/m2)
        
 
    !!! soilc_change_col is not used anywhere
@@ -1330,15 +1351,24 @@ subroutine updateCNFUNMIMICSplus (bounds, num_soilc, filter_soilc, &
 
 
    if (use_nitrif_denitrif) then
+      ! plant fluxes
       call p2c(bounds,nlevdecomp, &
-               cnveg_nitrogenflux_inst%sminn_to_plant_fun_no3_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp),&
-               soilbiogeochem_nitrogenflux_inst%sminn_to_plant_fun_no3_vr_col(bounds%begc:bounds%endc,1:nlevdecomp),&
+               n_active_no3_vr(bounds%begp:bounds%endp,1:nlevdecomp),&
+               cnfunmimicsplus_inst%no3_myc_to_plant_col(bounds%begc:bounds%endc,1:nlevdecomp),&
+               'unity')
+      call p2c(bounds,nlevdecomp, &
+               n_nonmyc_no3_vr(bounds%begp:bounds%endp,1:nlevdecomp),&
+               cnfunmimicsplus_inst%sminno3_nonmyc_to_plant_col(bounds%begc:bounds%endc,1:nlevdecomp),&
+               'unity')
+      call p2c(bounds,nlevdecomp, &
+               n_active_nh4_vr(bounds%begp:bounds%endp,1:nlevdecomp),&
+               cnfunmimicsplus_inst%nh4_myc_to_plant_col(bounds%begc:bounds%endc,1:nlevdecomp),&
+               'unity')
+      call p2c(bounds,nlevdecomp, &
+               n_nonmyc_nh4_vr(bounds%begp:bounds%endp,1:nlevdecomp),&
+               cnfunmimicsplus_inst%sminnh4_nonmyc_to_plant_col(bounds%begc:bounds%endc,1:nlevdecomp),&
                'unity')
 
-      call p2c(bounds,nlevdecomp, &
-               cnveg_nitrogenflux_inst%sminn_to_plant_fun_nh4_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp),&
-               soilbiogeochem_nitrogenflux_inst%sminn_to_plant_fun_nh4_vr_col(bounds%begc:bounds%endc,1:nlevdecomp),&
-               'unity')
       ! mycorrhyza fluxes
       call p2c(bounds,nlevdecomp, &
                sminno3_to_ecm_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp),&
