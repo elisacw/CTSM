@@ -72,6 +72,7 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
   public :: readParams                          ! Read in parameters from params file
   public :: init_decompcascade_mimicsplus       ! Initialization
   public :: decomp_rates_mimicsplus             ! Figure out decomposition rates
+  public :: decomp_rates_after_FUN
   public :: calc_myc_mining_rates
   public :: calc_myc_mortality
   public :: calc_myc_roi
@@ -1764,9 +1765,68 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
 
 end subroutine decomp_rates_mimicsplus
 
-! add a new subroutine decomp_rates_after_FUN, will be called in FUN 
+
+
+subroutine decomp_rates_after_FUN (bounds, num_bgc_soilc, filter_bgc_soilc, &
+   num_soilp, filter_soilp, &
+   soilstate_inst, cnveg_carbonflux_inst, &
+   soilbiogeochem_carbonflux_inst, soilbiogeochem_nitrogenflux_inst, &
+   soilbiogeochem_carbonstate_inst, soilbiogeochem_nitrogenstate_inst,& 
+   soilbiogeochem_state_inst &
+   )
+! 
+! DESCRIPTION
+!! add a new subroutine decomp_rates_after_FUN, will be called in FUN 
 ! col variables, do we have corresponding patch variables
 ! patch variables have to be p2c
+
+! USES:
+   use SoilBiogeochemNitrogenFluxType  , only : soilbiogeochem_nitrogenflux_type
+   use SoilBiogeochemNitrogenStateType  , only : soilbiogeochem_nitrogenstate_type
+   use subgridAveMod                    , only : p2c
+
+! ARGUMENTS:
+   type(bounds_type)                    , intent(in)    :: bounds          
+   integer                              , intent(in)    :: num_soilp       ! number of soil patches in filter
+   integer                              , intent(in)    :: filter_soilp(:) ! filter for soil patches
+   integer                              , intent(in)    :: num_bgc_soilc       ! number of soil columns in filter
+   integer                              , intent(in)    :: filter_bgc_soilc(:) ! filter for soil columns
+   type(soilstate_type)                 , intent(in)    :: soilstate_inst
+   type(cnveg_carbonflux_type)          , intent(in)    :: cnveg_carbonflux_inst
+   type(soilbiogeochem_carbonflux_type) , intent(inout) :: soilbiogeochem_carbonflux_inst
+   type(soilbiogeochem_carbonstate_type), intent(in)    :: soilbiogeochem_carbonstate_inst
+   type(soilbiogeochem_carbonflux_type) , intent(inout) :: soilbiogeochem_nitrogenflux_inst
+   type(soilbiogeochem_carbonstate_type), intent(in)    :: soilbiogeochem_nitrogenstate_inst
+   type(soilbiogeochem_state_type)      , intent(in)    :: soilbiogeochem_state_inst
+
+
+   !LOCAL VARIABLES:
+   integer   :: fn                    ! number of values in pft filter
+   integer   :: fp                    ! lake filter pft index 
+   integer   :: fc                    ! lake filter column index
+   integer   :: p, c                  ! pft index
+   integer   :: g, l                  ! indices
+   integer   :: j, i, k               ! soil/snow level index
+
+   associate ( &
+      ! Carbon
+      decomp_cpools_vr => soilbiogeochem_carbonstate_inst%decomp_cpools_vr_col , &  ! Input: [real(r8) (:,:,:) ] (gC/m3)  vertically-resolved decomposing (litter, cwd, soil) C pools
+      pathfrac_decomp_cascade => soilbiogeochem_carbonflux_inst%pathfrac_decomp_cascade_col, &  ! Output: [real(r8) (:,:,:) ]  what fraction of C leaving a given pool passes through a given transition (frac)
+      rf_decomp_cascade       => soilbiogeochem_carbonflux_inst%rf_decomp_cascade_col    , & ! Input:  [real(r8)          (:,:,:) ]  respired fraction in decomposition step (frac)
+        
+      decomp_npools_vr      => soilbiogeochem_nitrogenstate_inst%decomp_npools_vr_col         , &
+
+      )
+
+      ! CALCULATE MORTALITY FLUXES
+
+
+      ! CALCULATE FLUXES CARBON FLUXES
+
+      !
+
+   end associate
+end subroutine decomp_rates_after_FUN
 
 
    
@@ -2240,6 +2300,7 @@ end subroutine decomp_rates_mimicsplus
    !endif
 
   end subroutine fun_fluxes_myc_update1
+  
   
           
   !Moisture function, based on testbed code: https://github.com/wwieder/biogeochem_testbed/blob/957a5c634b9f2d0b4cdba0faa06b5a91216ace33/SOURCE_CODE/mimics_cycle.f90#L401-L419
