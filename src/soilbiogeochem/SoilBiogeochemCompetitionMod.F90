@@ -400,10 +400,6 @@ contains
                       cnveg_carbonflux_inst,cnveg_nitrogenstate_inst,cnveg_nitrogenflux_inst                ,&
                       soilbiogeochem_nitrogenflux_inst,soilbiogeochem_carbonflux_inst,canopystate_inst,      &
                       soilbiogeochem_nitrogenstate_inst, soilbiogeochem_carbonstate_inst, cnfunmimicsplus_inst)
-            call p2c(bounds, nlevdecomp, &
-                      cnveg_nitrogenflux_inst%sminn_to_plant_fun_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp),&
-                      soilbiogeochem_nitrogenflux_inst%sminn_to_plant_fun_vr_col(bounds%begc:bounds%endc,1:nlevdecomp), &
-                      'unity')
             call t_stopf( 'CNFUNMIMICSplus' )
          end if
 
@@ -799,17 +795,6 @@ contains
                       cnveg_carbonflux_inst,cnveg_nitrogenstate_inst,cnveg_nitrogenflux_inst                ,&
                       soilbiogeochem_nitrogenflux_inst,soilbiogeochem_carbonflux_inst,canopystate_inst,      &
                       soilbiogeochem_nitrogenstate_inst, soilbiogeochem_carbonstate_inst, cnfunmimicsplus_inst)
-                      
-            ! sminn_to_plant_fun is output of actual N uptake from FUN
-            call p2c(bounds,nlevdecomp, &
-                       cnveg_nitrogenflux_inst%sminn_to_plant_fun_no3_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp),&
-                       soilbiogeochem_nitrogenflux_inst%sminn_to_plant_fun_no3_vr_col(bounds%begc:bounds%endc,1:nlevdecomp),&
-                       'unity')
-
-            call p2c(bounds,nlevdecomp, &
-                       cnveg_nitrogenflux_inst%sminn_to_plant_fun_nh4_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp),&
-                       soilbiogeochem_nitrogenflux_inst%sminn_to_plant_fun_nh4_vr_col(bounds%begc:bounds%endc,1:nlevdecomp),&
-                       'unity')
             call t_stopf( 'CNFUNMIMICSplus' )
          end if
 
