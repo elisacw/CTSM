@@ -821,17 +821,17 @@ contains
                ! sum up N fluxes to plant after initial competition
                sminn_to_plant(c) = 0._r8 !this isn't use in fun. 
                do j = 1, nlevdecomp
-                  if ((cnfunmimicsplus_inst%sminno3_nonmyc_to_plant_col(c,j) + cnfunmimicsplus_inst%no3_myc_to_plant_col &
-                       - smin_no3_to_plant_vr(c,j)).gt.0.0000000000001_r8) then
+                  if ((cnfunmimicsplus_inst%sminno3_nonmyc_to_plant_col(c,j) + cnfunmimicsplus_inst%sminno3_to_ecm_vr_col(c,j) +  &
+                      cnfunmimicsplus_inst%sminno3_to_am_vr_col(c,j) - smin_no3_to_plant_vr(c,j)).gt.0.0000000000001_r8) then
                       write(iulog,*) 'problem with limitations on no3 uptake', &
-                              cnfunmimicsplus_inst%sminno3_nonmyc_to_plant_col(c,j) + cnfunmimicsplus_inst%no3_myc_to_plant_col, &
+                              cnfunmimicsplus_inst%sminno3_nonmyc_to_plant_col(c,j) + cnfunmimicsplus_inst%no3_myc_to_plant_col(c,j), &
                               smin_no3_to_plant_vr(c,j)
                       call endrun("too much NO3 uptake predicted by CNFUNMIMICSplus")
                   end if
-                  if ((cnfunmimicsplus_inst%sminnh4_nonmyc_to_plant_col(c,j) + cnfunmimicsplus_inst%nh4_myc_to_plant_col &
-                       - smin_nh4_to_plant_vr(c,j)).gt.0.0000000000001_r8) then
+                  if ((cnfunmimicsplus_inst%sminnh4_nonmyc_to_plant_col(c,j) + cnfunmimicsplus_inst%sminnh4_to_ecm_vr_col(c,j) + &
+                       cnfunmimicsplus_inst%sminno3_to_am_vr_col(c,j) - smin_nh4_to_plant_vr(c,j)).gt.0.0000000000001_r8) then
                       write(iulog,*) 'problem with limitations on nh4 uptake', &
-                              cnfunmimicsplus_inst%sminnh4_nonmyc_to_plant_col(c,j) + cnfunmimicsplus_inst%nh4_myc_to_plant_col, &
+                              cnfunmimicsplus_inst%sminnh4_nonmyc_to_plant_col(c,j) + cnfunmimicsplus_inst%nh4_myc_to_plant_col(c,j), &
                               smin_nh4_to_plant_vr(c,j)
                       call endrun("too much NH4 uptake predicted by CNFUNMIMICSplus")
                   end if
