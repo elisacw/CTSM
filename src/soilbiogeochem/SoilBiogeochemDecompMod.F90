@@ -13,6 +13,7 @@ module SoilBiogeochemDecompMod
   use clm_varpar                         , only : nlevdecomp, ndecomp_cascade_transitions, ndecomp_pools
   use clm_varctl                         , only : use_nitrif_denitrif, use_lch4, iulog
   use clm_varcon                         , only : dzsoi_decomp
+  use clm_varpar                         , only : i_phys_som, i_chem_som, i_avl_som, i_ecm_myc, i_am_myc
   use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, mimics_decomp, mimicsplus_decomp, decomp_method, use_soil_matrixcn
   use SoilBiogeochemStateType            , only : soilbiogeochem_state_type
   use SoilBiogeochemCarbonStateType      , only : soilbiogeochem_carbonstate_type
@@ -71,10 +72,12 @@ contains
        soilbiogeochem_state_inst, soilbiogeochem_carbonstate_inst, soilbiogeochem_carbonflux_inst, &
        soilbiogeochem_nitrogenstate_inst, soilbiogeochem_nitrogenflux_inst, &
        cn_decomp_pools, p_decomp_cpool_loss, pmnf_decomp_cascade, &
-       p_decomp_npool_to_din)
+       p_decomp_npool_to_din, cnfunmimicsplus_inst)
     !
     ! !USES:
     use SoilBiogeochemDecompCascadeConType, only : i_atm
+    use CNFUNMIMICSplusMod,                 only : cnfunmimicsplus_type
+    use clm_time_manager,                   only : get_step_size_real
     !
     ! !ARGUMENT:
     type(bounds_type)                       , intent(in)    :: bounds   
@@ -89,11 +92,14 @@ contains
     real(r8)                                , intent(inout) :: p_decomp_cpool_loss(bounds%begc:,1:,1:) ! potential C loss from one pool to another
     real(r8)                                , intent(inout) :: pmnf_decomp_cascade(bounds%begc:,1:,1:) ! potential mineral N flux from one pool to another
     real(r8)                                , intent(in)    :: p_decomp_npool_to_din(bounds%begc:,1:,1:) ! potential flux to dissolved inorganic N
+    type(cnfunmimicsplus_type)              , intent(inout) :: cnfunmimicsplus_inst
     !
     ! !LOCAL VARIABLES:
-    integer :: c,j,k,l,m                                    ! indices
-    integer :: fc                                           ! lake filter column index
-    integer :: begc,endc                                    ! bounds 
+    integer  :: c,j,k,l,m                                    ! indices
+    integer  :: fc                                           ! lake filter column index
+    integer  :: begc,endc                                    ! bounds 
+    real(r8) :: dt                                           ! timestep
+
     !  For methane code
     real(r8):: hrsum(bounds%begc:bounds%endc,1:nlevdecomp)  ! sum of HR (gC/m2/s) 
     !-----------------------------------------------------------------------
@@ -131,12 +137,29 @@ contains
          decomp_cascade_hr_vr             =>    soilbiogeochem_carbonflux_inst%decomp_cascade_hr_vr_col               , & ! Output: [real(r8) (:,:,:) ]  vertically-resolved het. resp. from decomposing C pools (gC/m3/s)
          decomp_cascade_ctransfer_vr      =>    soilbiogeochem_carbonflux_inst%decomp_cascade_ctransfer_vr_col        , & ! Output: [real(r8) (:,:,:) ]  vertically-resolved het. resp. from decomposing C pools (gC/m3/s)
          phr_vr                           =>    soilbiogeochem_carbonflux_inst%phr_vr_col                             , & ! Input:  [real(r8) (:,:)   ]  potential HR (gC/m3/s)                           
-         fphr                             =>    soilbiogeochem_carbonflux_inst%fphr_col                                 & ! Output: [real(r8) (:,:)   ]  fraction of potential SOM + LITTER heterotrophic
-         )
+         fphr                             =>    soilbiogeochem_carbonflux_inst%fphr_col                               , & ! Output: [real(r8) (:,:)   ]  fraction of potential SOM + LITTER heterotrophic
 
+         c_am_resp_vr                     => cnfunmimicsplus_inst%c_am_resp_vr_col                                    , &
+         c_ecm_resp_vr                    => cnfunmimicsplus_inst%c_ecm_resp_vr_col                                   , &
+         c_am_growth_vr                   => cnfunmimicsplus_inst%c_am_growth_vr_col                                  , &
+         c_ecm_growth_vr                  => cnfunmimicsplus_inst%c_ecm_growth_vr_col                                 , &
+         n_am_growth_vr                   => cnfunmimicsplus_inst%n_am_growth_vr_col                                  , &
+         n_ecm_growth_vr                  => cnfunmimicsplus_inst%n_ecm_growth_vr_col                                 , &
+         c_ecm_enz_vr                     => cnfunmimicsplus_inst%c_ecm_enz_vr_col                                    , &
+         n_somc2ecm_vr                    => cnfunmimicsplus_inst%n_somc2ecm_vr_col(:,:)                              , & ! nitrogen mining from ECM mycorrhiza
+         n_somp2ecm_vr                    => cnfunmimicsplus_inst%n_somp2ecm_vr_col(:,:)                              , & ! nitrogen mining from ECM mycorrhiza
+         c_somc2soma_vr                   => cnfunmimicsplus_inst%c_somc2soma_vr_col(:,:)                             , & ! carbon release from mining from somc pool
+         c_somp2soma_vr                   => cnfunmimicsplus_inst%c_somp2soma_vr_col(:,:)                             , & ! carbon release from mining from somp pool
+         sminno3_to_ecm_vr                => cnfunmimicsplus_inst%sminno3_to_ecm_vr_col(:,:)                          , & ! No3 flux from soil NO3 to ECM
+         sminno3_to_am_vr                 => cnfunmimicsplus_inst%sminno3_to_am_vr_col(:,:)                           , & ! No3 flux from soil NO3 to AM
+         sminnh4_to_ecm_vr                => cnfunmimicsplus_inst%sminnh4_to_ecm_vr_col(:,:)                          , & ! No3 flux from soil NO3 to ECM
+         sminnh4_to_am_vr                 => cnfunmimicsplus_inst%sminnh4_to_am_vr_col(:,:)                             & ! No3 flux from soil NO3 to A
+          )
+
+      dt = get_step_size_real()
       ! column loop to calculate actual immobilization and decomp rates, following
       ! resolution of plant/heterotroph  competition for mineral N
-
+      dt = get_step_size_real()
       ! calculate c:n ratios of applicable pools !ECW CN ratio calculated based on pool sizes
       do l = 1, ndecomp_pools
          if ( floating_cn_ratio_decomp_pools(l) ) then
@@ -273,6 +296,52 @@ contains
               gross_nmin(c) = gross_nmin(c) + gross_nmin_vr(c,j) * dzsoi_decomp(j)
          end do
       end do
+
+      ! update fluxes from mimicsplus after FUN
+
+
+      if (decomp_method ==  mimicsplus_decomp) then
+
+         do fc = 1,num_bgc_soilc
+            c = filter_bgc_soilc(fc)
+            do j = 1,nlevdecomp
+               do k = 1,ndecomp_cascade_transitions
+
+                  if (cascade_donor_pool(k) == i_ecm_myc) then
+                     ! mining fluxes
+                     if (cascade_receiver_pool(k) == i_chem_som) then
+                     ! mortality fluxes have been calculated in the mimicsplus_decomp_rates()
+                        decomp_cascade_ntransfer_vr(c,j,k) = decomp_cascade_ntransfer_vr(c,j,k) - n_somc2ecm_vr(c,j)
+                     else if (cascade_receiver_pool(k) == i_phys_som) then
+                        decomp_cascade_ntransfer_vr(c,j,k) = decomp_cascade_ntransfer_vr(c,j,k) - n_somp2ecm_vr(c,j)
+                     end if
+
+                  elseif  (cascade_receiver_pool(k) == i_avl_som) then
+                     ! carbon release associated with mining
+                     if (cascade_donor_pool(k) == i_chem_som) then
+                        decomp_cascade_ctransfer_vr(c,j,k) = decomp_cascade_ctransfer_vr(c,j,k) + c_somc2soma_vr(c,j)
+                     else if (cascade_donor_pool(k) == i_phys_som) then
+                        decomp_cascade_ctransfer_vr(c,j,k) = decomp_cascade_ctransfer_vr(c,j,k) + c_somp2soma_vr(c,j)
+                     end if
+                  end if
+                     ! fluxes that are not part of the cascade.
+                     decomp_cpools_vr(c,j,i_ecm_myc) = decomp_cpools_vr(c,j,i_ecm_myc) + (c_ecm_growth_vr(c,j) -  &
+                                                       c_ecm_resp_vr(c,j)) * dt
+                     decomp_npools_vr(c,j,i_ecm_myc) = decomp_npools_vr(c,j,i_ecm_myc) + (n_ecm_growth_vr(c,j) + &
+                                                       sminno3_to_ecm_vr(c,j) + sminnh4_to_ecm_vr(c,j)) * dt
+                     decomp_cpools_vr(c,j,i_am_myc) = decomp_cpools_vr(c,j,i_am_myc) + (c_am_growth_vr(c,j) -  &
+                                                      c_am_resp_vr(c,j)) * dt
+                     decomp_npools_vr(c,j,i_am_myc) = decomp_npools_vr(c,j,i_am_myc) + (n_ecm_growth_vr(c,j) + &
+                                                      sminno3_to_am_vr(c,j) + sminnh4_to_am_vr(c,j)) * dt
+                     decomp_npools_vr(c,j,i_avl_som) = decomp_npools_vr(c,j,i_avl_som) + c_ecm_enz_vr(c,j) * dt
+                end do ! transitions
+            end do ! layer
+         enddo !column
+
+
+
+
+      end if
 
     end associate
 
