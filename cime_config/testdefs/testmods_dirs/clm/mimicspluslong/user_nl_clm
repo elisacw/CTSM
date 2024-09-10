@@ -1,7 +1,7 @@
 hist_dov2xy    = .true., .true.
 ! Even though only 2 history tapes are defined here, set ndens to 1 for up to 6 history
 ! tapes, for the sake of mods that extend these default mods and may add other history tapes
- hist_nhtfrq    = 1,1,1,1,1,1,1
+ hist_nhtfrq    = 0,0,0,0,0,0,0
  hist_mfilt     = 1,1,1,1,1,1,1
  hist_fincl1    = 'TRAFFICFLUX', 'SNOWLIQ:A','SNOWICE:A'
 ! Add FCO2 because few (if any) tests send this flux to the coupler, so it isn't checked via cpl hist files
