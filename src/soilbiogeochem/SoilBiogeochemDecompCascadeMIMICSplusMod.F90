@@ -2012,9 +2012,10 @@ end subroutine calc_myc_mortality
       real(r8), intent(out) :: cost_myc_nh4    ! cost function for mycorrhiza in FUN UNITS!!!!
 
    !LOCAL VARIABLES
-   real(r8) :: secphr = 60.0_r8 * 60.0_r8
+   real(r8), parameter :: secphr = 60.0_r8 * 60.0_r8
    real(r8), parameter :: f_enz = 0.1_r8                ! [-]Fraction of C from vegetation to EcM, that goes into SOMa for mining
    real(r8), parameter :: f_growth = 0.5_r8            ! [-] Fraction of mycorrhizal N uptake that needs to stay within the fungi (not given to plant)
+   real(r8), parameter :: small_Value = 1.0e-6_r8
 
    real(r8) :: fn_myc2veg                           ! nitrogen fluxes mycorrhiza to vegetation
    real(r8) :: fn_smin2myc                          ! nitrogen flux from mineral soil to myc [gN/m2/s]
@@ -2067,10 +2068,10 @@ end subroutine calc_myc_mortality
          end if
    end if
 
-   if (fn_myc2veg > 0) then
-      if (sminfrc_no3 > 0) then
+   if (fn_myc2veg > small_Value) then
+      if (sminfrc_no3 > small_Value) then
          cost_myc_no3 = fc_veg2myc / (fn_myc2veg) / sminfrc_no3
-         if ( (1.0_r8 - sminfrc_no3)> 0) then
+         if ( (1.0_r8 - sminfrc_no3)> small_Value) then
             cost_myc_nh4 = fc_veg2myc / (fn_myc2veg) / (1.0_r8 - sminfrc_no3)
          else
             cost_myc_nh4 = big_cost

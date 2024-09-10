@@ -394,8 +394,9 @@ contains
        else if (decomp_method == mimicsplus_decomp ) then
           call init_decompcascade_mimicsplus(bounds, soilbiogeochem_state_inst, &
                                          soilstate_inst)
-          call cnfunmimicsplus_inst%Init(bounds)
        end if
+      ! init this all the time, so we don't have to pass it as optional.
+       call cnfunmimicsplus_inst%Init(bounds)
 
        ! Initalize soilbiogeochem carbon types
 
