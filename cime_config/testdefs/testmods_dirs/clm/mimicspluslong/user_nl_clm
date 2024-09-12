@@ -42,7 +42,7 @@ hist_dov2xy    = .true., .true.
 
 
  use_ssre = .true.
- paramfile = '/cluster/projects/nn2806k/elisacw/parameters/clm_params_mimicsplus.nc'
+ paramfile = '/cluster/projects/nn2806k/elisacw/parameters/clm51_params_mimicsplus_netcdf5.nc'
 
 
 soil_decomp_method = 'MIMICSplusAas2023'
