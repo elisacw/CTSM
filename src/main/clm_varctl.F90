@@ -152,11 +152,20 @@ module clm_varctl
   ! true => separate crop landunit is not created by default
   logical, public :: create_crop_landunit = .false.     
   
+  ! number of hillslopes per landunit
+  integer, public :: nhillslope = 0
+
+  ! maximum number of hillslope columns per landunit
+  integer, public :: max_columns_hillslope = 1
+
   ! do not irrigate by default
   logical, public :: irrigate = .false.            
 
   ! set saturated excess runoff to zero for crops
   logical, public :: crop_fsat_equals_zero = .false.
+
+  ! remove this fraction of crop residues to a 1-year product pool (instead of going to litter)
+  real(r8), public :: crop_residue_removal_frac = 0.0
   
   !----------------------------------------------------------
   ! Other subgrid logic
@@ -167,6 +176,11 @@ module clm_varctl
 
   ! true => make ALL patches, cols & landunits active (even if weight is 0)
   logical, public :: all_active = .false.          
+
+  ! true => any ocean (i.e., "wetland") points on the surface dataset are converted to
+  ! bare ground (or whatever vegetation is given in that grid cell... but typically this
+  ! will be bare ground)
+  logical, public :: convert_ocean_to_land = .false.
 
   logical, public :: collapse_urban = .false.  ! true => collapse urban landunits to the dominant urban landunit; default = .false. means "do nothing" i.e. keep all urban landunits as found in the input data
   integer, public :: n_dom_landunits = -1  ! # of dominant landunits; determines the number of active landunits; default = 0 (set in namelist_defaults_ctsm.xml) means "do nothing"
@@ -221,6 +235,8 @@ module clm_varctl
 
   ! which snow cover fraction parameterization to use
   character(len=64), public :: snow_cover_fraction_method
+  ! which snow thermal conductivity parameterization to use
+  character(len=25), public :: snow_thermal_cond_method
 
   ! atmospheric CO2 molar ratio (by volume) (umol/mol)
   real(r8), public :: co2_ppmv     = 355._r8            !
@@ -229,6 +245,41 @@ module clm_varctl
   character(len=64), public    :: o3_veg_stress_method = 'unset'
 
   real(r8), public  :: o3_ppbv = 100._r8
+
+  ! number of wavelength bands used in SNICAR snow albedo calculation
+  integer, public :: snicar_numrad_snw = 5 
+
+  ! type of downward solar radiation spectrum for SNICAR snow albedo calculation
+  ! options:
+  ! mid_latitude_winter, mid_latitude_summer, sub_arctic_winter,
+  ! sub_arctic_summer, summit_greenland_summer, high_mountain_summer;
+  character(len=25), public :: snicar_solarspec = 'mid_latitude_winter'
+
+  ! dust optics type for SNICAR snow albedo calculation
+  ! options:
+  ! sahara: Saharan dust (Balkanski et al., 2007, central hematite)
+  ! san_juan_mtns_colorado: San Juan Mountains dust, CO (Skiles et al, 2017)
+  ! greenland: Greenland dust (Polashenski et al., 2015, central absorptivity)
+  character(len=25), public :: snicar_dust_optics = 'sahara'
+  ! option to turn off aerosol effect in snow in SNICAR
+  logical, public :: snicar_use_aerosol = .true. ! if .false., turn off aerosol deposition flux
+
+  ! option for snow grain shape in SNICAR (He et al. 2017 JC)
+  character(len=25), public :: snicar_snw_shape = 'hexagonal_plate'  ! sphere, spheroid, hexagonal_plate, koch_snowflake
+
+  ! option to activate BC-snow internal mixing in SNICAR (He et al. 2017 JC), ceniln
+  logical, public :: snicar_snobc_intmix = .false.   ! false->external mixing for all BC; true->internal mixing for hydrophilic BC
+
+  ! option to activate dust-snow internal mixing in SNICAR (He et al. 2017 JC), ceniln
+  logical, public :: snicar_snodst_intmix = .false.   ! false->external mixing for all dust; true->internal mixing for all dust
+
+  ! option to activate OC in snow in SNICAR
+  logical, public :: do_sno_oc = .false.  ! control to include organic carbon (OC) in snow
+
+  !----------------------------------------------------------
+  ! DUST emission method
+  !----------------------------------------------------------
+  character(len=25), public :: dust_emis_method = 'Zender_2003'  ! Dust emisison method to use: Zender_2003 or Leung_2023
 
   !----------------------------------------------------------
   ! C isotopes
@@ -260,6 +311,8 @@ module clm_varctl
 
   ! These are INTERNAL to the FATES module
 
+  integer, public            :: fates_seeddisp_cadence = iundef         ! 0 => no seed dispersal
+                                                                        ! 1, 2, 3 => daily, monthly, or yearly dispersal
   integer, public            :: fates_parteh_mode = -9                  ! 1 => carbon only
                                                                         ! 2 => C+N+P (not enabled yet)
                                                                         ! no others enabled
@@ -276,6 +329,22 @@ module clm_varctl
   logical, public            :: use_fates_inventory_init = .false.      ! true => initialize fates from inventory
   logical, public            :: use_fates_fixed_biogeog = .false.       ! true => use fixed biogeography mode
   logical, public            :: use_fates_nocomp = .false.              ! true => use no comopetition mode
+
+  ! FATES history dimension level
+  ! fates can produce history at either the daily timescale (dynamics)
+  ! and the model step timescale. It can also generate output on the extra dimension
+  ! Performing this output can be expensive, so we allow different history dimension
+  ! levels.
+  ! The first index is output at the model timescale
+  ! The second index is output at the dynamics (daily) timescale      
+  ! 0 - no output
+  ! 1 - include only column level means (3D)
+  ! 2 - include output that includes the 4th dimension
+  
+  integer, dimension(2), public   :: fates_history_dimlevel = (/2,2/)
+  
+  logical, public            :: use_fates_luh = .false.                 ! true => use FATES landuse data mode
+  character(len=256), public :: fluh_timeseries = ''                    ! filename for fates landuse timeseries data
   character(len=256), public :: fates_inventory_ctrl_filename = ''      ! filename for inventory control
 
   ! FATES SP AND FATES BGC are MUTUTALLY EXCLUSIVE, THEY CAN'T BOTH BE ON
@@ -320,7 +389,7 @@ module clm_varctl
   !----------------------------------------------------------
 
   logical, public :: use_cropcal_streams = .false.
-  logical, public :: use_cropcal_rx_sdates = .false.
+  logical, public :: use_cropcal_rx_swindows = .false.
   logical, public :: use_cropcal_rx_cultivar_gdds = .false.
 
   !----------------------------------------------------------
@@ -339,7 +408,15 @@ module clm_varctl
   integer, public :: soil_layerstruct_userdefined_nlevsoi = iundef
 
   !----------------------------------------------------------
-  !excess ice physics switch
+  ! hillslope hydrology switch
+  !----------------------------------------------------------
+
+  logical, public :: use_hillslope = .false. ! true => use multi-column hillslope hydrology
+  logical, public :: downscale_hillslope_meteorology = .false. ! true => downscale meteorological forcing in hillslope model
+  logical, public :: use_hillslope_routing = .false. ! true => use surface water routing in hillslope hydrology
+
+  !----------------------------------------------------------
+  ! excess ice physics switch
   !----------------------------------------------------------
   logical, public :: use_excess_ice = .false. ! true. => use excess ice physics
 

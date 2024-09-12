@@ -111,10 +111,12 @@ contains
     ! the calling tree is given in the description of this module.
     !
     ! !USES:
-    use clm_time_manager     , only : get_curr_date
-    use clm_varctl           , only : use_lai_streams, fates_spitfire_mode
-    use laiStreamMod         , only : lai_advance
-    use FATESFireFactoryMod  , only : scalar_lightning
+    use clm_time_manager      , only : get_curr_date
+    use clm_varctl            , only : use_lai_streams, fates_spitfire_mode
+    use clm_varctl            , only : fates_seeddisp_cadence
+    use laiStreamMod          , only : lai_advance
+    use FATESFireFactoryMod   , only : scalar_lightning
+    use FatesInterfaceTypesMod, only : fates_dispersal_cadence_none
     !
     ! !ARGUMENTS:
     implicit none
@@ -509,7 +511,7 @@ contains
             atm_topo = atm2lnd_inst%forc_topo_grc(bounds_clump%begg:bounds_clump%endg))
 
        call downscale_forcings(bounds_clump, &
-            topo_inst, atm2lnd_inst, water_inst%wateratm2lndbulk_inst, &
+            topo_inst, atm2lnd_inst, surfalb_inst, water_inst%wateratm2lndbulk_inst, &
             eflx_sh_precip_conversion = energyflux_inst%eflx_sh_precip_conversion_col(bounds_clump%begc:bounds_clump%endc))
 
        call set_atm2lnd_water_tracers(bounds_clump, &
@@ -1090,7 +1092,7 @@ contains
             filter(nc)%num_hydrologyc, filter(nc)%hydrologyc, &
             filter(nc)%num_urbanc, filter(nc)%urbanc,         &
             filter(nc)%num_do_smb_c, filter(nc)%do_smb_c,     &
-            atm2lnd_inst, glc2lnd_inst, temperature_inst,     &
+            glc2lnd_inst, temperature_inst,                   &
             soilhydrology_inst, soilstate_inst, water_inst%waterstatebulk_inst, &
             water_inst%waterdiagnosticbulk_inst, water_inst%waterbalancebulk_inst, &
             water_inst%waterfluxbulk_inst, water_inst%wateratm2lndbulk_inst, &
@@ -1266,6 +1268,14 @@ contains
 
     end do
     !$OMP END PARALLEL DO
+
+
+    ! Pass fates seed dispersal information to neighboring gridcells across
+    ! all MPI tasks.  Note that WrapGlobalSeedDispersal calls an MPI collective routine
+    ! and as such WrapGlobalSeedDispersal should be called outside of OMP threaded loop regions
+    if (use_fates) then
+       if (fates_seeddisp_cadence /= fates_dispersal_cadence_none) call clm_fates%WrapGlobalSeedDispersal()
+    end if
 
     ! ============================================================================
     ! Determine gridcell averaged properties to send to atm

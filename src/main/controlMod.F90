@@ -46,7 +46,7 @@ module controlMod
   use SoilBiogeochemLittVertTranspMod  , only: som_adv_flux, max_depth_cryoturb
   use SoilBiogeochemVerticalProfileMod , only: surfprof_exp
   use SoilBiogeochemNitrifDenitrifMod  , only: no_frozen_nitrif_denitrif
-  use SoilHydrologyMod                 , only: soilHydReadNML
+  use SoilHydrologyMod                 , only: soilHydReadNML, hillslope_hydrology_ReadNML
   use CNFireFactoryMod                 , only: CNFireReadNML
   use CanopyFluxesMod                  , only: CanopyFluxesReadNML
   use shr_drydep_mod                   , only: n_drydep
@@ -200,12 +200,19 @@ contains
          clump_pproc, &
          create_crop_landunit, nsegspc, co2_ppmv, &
          albice, soil_layerstruct_predefined, soil_layerstruct_userdefined, &
-         soil_layerstruct_userdefined_nlevsoi, use_subgrid_fluxes, snow_cover_fraction_method, &
+         soil_layerstruct_userdefined_nlevsoi, use_subgrid_fluxes, &
+         snow_thermal_cond_method, snow_cover_fraction_method, &
          irrigate, run_zero_weight_urban, all_active, &
          crop_fsat_equals_zero, for_testing_run_ncdiopio_tests, &
          for_testing_use_second_grain_pool, for_testing_use_repr_structure_pool, &
          for_testing_no_crop_seed_replenishment, &
          z0param_method, use_z0m_snowmelt
+
+    ! NOTE: EBK 02/26/2024: dust_emis_method is here in CTSM temporarily until it's moved to CMEPS
+    ! See: https://github.com/ESCOMP/CMEPS/pull/429
+    ! Normally this should also need error checking and a broadcast, but since
+    ! there is only one hardcoded option right now that is unneeded.
+    namelist /clm_inparm/ dust_emis_method
 
     ! vertical soil mixing variables
     namelist /clm_inparm/  &
@@ -230,12 +237,16 @@ contains
           use_fates_fixed_biogeog,                      &
           use_fates_nocomp,                             &
           use_fates_sp,                                 &
+          use_fates_luh,                                &
+          fluh_timeseries,                              &
           fates_inventory_ctrl_filename,                &
           fates_parteh_mode,                            &
-          use_fates_tree_damage
+          fates_seeddisp_cadence,                       &
+          use_fates_tree_damage,                        &
+          fates_history_dimlevel
 
     ! Ozone vegetation stress method
-    namelist / clm_inparam / o3_veg_stress_method
+    namelist / clm_inparm / o3_veg_stress_method
 
     ! CLM 5.0 nitrogen flags
     namelist /clm_inparm/ use_flexibleCN, use_luna
@@ -254,6 +265,11 @@ contains
 
     namelist /clm_inparm/ use_biomass_heat_storage
 
+    namelist /clm_inparm/ use_hillslope
+
+    namelist /clm_inparm/ downscale_hillslope_meteorology
+
+    namelist /clm_inparm/ use_hillslope_routing
 
     namelist /clm_inparm/ use_hydrstress
 
@@ -263,6 +279,8 @@ contains
          use_c14_bombspike, atm_c14_filename, use_c13_timeseries, atm_c13_filename
 
     ! All old cpp-ifdefs are below and have been converted to namelist variables
+
+    namelist /clm_inparm/ convert_ocean_to_land
 
     ! Number of dominant pfts and landunits. Enhance ctsm performance by
     ! reducing the number of active pfts to n_dom_pfts and
@@ -283,10 +301,15 @@ contains
 
     namelist /clm_inparm/ &
          use_lch4, use_nitrif_denitrif, use_extralakelayers, &
-         use_vichydro, use_cn, use_cndv, use_crop, use_fertilizer, o3_veg_stress_method, &
+         use_vichydro, use_cn, use_cndv, use_crop, use_fertilizer, &
          use_grainproduct, use_snicar_frc, use_vancouver, use_mexicocity, use_noio, &
-         use_nguardrail
+         use_nguardrail, crop_residue_removal_frac
 
+    ! SNICAR
+    namelist /clm_inparm/ &
+         snicar_numrad_snw, snicar_solarspec, snicar_dust_optics, &
+         snicar_use_aerosol, snicar_snw_shape, snicar_snobc_intmix, &
+         snicar_snodst_intmix, do_sno_oc
 
     ! ----------------------------------------------------------------------
     ! Default values
@@ -482,7 +505,7 @@ contains
              call endrun(msg=' ERROR: C13 and C14 dynamics are not compatible with FATES.'//&
                   errMsg(sourcefile, __LINE__))
           end if
-          
+
        else
           
           ! These do default to false anyway, but this emphasizes they
@@ -566,8 +589,10 @@ contains
     end if
 
     call soilHydReadNML(   NLFilename )
-
-    if( use_cn ) then
+    if ( use_hillslope ) then
+       call hillslope_hydrology_ReadNML(   NLFilename )
+    endif
+    if ( use_cn ) then
        call CNFireReadNML(             NLFilename )
        call CNPrecisionControlReadNML( NLFilename )
        call CNNDynamicsReadNML       ( NLFilename )
@@ -607,6 +632,24 @@ contains
     ! Consistency settings for co2_ppvm
     if ( (co2_ppmv <= 0.0_r8) .or. (co2_ppmv > 3000.0_r8) ) then
        call endrun(msg=' ERROR: co2_ppmv is out of a reasonable range'//&
+            errMsg(sourcefile, __LINE__))
+    end if
+
+    ! check on SNICAR BC-snow and dust-snow internal mixing
+    if ( snicar_snobc_intmix .and. snicar_snodst_intmix ) then
+       call endrun(msg=' ERROR: currently dust-snow and BC-snow internal mixing cannot be activated together'//&
+            errMsg(sourcefile, __LINE__))
+    end if
+
+    ! other SNICAR warnings
+    if ((snicar_snw_shape /= 'sphere' .and. snicar_snw_shape /= 'hexagonal_plate') .or.  &
+         snicar_solarspec /= 'mid_latitude_winter' .or.  &
+         snicar_dust_optics /= 'sahara' .or.  &
+         snicar_numrad_snw /= 5 .or.  &
+         snicar_snodst_intmix .or.  &
+         .not. snicar_use_aerosol .or.  &
+         do_sno_oc) then
+       call endrun(msg=' ERROR: You have selected an option that is EXPERIMENTAL, UNSUPPORTED, and UNTESTED. For guidance see namelist_defaults_ctsm.xml'//&
             errMsg(sourcefile, __LINE__))
     end if
 
@@ -671,6 +714,7 @@ contains
     call mpi_bcast (use_crop, 1, MPI_LOGICAL, 0, mpicom, ier)
     call mpi_bcast (use_fertilizer, 1, MPI_LOGICAL, 0, mpicom, ier)
     call mpi_bcast (use_grainproduct, 1, MPI_LOGICAL, 0, mpicom, ier)
+    call mpi_bcast (crop_residue_removal_frac, 1, MPI_REAL8, 0, mpicom, ier)
     call mpi_bcast (o3_veg_stress_method, len(o3_veg_stress_method), MPI_CHARACTER, 0, mpicom, ier)
     call mpi_bcast (use_snicar_frc, 1, MPI_LOGICAL, 0, mpicom, ier)
     call mpi_bcast (use_vancouver, 1, MPI_LOGICAL, 0, mpicom, ier)
@@ -709,6 +753,7 @@ contains
     ! Other subgrid logic
     call mpi_bcast(run_zero_weight_urban, 1, MPI_LOGICAL, 0, mpicom, ier)
     call mpi_bcast(all_active, 1, MPI_LOGICAL, 0, mpicom, ier)
+    call mpi_bcast(convert_ocean_to_land, 1, MPI_LOGICAL, 0, mpicom, ier)
 
     ! Number of dominant pfts and landunits. Enhance ctsm performance by
     ! reducing the number of active pfts to n_dom_pfts and
@@ -756,10 +801,14 @@ contains
     call mpi_bcast (use_fates_fixed_biogeog, 1, MPI_LOGICAL, 0, mpicom, ier)
     call mpi_bcast (use_fates_nocomp, 1, MPI_LOGICAL, 0, mpicom, ier)
     call mpi_bcast (use_fates_sp, 1, MPI_LOGICAL, 0, mpicom, ier)
+    call mpi_bcast (use_fates_luh, 1, MPI_LOGICAL, 0, mpicom, ier)
     call mpi_bcast (use_fates_bgc, 1, MPI_LOGICAL, 0, mpicom, ier)
     call mpi_bcast (fates_inventory_ctrl_filename, len(fates_inventory_ctrl_filename), MPI_CHARACTER, 0, mpicom, ier)
     call mpi_bcast (fates_paramfile, len(fates_paramfile) , MPI_CHARACTER, 0, mpicom, ier)
+    call mpi_bcast (fluh_timeseries, len(fluh_timeseries) , MPI_CHARACTER, 0, mpicom, ier)
     call mpi_bcast (fates_parteh_mode, 1, MPI_INTEGER, 0, mpicom, ier)
+    call mpi_bcast (fates_seeddisp_cadence, 1, MPI_INTEGER, 0, mpicom, ier)
+    call mpi_bcast (fates_history_dimlevel, 2, MPI_INTEGER, 0, mpicom, ier)
 
     ! flexibleCN nitrogen model
     call mpi_bcast (use_flexibleCN, 1, MPI_LOGICAL, 0, mpicom, ier)
@@ -786,6 +835,11 @@ contains
 
     call mpi_bcast (use_biomass_heat_storage, 1, MPI_LOGICAL, 0, mpicom, ier)
 
+    call mpi_bcast (use_hillslope, 1, MPI_LOGICAL, 0, mpicom, ier)
+
+    call mpi_bcast (downscale_hillslope_meteorology, 1, MPI_LOGICAL, 0, mpicom, ier)
+
+    call mpi_bcast (use_hillslope_routing, 1, MPI_LOGICAL, 0, mpicom, ier)
 
     call mpi_bcast (use_hydrstress, 1, MPI_LOGICAL, 0, mpicom, ier)
 
@@ -826,6 +880,7 @@ contains
     ! physics variables
     call mpi_bcast (nsegspc, 1, MPI_INTEGER, 0, mpicom, ier)
     call mpi_bcast (use_subgrid_fluxes , 1, MPI_LOGICAL, 0, mpicom, ier)
+    call mpi_bcast (snow_thermal_cond_method, len(snow_thermal_cond_method), MPI_CHARACTER, 0, mpicom, ier)
     call mpi_bcast (snow_cover_fraction_method , len(snow_cover_fraction_method), MPI_CHARACTER, 0, mpicom, ier)
     call mpi_bcast (z0param_method , len(z0param_method), MPI_CHARACTER, 0, mpicom, ier)
     call mpi_bcast (use_z0m_snowmelt, 1, MPI_LOGICAL, 0, mpicom, ier)
@@ -837,6 +892,14 @@ contains
     call mpi_bcast (soil_layerstruct_predefined,len(soil_layerstruct_predefined), MPI_CHARACTER, 0, mpicom, ier)
     call mpi_bcast (soil_layerstruct_userdefined,size(soil_layerstruct_userdefined), MPI_REAL8, 0, mpicom, ier)
     call mpi_bcast (soil_layerstruct_userdefined_nlevsoi, 1, MPI_INTEGER, 0, mpicom, ier)
+    call mpi_bcast (snicar_numrad_snw, 1, MPI_INTEGER, 0, mpicom, ier)
+    call mpi_bcast (snicar_solarspec, len(snicar_solarspec), MPI_CHARACTER, 0, mpicom, ier)
+    call mpi_bcast (snicar_dust_optics, len(snicar_dust_optics), MPI_CHARACTER, 0, mpicom, ier)
+    call mpi_bcast (snicar_snw_shape, len(snicar_snw_shape), MPI_CHARACTER, 0, mpicom, ier)
+    call mpi_bcast (snicar_use_aerosol, 1, MPI_LOGICAL, 0, mpicom, ier)
+    call mpi_bcast (snicar_snobc_intmix, 1, MPI_LOGICAL, 0, mpicom, ier)
+    call mpi_bcast (snicar_snodst_intmix, 1, MPI_LOGICAL, 0, mpicom, ier)
+    call mpi_bcast (do_sno_oc, 1, MPI_LOGICAL, 0, mpicom, ier)
 
     ! snow pack variables
     call mpi_bcast (nlevsno, 1, MPI_INTEGER, 0, mpicom, ier)
@@ -923,8 +986,10 @@ contains
     write(iulog,*) '    use_crop = ', use_crop
     write(iulog,*) '    use_fertilizer = ', use_fertilizer
     write(iulog,*) '    use_grainproduct = ', use_grainproduct
+    write(iulog,*) '    crop_residue_removal_frac = ', crop_residue_removal_frac
     write(iulog,*) '    o3_veg_stress_method = ', o3_veg_stress_method
     write(iulog,*) '    use_snicar_frc = ', use_snicar_frc
+    write(iulog,*) '    snicar_use_aerosol = ',snicar_use_aerosol
     write(iulog,*) '    use_vancouver = ', use_vancouver
     write(iulog,*) '    use_mexicocity = ', use_mexicocity
     write(iulog,*) '    use_noio = ', use_noio
@@ -941,6 +1006,7 @@ contains
     else
        write(iulog,*) '   land frac data = ',trim(fatmlndfrc)
     end if
+    write(iulog,*) '   Convert ocean to land = ', convert_ocean_to_land
     write(iulog,*) '   Number of ACTIVE PFTS (0 means input pft data NOT collapsed to n_dom_pfts) =', n_dom_pfts
     write(iulog,*) '   Number of ACTIVE LANDUNITS (0 means input landunit data NOT collapsed to n_dom_landunits) =', n_dom_landunits
     write(iulog,*) '   Collapse urban landunits; done before collapsing all landunits to n_dom_landunits; .false. means do nothing i.e. keep all the urban landunits, though n_dom_landunits may still remove them =', collapse_urban
@@ -1013,10 +1079,19 @@ contains
        write(iulog,'(a)') '   snow aging parameters file = '//trim(fsnowaging)
     endif
 
+    write(iulog,*) '   SNICAR: downward solar radiation spectrum type =', snicar_solarspec
+    write(iulog,*) '   SNICAR: dust optics type = ', snicar_dust_optics
+    write(iulog,*) '   SNICAR: number of bands in snow albedo calculation =', snicar_numrad_snw
+    write(iulog,*) '   SNICAR: snow grain shape type = ', snicar_snw_shape
+    write(iulog,*) '   SNICAR: BC-snow internal mixing = ', snicar_snobc_intmix
+    write(iulog,*) '   SNICAR: dust-snow internal mixing = ', snicar_snodst_intmix
+    write(iulog,*) '   SNICAR: OC in snow = ', do_sno_oc
+
     write(iulog,'(a,i8)') '   Number of snow layers =', nlevsno
     write(iulog,'(a,d20.10)') '   Max snow depth (mm) =', h2osno_max
 
     write(iulog,'(a,i8)') '   glc number of elevation classes =', maxpatch_glc
+
     if (glc_do_dynglacier) then
        write(iulog,*) '   glc CLM glacier areas and topography WILL evolve dynamically'
     else
@@ -1049,6 +1124,9 @@ contains
     end if
 
     write(iulog,*) '   land-ice albedos      (unitless 0-1)   = ', albice
+    write(iulog,*) '   hillslope hydrology    = ', use_hillslope
+    write(iulog,*) '   downscale hillslope meteorology    = ', downscale_hillslope_meteorology
+    write(iulog,*) '   hillslope routing      = ', use_hillslope_routing
     write(iulog,*) '   pre-defined soil layer structure = ', soil_layerstruct_predefined
     write(iulog,*) '   user-defined soil layer structure = ', soil_layerstruct_userdefined
     write(iulog,*) '   user-defined number of soil layers = ', soil_layerstruct_userdefined_nlevsoi
@@ -1092,7 +1170,6 @@ contains
        write(iulog, *) '    carbon_resp_opt = ', carbon_resp_opt
     end if
     write(iulog, *) '  use_luna = ', use_luna
-    write(iulog, *) '  ozone vegetation stress method = ', o3_veg_stress_method
 
     write(iulog, *) '  ED/FATES: '
     write(iulog, *) '    use_fates = ', use_fates
@@ -1110,7 +1187,11 @@ contains
        write(iulog, *) '    use_fates_fixed_biogeog = ', use_fates_fixed_biogeog
        write(iulog, *) '    use_fates_nocomp = ', use_fates_nocomp
        write(iulog, *) '    use_fates_sp = ', use_fates_sp
-       write(iulog, *) '    fates_inventory_ctrl_filename = ',fates_inventory_ctrl_filename
+       write(iulog, *) '    use_fates_luh= ', use_fates_luh
+       write(iulog, *) '    fluh_timeseries = ', trim(fluh_timeseries)
+       write(iulog, *) '    fates_seeddisp_cadence = ', fates_seeddisp_cadence
+       write(iulog, *) '    fates_seeddisp_cadence: 0, 1, 2, 3 => off, daily, monthly, or yearly dispersal'
+       write(iulog, *) '    fates_inventory_ctrl_filename = ', trim(fates_inventory_ctrl_filename)
     end if
   end subroutine control_print
 

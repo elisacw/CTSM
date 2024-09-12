@@ -328,6 +328,7 @@ class RXCROPMATURITY(SystemTestsCommon):
             cfg_out.write("PCT_GLACIER = 0.0\n")
             cfg_out.write("PCT_WETLAND = 0.0\n")
             cfg_out.write("PCT_LAKE    = 0.0\n")
+            cfg_out.write("PCT_OCEAN   = 0.0\n")
             cfg_out.write("PCT_URBAN   = 0.0 0.0 0.0\n")
 
     def _run_check_rxboth_run(self):
@@ -357,7 +358,8 @@ class RXCROPMATURITY(SystemTestsCommon):
     def _modify_user_nl_allruns(self):
         nl_additions = [
             "stream_meshfile_cropcal = '{}'".format(self._case.get_value("LND_DOMAIN_MESH")),
-            "stream_fldFileName_sdate = '{}'".format(self._sdatefile),
+            "stream_fldFileName_swindow_start = '{}'".format(self._sdatefile),
+            "stream_fldFileName_swindow_end   = '{}'".format(self._sdatefile),
             "stream_year_first_cropcal = 2000",
             "stream_year_last_cropcal = 2000",
             "model_year_align_cropcal = 2000",
