@@ -24,4 +24,4 @@
                   'SWup', 'LWup', 'URBAN_AC', 'URBAN_HEAT'
 
  use_ssre = .true.
- paramfile = '/cluster/projects/nn2806k/elisacw/parameters/clm51_params_mimicsplus_netcdf5.nc'
+ paramfile = '/cluster/projects/nn2806k/elisacw/parameters/clm_params_mimicsplus_netcdf5_11.09.24.nc'
