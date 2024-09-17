@@ -1687,14 +1687,12 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
 
               !Parameter equations microbial necromass
 
-              decomp_k(c,j,i_cop_mic) = tau_m1 * &
-                    m1_conc**(mimicsplus_densdep - 1.0_r8) * moist_mod !w_d_o_scalars    !decomposition rate for microbial bacteria
+              decomp_k(c,j,i_cop_mic) = tau_m1 * tau_m1 * m1_conc**(mimicsplus_densdep)  !decomposition rate for microbial bacteria
               favl = min(1.0_r8, max(0.0_r8, 1.0_r8 - fphys_m1(c,j) - fchem_m1))         !parameter equation for microbial necromass SAPb -> SOMa
               pathfrac_decomp_cascade(c,j,i_m1s1) = favl                                 !stores parameter to be transferred in next module
               pathfrac_decomp_cascade(c,j,i_m1s2) = fchem_m1                             !stores parameter to be transferred in next module
 
-              decomp_k(c,j,i_oli_mic) = tau_m2 * &
-                    m2_conc**(mimicsplus_densdep - 1.0_r8) * moist_mod !w_d_o_scalars    !decomposition rate for microbial fungi
+              decomp_k(c,j,i_oli_mic) = tau_m2 * m2_conc**(mimicsplus_densdep)           !decomposition rate for microbial fungi
               favl = min(1.0_r8, max(0.0_r8, 1.0_r8 - fphys_m2(c,j) - fchem_m2))         !parameter equation for microbial necromass SAPf -> SOMa
               pathfrac_decomp_cascade(c,j,i_m2s1) = favl                                 !stores parameter to be transferred in next module
               pathfrac_decomp_cascade(c,j,i_m2s2) = fchem_m2                             !stores parameter to be transferred in next module
