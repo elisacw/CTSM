@@ -486,7 +486,6 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
    type(soilbiogeochem_carbonstate_type)   , intent(inout) :: soilbiogeochem_carbonstate_inst
    type(cnfunmimicsplus_type)              , intent(inout) :: cnfunmimicsplus_inst
 
-
    ! LOCAL VARIABLES:
    integer   :: fn                    ! number of values in pft filter
    integer   :: fp                    ! lake filter pft index 
@@ -506,6 +505,8 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
    real(r8)  :: ndays_off             ! number of days to complete leaf offset
    real(r8)  :: frac_ideal_C_use      ! How much less C do we use for 'buying' N than that needed to get to the ideal ratio?  fraction. 
    real(r8)  :: N_acquired
+   real(r8)  :: N_before_corr
+   real(r8)  :: N_bc(1:npath6)
    real(r8)  :: C_spent
    real(r8)  :: leaf_narea            ! leaf n per unit leaf area in gN/m2 (averaged across canopy, which is OK for the cost calculation)
    real(r8)  :: sum_n_acquired        ! Sum N aquired from one unit of C (unitless)  
@@ -756,7 +757,7 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
          call calc_myc_roi(decomp_cpools_vr(c,j,i_am_myc),decomp_npools_vr(c,j,i_am_myc) , &
          decomp_cpools_vr(c,j,i_phys_som),decomp_cpools_vr(c,j,i_avl_som),decomp_cpools_vr(c,j,i_chem_som), &
          decomp_npools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_chem_som), &
-         (smin_no3_to_plant_vr(c,j) + smin_nh4_to_plant_vr(c,j)) * dt, am_step , dzsoi_decomp(j),- big_cost, roi_am)
+         (smin_no3_to_plant_vr(c,j) + smin_nh4_to_plant_vr(c,j)) * dt, am_step , dzsoi_decomp(j),big_cost, roi_am)
          frac_alloc_ecm=(roi_ecm)/(roi_ecm + roi_am) !
          if (crootfr(p,j)>0.0_r8) then
             n_uptake_myc_frac(p,ecm_step) = n_uptake_myc_frac(p,ecm_step) + frac_alloc_ecm * crootfr(p,j)
@@ -912,8 +913,8 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
           endif 
           npp_to_spend = npp_remaining(p,imyc)  * fixerfrac !put parameter here.
           ! has to be zeroed since depend on accumula
-          n_from_paths(p,:,ipano3:ipnmnh4) = 0._r8 !act and nonmyc boths nh4 and no3
-
+          n_from_paths(p,:,:) = 0.0_r8 !act and nonmyc boths nh4 and no3
+          npp_frac_paths(p,:,:) = 0.0_r8
           !           Calculate Integrated Resistance OF WHOLE SOIL COLUMN
           
           sum_n_acquired      = 0.0_r8
@@ -956,7 +957,12 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
                sum_n_acquired= sum_n_acquired +  npp_frac_paths(p,j,ipfix)/costs_paths(p,j,ipfix)
              end if                                                          
           end do
- 
+          if (sum_n_acquired>0.0_r8) then
+             total_N_resistance = max(1.0_r8/sum_n_acquired,1.0_r8/big_cost)
+          else
+             total_N_resistance = 1.0_r8/big_cost
+          endif 
+
           free_n_retrans = 0.0_r8
           !  Calculate appropriate degree of retranslocation
           if(leafc(p).gt.0.0_r8.and.litterfall_n_step(p,imyc)* fixerfrac>0.0_r8.and.ivt(p) <npcropmin)then
@@ -978,6 +984,7 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
           !Add retrans fluxes in to total budgets.
           ! remove C from available pool, both directly spent and accounted for by N uptake
           npp_to_spend  = npp_to_spend - total_c_spent_retrans - total_c_accounted_retrans
+
           npp_retrans_acc(p,imyc) = npp_retrans_acc(p,imyc) + total_c_spent_retrans 
           ! add to to C spent pool                              
           n_retrans_acc(p,imyc)     = n_retrans_acc(p,imyc)     + paid_for_n_retrans
@@ -1027,10 +1034,19 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
           ! This calculation is based on the simulataneous solution of the uptake and extrction N balance. 
           ! It satisfies the criteria (spentC+growthC=availC AND spentC/cost=growthC/plantCN
           ! Had to add growth respiration here to balance carbon pool. 
-
+          if (total_N_resistance <= 1.0e-10_r8) then
+                 write(iulog,*) 'ERROR: total_N_resistance=', total_N_resistance
+                 do ipath = 1, npath6
+                 do j = 1,nlevdecomp
+                 write(iulog,*) 'n_from_paths:', n_from_paths(p,j,ipath), npp_to_paths(p,j,ipath)
+                 enddo
+                 end do
+                 call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
+                             msg= errMsg(sourcefile,  __LINE__))
+              end if
           dnpp  = npp_to_spend / ( (1.0_r8+grperc(ivt(p)))*(plantCN(p) / total_N_resistance) + 1._r8)  
           dnpp  = dnpp * frac_ideal_C_use
-      
+
 
           !hypothetical amount of N acquired. 
           dn    = dnpp / total_N_resistance
@@ -1056,11 +1072,16 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
            end if                                                   
           end do
 
-
+          N_bc=0.0_r8
          ! Check if LIMITS of pools were exceeded:
           do j = 1,nlevdecomp
+            N_before_corr = sum(n_from_paths(p,j,ipano3:ipnmnh4))
+            N_bc=n_from_paths(p,j,:)
+            C_spent        =   sum(npp_to_paths(p,j,ipano3:ipnmnh4))
             if ((sminn_layer_step(p,j,imyc)) > 0.0_r8) then
               if (imyc == ecm_step) then
+                sminno3_to_ecm_vr_patch(p,j) = 0.0_r8
+                sminnh4_to_ecm_vr_patch(p,j) = 0.0_r8
                 call fun_fluxes_myc_update1 (decomp_cpools_vr(c,j,i_ecm_myc),decomp_npools_vr(c,j,i_ecm_myc), &
                 decomp_cpools_vr(c,j,i_phys_som),decomp_cpools_vr(c,j,i_avl_som),decomp_cpools_vr(c,j,i_chem_som), &
                 decomp_npools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_chem_som), &
@@ -1072,6 +1093,8 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
                 c_somp2soma_vr_patch(p,j), c_somc2soma_vr_patch(p,j), n_somp2ecm_vr_patch(p,j), n_somc2ecm_vr_patch(p,j))
                 ! update npp_to_nonmyc with cost
               else
+                sminno3_to_am_vr_patch(p,j) = 0.0_r8
+                sminnh4_to_am_vr_patch(p,j) = 0.0_r8
                 call fun_fluxes_myc_update1 (decomp_cpools_vr(c,j,i_am_myc),decomp_npools_vr(c,j,i_am_myc), &
                 decomp_cpools_vr(c,j,i_phys_som),decomp_cpools_vr(c,j,i_avl_som),decomp_cpools_vr(c,j,i_chem_som), &
                 decomp_npools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_chem_som), &
@@ -1081,9 +1104,27 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
                 sminno3_to_am_vr_patch(p,j), sminnh4_to_am_vr_patch(p,j), &
                 c_am_resp_vr_patch(p,j), c_am_growth_vr_patch(p,j), n_am_growth_vr_patch(p,j))
               endif
+              if (sminno3_to_am_vr_patch(p,j) + sminno3_to_am_vr_patch(p,j) + &
+                  sminnh4_to_ecm_vr_patch(p,j) + sminnh4_to_ecm_vr_patch(p,j) + &
+                   n_from_paths(p,j,ipnmno3) +  n_from_paths(p,j,ipnmnh4) > sminn_layer_step(p,j,imyc) ) then 
+                 write(iulog,*) 'ERROR: myc_type is=',imyc, N_before_corr - sum(n_from_paths(p,j,ipano3:ipnmnh4))
+                 write(iulog,*) 'ERROR: N before corrections=',N_before_corr, N_bc
+                 write(iulog,*) 'ERROR: More N acquired before correcting for sminn diff: ', sum(n_from_paths(p,j,ipano3:ipnmnh4)), n_from_paths(p,j,:)
+                 write(iulog,*) 'ERROR: More cost_paths: ', N_before_corr,costs_paths(p,j,ipano3:ipnmnh4)
+                 write(iulog,*) 'ERROR: More cost_paths: ', '0.0',costs_paths(p,j,ipano3:ipnmnh4)
+                 write(iulog,*) 'ERROR: C_spent and npp: ', C_spent,npp_to_paths(p,j,ipano3:ipnmnh4)
+                 write(iulog,*) 'ERROR: Cpent diff:', C_spent - sum(npp_to_paths(p,j,ipano3:ipnmnh4))
+                     call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
+                             msg= errMsg(sourcefile,  __LINE__))
+              endif
               npp_to_paths(p,j,ipnmno3) =  n_from_paths(p,j,ipnmno3) * costs_paths(p,j,ipnmno3)
               npp_to_paths(p,j,ipnmnh4) =  n_from_paths(p,j,ipnmnh4) * costs_paths(p,j,ipnmnh4)
 
+              if ( sum(npp_to_paths(p,j,ipano3:ipnmnh4)) > C_spent) then
+                  write(iulog,*) 'ERROR: C spent before correcting for sminn diff: ', C_spent ,npp_to_paths(p,j,ipano3:ipnmnh4)
+                  call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
+                             msg= errMsg(sourcefile,  __LINE__))
+              endif
               ! switch units to gN/m3/s for use in other routines
               sminno3_to_am_vr_patch(p,j)  = sminno3_to_am_vr_patch(p,j)/(dzsoi_decomp(j)*dt)
               sminno3_to_ecm_vr_patch(p,j) = sminno3_to_ecm_vr_patch(p,j)/(dzsoi_decomp(j)*dt)
@@ -1232,21 +1273,36 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
              npp_Nactive_nh4(p) = sum(npp_paths_acc(p,1:nmyc,ipanh4)) / dt
              npp_Nnonmyc_no3(p) = sum(npp_paths_acc(p,1:nmyc,ipnmno3)) / dt
              npp_Nnonmyc_nh4(p) = sum(npp_paths_acc(p,1:nmyc,ipnmnh4)) / dt
-             
+             npp_Nfix(p) = sum(npp_paths_acc(p,1:nmyc,ipfix)) /dt
              npp_Nactive(p) = npp_Nactive_no3(p) + npp_Nactive_nh4(p) + npp_Nnonmyc_no3(p) + npp_Nnonmyc_nh4(p)
              npp_Nnonmyc(p) = npp_Nnonmyc_no3(p) + npp_Nnonmyc_nh4(p)
-            
+             npp_Nretrans(p) = sum(npp_retrans_acc(p,1:nmyc))/dt
+             
              !---------------------------Extra Respiration Fluxes--------------------!      
-             soilc_change(p)           = sum(npp_paths_acc(p,1:nmyc,ipano3)) + sum(npp_paths_acc(p,1:nmyc,ipanh4)) + sum(npp_paths_acc(p,1:nmyc,ipnmno3)) &
-                                          + sum(npp_paths_acc(p,1:nmyc,ipnmno3)) + sum(npp_paths_acc(p,1:nmyc,ipnmnh4)) &
-                                          + sum(npp_paths_acc(p,1:nmyc,ipfix)) / dt !ECW thats it right?, retrans is 0?
+             soilc_change(p)           = npp_Nactive(p) + npp_Nfix(p) + npp_Nretrans(p)
              soilc_change(p)           = soilc_change(p) + burned_off_carbon / dt                 
              npp_burnedoff(p)          = burned_off_carbon/dt          
              npp_Nuptake(p)            = soilc_change(p)
              ! how much carbon goes to growth of tissues?  
-             npp_growth(p)             = (Nuptake(p)- free_retransn_to_npool(p))*plantCN(p)+(excess_carbon_acc/dt) !does not include gresp, since this is calculated from growth
+             npp_growth(p)             = (Nuptake(p)- free_retransn_to_npool(p))*plantCN(p)+(excess_carbon_acc/dt) !does not include gresp, since this is calculated from growth 
+             if (availc(p) <= 0.0_r8 .and. soilc_change(p) > 0.0_r8) then
+              write(iulog,*) 'ERROR: availc(p): ', availc(p)
+              write(iulog,*) 'ERROR: soilc_change(p): ', soilc_change(p)
+              write(iulog,*) 'ERROR: free_retransn_to_npool(p) is negative: ', free_retransn_to_npool(p)
+              write(iulog,*) 'ERROR:burned_off_carbon / dt: ',burned_off_carbon / dt
+              write(iulog,*) 'ERROR: excess_carbon_acc: ', sum(npp_uptake(p,1:nmyc))
+              write(iulog,*) 'ERROR: npp_Nretrans(p): ', npp_Nretrans(p)
+              write(iulog,*) 'npp_growth(p): ',npp_growth(p)
 
-             if (npp_growth(p) < -10000._r8 .or. npp_growth(p) > 10000._r8) then
+              do ipath = 1,npath6
+                write(iulog,*) 'ERROR nppaths_ecm:',ipath, npp_paths_acc(p,1,ipath)
+                write(iulog,*) 'ERROR nppaths_am:',ipath, npp_paths_acc(p,1,ipath)
+              enddo
+                 call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
+                             msg= errMsg(sourcefile,  __LINE__))
+             endif
+
+             if (npp_growth(p) < -1.0e-7_r8 .or. npp_growth(p) > 10000._r8) then
               write(iulog,*) 'ERROR: Nuptake(p) is negative: ', Nuptake(p)
               write(iulog,*) 'ERROR: npp_Nuptake(p) is negative: ', npp_Nuptake(p)
               write(iulog,*) 'ERROR: free_retransn_to_npool(p) is negative: ', free_retransn_to_npool(p)
@@ -1257,12 +1313,11 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
                  call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
                              msg= errMsg(sourcefile,  __LINE__))
              endif
-             if (npp_Nuptake(p) > 10000._r8) then
-              write(iulog,*) 'ERROR: npp_N negative: ', npp_Nuptake(p)
+             if (availc(p) - npp_Nuptake(p) - npp_growth(p) < 0._r8) then
+              write(iulog,*) 'ERROR: balance Cfun is negative: ',availc(p), npp_Nuptake(p),npp_growth(p),excess_carbon_acc/dt,npp_Nretrans(p)
                  call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
                              msg= errMsg(sourcefile,  __LINE__))
              endif
-       
              !-----------------------Diagnostic Fluxes------------------------------!
              if(availc(p).gt.0.0_r8)then !what happens in the night? 
                 nuptake_npp_fraction_patch(p) = npp_Nuptake(p)/availc(p)

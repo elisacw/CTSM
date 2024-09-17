@@ -14,7 +14,8 @@ module CNCStateUpdate1Mod
   use clm_varpar                         , only : i_litr_min, i_litr_max, i_cwd
   use pftconMod                          , only : npcropmin, nc3crop, pftcon
   use abortutils                         , only : endrun
-  use decompMod                          , only : bounds_type
+  use clm_varctl                         , only : iulog
+  use decompMod                          , only : bounds_type, subgrid_level_patch
   use CNVegCarbonStateType               , only : cnveg_carbonstate_type
   use CNVegCarbonFluxType                , only : cnveg_carbonflux_type
   use CropType                           , only : crop_type
@@ -37,6 +38,8 @@ module CNCStateUpdate1Mod
   public :: CStateUpdate0
   public :: CStateUpdate1
   !-----------------------------------------------------------------------
+  character(len=*), parameter, private :: sourcefile = &
+       __FILE__
 
 contains
 
@@ -272,7 +275,12 @@ contains
       soilpatch_loop: do fp = 1,num_soilp
          p = filter_soilp(fp)
          c = patch%column(p)
+          if (cs_veg%cpool_patch(p) < -1.0e-09_r8 .or. cs_veg%cpool_patch(p) > 1.0e6_r8) then
+                 write(iulog,*) 'ERROR: cpool_patch=',cs_veg%cpool_patch(p)
 
+                 call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
+                             msg= errMsg(sourcefile,  __LINE__))
+          end if
          ! phenology: transfer growth fluxes
 
          !
@@ -352,7 +360,12 @@ contains
 
          check_cpool = cs_veg%cpool_patch(p)- cf_veg%psnsun_to_cpool_patch(p)*dt-cf_veg%psnshade_to_cpool_patch(p)*dt
          cpool_delta  =  cs_veg%cpool_patch(p) 
+          if (cs_veg%cpool_patch(p) < -1.0e-09_r8) then
+                 write(iulog,*) 'ERROR: cpool_patch=',cs_veg%cpool_patch(p),cf_veg%availc_patch(p)
 
+                 call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
+                             msg= errMsg(sourcefile,  __LINE__))
+          end if
          ! maintenance respiration fluxes from cpool
 
          cs_veg%cpool_patch(p) = cs_veg%cpool_patch(p) - cf_veg%cpool_to_xsmrpool_patch(p)*dt
@@ -374,7 +387,12 @@ contains
 
          !RF Add in the carbon spent on uptake respiration. 
          cs_veg%cpool_patch(p)= cs_veg%cpool_patch(p) - cf_veg%soilc_change_patch(p)*dt
-           
+          if (cs_veg%cpool_patch(p) < -1.0e-09_r8 .or. cs_veg%cpool_patch(p) > 1.0e6_r8) then
+                 write(iulog,*) 'ERROR: cpool_patch=',cs_veg%cpool_patch(p),cf_veg%cpool_to_resp_patch(p)*dt,cf_veg%soilc_change_patch(p)*dt,cf_veg%availc_patch(p)
+
+                 call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
+                             msg= errMsg(sourcefile,  __LINE__))
+          end if 
          ! maintenance respiration fluxes from xsmrpool
          cs_veg%xsmrpool_patch(p) = cs_veg%xsmrpool_patch(p) + cf_veg%cpool_to_xsmrpool_patch(p)*dt
          cs_veg%xsmrpool_patch(p) = cs_veg%xsmrpool_patch(p) - cf_veg%leaf_xsmr_patch(p)*dt
@@ -405,6 +423,16 @@ contains
            cs_veg%leafc_storage_patch(p)   = cs_veg%leafc_storage_patch(p)  + cf_veg%cpool_to_leafc_storage_patch(p)*dt
            cs_veg%frootc_patch(p)          = cs_veg%frootc_patch(p)         + cf_veg%cpool_to_frootc_patch(p)*dt
            cs_veg%frootc_storage_patch(p)  = cs_veg%frootc_storage_patch(p) + cf_veg%cpool_to_frootc_storage_patch(p)*dt
+
+          if (cs_veg%cpool_patch(p) < -1.0e-09_r8 .or. cs_veg%cpool_patch(p) > 1.0e6_r8) then
+                 write(iulog,*) 'ERROR: cpool_patch=',cs_veg%cpool_patch(p)
+                 write(iulog,*) 'ERROR: cpool_to_leafc_patch=',cf_veg%cpool_to_leafc_patch(p)*dt
+                 write(iulog,*) 'ERROR: cpool_to_leafc_storage_patch=',cf_veg%cpool_to_leafc_storage_patch(p)*dt
+                 write(iulog,*) 'ERROR: cpool_to_frootc_patch=',cf_veg%cpool_to_frootc_patch(p)*dt
+                 write(iulog,*) 'ERROR: cpool_to_frootc_storage_patch=',cf_veg%cpool_to_frootc_storage_patch(p)*dt
+                 call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
+                             msg= errMsg(sourcefile,  __LINE__))
+          end if
            !
            ! For the matrix solution the actual state update comes after the matrix
            ! multiply in VegMatrix, but the matrix needs to be setup with
