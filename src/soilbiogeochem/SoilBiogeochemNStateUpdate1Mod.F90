@@ -243,11 +243,11 @@ contains
                   ns%smin_no3_vr_col(c,j) = ns%smin_no3_vr_col(c,j) - nf%smin_no3_to_plant_vr_col(c,j)*dt
                else if (decomp_method == mimicsplus_decomp) then
                ! we treat mycorrhiza differently in mimics plus
-                  ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) -  cnfunmimicsplus_inst%sminnh4_nonmyc_to_plant_col(c,j)*dt - &
-                  (cnfunmimicsplus_inst%sminnh4_to_am_vr_col(c,j) + cnfunmimicsplus_inst%sminnh4_to_ecm_vr_col(c,j)) * dt
+                  ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) -  nf%sminnh4_nonmyc_to_plant_col(c,j) * dt - &
+                  (nf%sminnh4_to_am_vr_col(c,j) + nf%sminnh4_to_ecm_vr_col(c,j)) * dt
 
-                  ns%smin_no3_vr_col(c,j) = ns%smin_no3_vr_col(c,j) -  cnfunmimicsplus_inst%sminno3_nonmyc_to_plant_col(c,j)*dt - &
-                  (cnfunmimicsplus_inst%sminno3_to_am_vr_col(c,j) + cnfunmimicsplus_inst%sminno3_to_ecm_vr_col(c,j)) * dt
+                  ns%smin_no3_vr_col(c,j) = ns%smin_no3_vr_col(c,j) -  nf%sminno3_nonmyc_to_plant_col(c,j) * dt - &
+                  (nf%sminno3_to_am_vr_col(c,j) + nf%sminno3_to_ecm_vr_col(c,j)) * dt
                else 
                   ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) -  nf%sminn_to_plant_fun_nh4_vr_col(c,j)*dt
 

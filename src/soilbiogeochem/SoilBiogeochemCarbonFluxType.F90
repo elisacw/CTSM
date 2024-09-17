@@ -61,6 +61,14 @@ module SoilBiogeochemCarbonFluxType
      real(r8), pointer :: fates_litter_flux                         (:)     ! (gC/m2/s) A summary of the total litter
                                                                             ! flux passed in from FATES.
                                                                             ! This is a diagnostic for balance checks only
+  real(r8),  pointer ::  c_am_resp_vr_col(:,:)            ! carbon respiration flux for AM mycorrhiza
+  real(r8),  pointer ::  c_ecm_resp_vr_col(:,:)           ! carbon respiration flux for ECM mycorrhiza
+  real(r8),  pointer ::  c_am_growth_vr_col(:,:)          ! carbon growth flux for AM mycorrhiza
+  real(r8),  pointer ::  c_ecm_growth_vr_col(:,:)         ! carbon growth flux for ECM mycorrhiza
+
+  real(r8),  pointer ::  c_ecm_enz_vr_col(:,:)            ! carbon enzyme production flux for ECM mycorrhiza
+  real(r8),  pointer ::  c_somc2soma_vr_col(:,:)        ! carbon release from mining from somc pool
+  real(r8),  pointer ::  c_somp2soma_vr_col(:,:)        ! carbon release from mining from somp pool
 
      
    contains
@@ -172,6 +180,15 @@ contains
 
      allocate(this%litr_lig_c_to_n_col(begc:endc))
      this%litr_lig_c_to_n_col(:)= 0._r8
+
+     allocate(this%c_am_resp_vr_col(begc:endc,1:nlevdecomp_full))    ; this%c_am_resp_vr_col    = spval
+     allocate(this%c_ecm_resp_vr_col(begc:endc,1:nlevdecomp_full))   ; this%c_ecm_resp_vr_col   = spval
+     allocate(this%c_am_growth_vr_col(begc:endc,1:nlevdecomp_full))  ; this%c_am_growth_vr_col  = spval
+     allocate(this%c_ecm_growth_vr_col(begc:endc,1:nlevdecomp_full)) ; this%c_ecm_growth_vr_col = spval
+
+     allocate(this%c_ecm_enz_vr_col(begc:endc,1:nlevdecomp_full))    ; this%c_ecm_enz_vr_col    = spval
+     allocate(this%c_somc2soma_vr_col(begc:endc,1:nlevdecomp_full))  ; this%c_somc2soma_vr_col  = spval
+     allocate(this%c_somp2soma_vr_col(begc:endc,1:nlevdecomp_full))  ; this%c_somp2soma_vr_col  = spval
      
    end subroutine InitAllocate 
 
@@ -729,6 +746,14 @@ contains
        do fi = 1,num_column
           i = filter_column(fi)
           this%hr_vr_col(i,j) = value_column
+
+          this%c_am_resp_vr_col(i,j)    = value_column
+          this%c_ecm_resp_vr_col(i,j)   = value_column
+          this%c_am_growth_vr_col(i,j)  = value_column
+          this%c_ecm_growth_vr_col(i,j) = value_column
+          this%c_ecm_enz_vr_col(i,j)    = value_column
+          this%c_somc2soma_vr_col(i,j)  = value_column
+          this%c_somp2soma_vr_col(i,j)  = value_column
        end do
     end do
 
@@ -751,7 +776,7 @@ contains
                      num_bgc_soilc, filter_bgc_soilc, num_soilp, filter_soilp, &
                      soilbiogeochem_decomp_cascade_ctransfer_col, &
                      soilbiogeochem_cwdc_col, soilbiogeochem_cwdn_col, &
-                     leafc_to_litter_patch, frootc_to_litter_patch)
+                     leafc_to_litter_patch, frootc_to_litter_patch, c_myc_resp)
     !
     ! !DESCRIPTION:
     ! On the radiation time step, carbon summary calculations
@@ -773,6 +798,7 @@ contains
 
     real(r8), intent(in), optional :: leafc_to_litter_patch(:)
     real(r8), intent(in), optional :: frootc_to_litter_patch(:)
+    real(r8), intent(in), optional :: c_myc_resp(bounds%begc:,1:)
     !
     ! !LOCAL VARIABLES:
     integer  :: c,j,k,l,p
@@ -826,6 +852,15 @@ contains
        end do
     end do
 
+    ! we need to explicitly add mycorrhizal respiration, since that is due to the flux to plant and not part of the cascade.
+    if (decomp_method == mimicsplus_decomp) then
+       do j = 1,nlevdecomp
+          do fc = 1,num_bgc_soilc
+             c = filter_bgc_soilc(fc)
+             this%hr_vr_col(c,j) = &
+                  this%hr_vr_col(c,j) + 
+          end do
+       end do
     ! add up all vertical transport tendency terms and calculate total som leaching loss as the sum of these
     do l = 1, ndecomp_pools
        do fc = 1,num_bgc_soilc

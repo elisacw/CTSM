@@ -132,6 +132,15 @@ module SoilBiogeochemNitrogenFluxType
      real(r8), pointer :: fates_litter_flux                         (:)     ! (gN/m2/s) A summary of the total litter
                                                                             ! flux passed in from FATES.
                                                                             ! This is a diagnostic for balance checks only
+     real(r8),  pointer ::  n_am_growth_vr_col(:,:)          ! nitrogen growth flux for AM mycorrhiza
+     real(r8),  pointer ::  n_ecm_growth_vr_col(:,:)         ! nitrogen growth flux for ECM mycorrhiza
+     real(r8),  pointer ::  n_somc2ecm_vr_col(:,:)         ! nitrogen mining from ECM mycorrhiza
+     real(r8),  pointer ::  n_somp2ecm_vr_col(:,:)         ! nitrogen mining from ECM mycorrhiza
+
+     real(r8),  pointer ::  sminno3_to_ecm_vr_col(:,:)       ! No3 flux from soil NO3 to ECM
+     real(r8),  pointer ::  sminno3_to_am_vr_col(:,:)        ! No3 flux from soil NO3 to AM
+     real(r8),  pointer ::  sminnh4_to_ecm_vr_col(:,:)       ! No3 flux from soil NO3 to ECM
+     real(r8),  pointer ::  sminnh4_to_am_vr_col(:,:)        ! No3 flux from soil NO3 to AM
      ! track tradiagonal matrix  
 
    contains
