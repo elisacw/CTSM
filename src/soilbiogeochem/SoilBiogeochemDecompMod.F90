@@ -139,8 +139,6 @@ contains
          phr_vr                           =>    soilbiogeochem_carbonflux_inst%phr_vr_col                             , & ! Input:  [real(r8) (:,:)   ]  potential HR (gC/m3/s)                           
          fphr                             =>    soilbiogeochem_carbonflux_inst%fphr_col                               , & ! Output: [real(r8) (:,:)   ]  fraction of potential SOM + LITTER heterotrophic
 
-         c_am_resp_vr                     => soilbiogeochem_carbonflux_inst%c_am_resp_vr_col                          , & ! Input: [real(r8) (:,:)    ]  vertically resolved C respiration flux for AM mycorrhiza (gC/m3/s)
-         c_ecm_resp_vr                    => soilbiogeochem_carbonflux_inst%c_ecm_resp_vr_col                         , & ! Input: [real(r8) (:,:)    ]  vertically resolved C respiration flux for ECM mycorrhiza (gC/m3/s)
          c_am_growth_vr                   => soilbiogeochem_carbonflux_inst%c_am_growth_vr_col                        , & ! Input: [real(r8) (:,:)    ]  vertically resolved C growth flux for AM mycorrhiza (gC/m3/s)
          c_ecm_growth_vr                  => soilbiogeochem_carbonflux_inst%c_ecm_growth_vr_col                       , & ! Input: [real(r8) (:,:)    ]  vertically resolved C growth flux for ECM mycorrhiza (gC/m3/s)
          n_am_growth_vr                   => soilbiogeochem_nitrogenflux_inst%n_am_growth_vr_col                      , & ! Input: [real(r8) (:,:)    ]  vertically resolved N growth flux for AM mycorrhiza (gC/m3/s)
@@ -148,7 +146,8 @@ contains
          c_ecm_enz_vr                     => soilbiogeochem_carbonflux_inst%c_ecm_enz_vr_col                          , & ! Input: [real(r8) (:,:)    ]  vertically resolved C enzyme flux for ECM mycorrhiza (goes from plant) (gC/m3/s)
          n_somc2ecm_vr                    => soilbiogeochem_nitrogenflux_inst%n_somc2ecm_vr_col(:,:)                  , & ! Input: [real(r8) (:,:)    ]nitrogen mining from ECM mycorrhiza
          n_somp2ecm_vr                    => soilbiogeochem_nitrogenflux_inst%n_somp2ecm_vr_col(:,:)                  , & ! Input: [real(r8) (:,:)    ]nitrogen mining from ECM mycorrhiza
-         c_somc2soma_vr                   => soilbiogeochem_carbonflux_inst%c_somc2soma_vr_col(:,:)                   , & ! Input: [real(r8) (:,:) carbon release from mining from somp pool
+         c_somc2soma_vr                   => soilbiogeochem_carbonflux_inst%c_somc2soma_vr_col(:,:)                   , & ! Input: [real(r8) (:,:) carbon release from mining from somс pool
+         c_somp2soma_vr                   => soilbiogeochem_carbonflux_inst%c_somp2soma_vr_col(:,:)                   , & ! Input: [real(r8) (:,:) carbon release from mining from somp pool
          sminno3_to_ecm_vr                => soilbiogeochem_nitrogenflux_inst%sminno3_to_ecm_vr_col(:,:)              , & ! Input: [real(r8) (:,:)No3 flux from soil NO3 to ECM
          sminno3_to_am_vr                 => soilbiogeochem_nitrogenflux_inst%sminno3_to_am_vr_col(:,:)               , & ! Input: [real(r8) (:,:)No3 flux from soil NO3 to AM
          sminnh4_to_ecm_vr                => soilbiogeochem_nitrogenflux_inst%sminnh4_to_ecm_vr_col(:,:)              , & ! Input: [real(r8) (:,:)No3 flux from soil NO3 to ECM
@@ -314,8 +313,8 @@ contains
                      else if (cascade_receiver_pool(k) == i_phys_som) then
                         decomp_cascade_ntransfer_vr(c,j,k) = decomp_cascade_ntransfer_vr(c,j,k) - n_somp2ecm_vr(c,j)
                      end if
-
-                  elseif  (cascade_receiver_pool(k) == i_avl_som) then
+                  endif
+                  if  (cascade_receiver_pool(k) == i_avl_som) then
                      ! carbon release associated with mining
                      if (cascade_donor_pool(k) == i_chem_som) then
                         decomp_cascade_ctransfer_vr(c,j,k) = decomp_cascade_ctransfer_vr(c,j,k) + c_somc2soma_vr(c,j)
@@ -323,15 +322,16 @@ contains
                         decomp_cascade_ctransfer_vr(c,j,k) = decomp_cascade_ctransfer_vr(c,j,k) + c_somp2soma_vr(c,j)
                      end if
                   end if
-                     ! fluxes that are not part of the cascade.
-                     decomp_cpools_vr(c,j,i_ecm_myc) = decomp_cpools_vr(c,j,i_ecm_myc) + c_ecm_growth_vr(c,j) * dt
-                     decomp_npools_vr(c,j,i_ecm_myc) = decomp_npools_vr(c,j,i_ecm_myc) + (n_ecm_growth_vr(c,j) + &
-                                                       sminno3_to_ecm_vr(c,j) + sminnh4_to_ecm_vr(c,j)) * dt
-                     decomp_cpools_vr(c,j,i_am_myc) = decomp_cpools_vr(c,j,i_am_myc) + c_am_growth_vr(c,j) * dt
-                     decomp_npools_vr(c,j,i_am_myc) = decomp_npools_vr(c,j,i_am_myc) + (n_ecm_growth_vr(c,j) + &
-                                                      sminno3_to_am_vr(c,j) + sminnh4_to_am_vr(c,j)) * dt
-                     decomp_cpools_vr(c,j,i_avl_som) = decomp_cpools_vr(c,j,i_avl_som) + c_ecm_enz_vr(c,j) * dt
+
                 end do ! transitions
+                ! fluxes that are not part of the cascade.
+                decomp_cpools_vr(c,j,i_ecm_myc) = decomp_cpools_vr(c,j,i_ecm_myc) + c_ecm_growth_vr(c,j) * dt
+                decomp_npools_vr(c,j,i_ecm_myc) = decomp_npools_vr(c,j,i_ecm_myc) + (n_ecm_growth_vr(c,j) + &
+                                                  sminno3_to_ecm_vr(c,j) + sminnh4_to_ecm_vr(c,j)) * dt
+                decomp_cpools_vr(c,j,i_am_myc) = decomp_cpools_vr(c,j,i_am_myc) + c_am_growth_vr(c,j) * dt
+                decomp_npools_vr(c,j,i_am_myc) = decomp_npools_vr(c,j,i_am_myc) + (n_ecm_growth_vr(c,j) + &
+                                                   sminno3_to_am_vr(c,j) + sminnh4_to_am_vr(c,j)) * dt
+                decomp_cpools_vr(c,j,i_avl_som) = decomp_cpools_vr(c,j,i_avl_som) + c_ecm_enz_vr(c,j) * dt
             end do ! layer
          enddo !column
 
