@@ -232,6 +232,7 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
   subroutine readParams ( ncid )
       !
       ! !DESCRIPTION:
+      ! Reads MIMICSplus parameters from parameter netCDF file
       !
       ! !USES:
       use ncdio_pio    , only: file_desc_t,ncd_io
@@ -428,11 +429,6 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
       if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
       params_inst%mimicsplus_mge_am = tempr
 
-      !tString='mimicsplus_r_myc'
-      !call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-      !if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-      !params_inst%mimicsplus_r_myc = tempr
-
       tString='mimicsplus_fphys_ecm'
       call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
       if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
@@ -468,13 +464,18 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
       if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
       params_inst%mimicsplus_cn_myc = tempr
 
+      tString='mimicsplus_fi'
+      call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+      if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+      params_inst%mimicsplus_fi = tempr
+
   end subroutine readParams  
 
   !-----------------------------------------------------------------------
   subroutine init_decompcascade_mimicsplus(bounds, soilbiogeochem_state_inst, soilstate_inst)
       !
       ! !DESCRIPTION:
-      ! initialize rate constants and decomposition pathways following the
+      ! Initialize rate constants and decomposition pathways following the
       ! decomposition cascade of the MIMICS+ model.
       !
       ! !USES:
@@ -2110,8 +2111,8 @@ end subroutine calc_myc_mortality
    ! DESCRIPTION:
    ! Calculates mining of ectomycorrhizal fungi for nitrogen in soil organic matter pools.
    ! (only!) Ectomycorrhizal fungi can a allocate fraction of the incoming carbon from vegetation (not in this subroutine) to the avaliable SOM pool.
-   ! They mine for nitrogen in the chemmically and physically protected SOM pools and create nitrogen fluxes from theses to EcM.
-   ! During this process carbon is release from the chemmically and physically protected SOM pools which enters the avaliable SOM pool.
+   ! They mine for nitrogen in the chemically and physically protected SOM pools and create nitrogen fluxes from theses to EcM.
+   ! During this process carbon is release from the chemically and physically protected SOM pools which enters the avaliable SOM pool.
 
    ! USES:
 
