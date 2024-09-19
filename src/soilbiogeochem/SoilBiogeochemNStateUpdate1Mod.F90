@@ -59,7 +59,8 @@ contains
          nfixation_prof        => soilbiogeochem_state_inst%nfixation_prof_col , & ! Input:  [real(r8) (:,:)   ]  profile over which N fixation is distributed through column (1/m)
 
          nf                    => soilbiogeochem_nitrogenflux_inst             , & ! Output:
-         ns                    => soilbiogeochem_nitrogenstate_inst              & ! Output:
+         ns                    => soilbiogeochem_nitrogenstate_inst            , & ! Output:
+         cnfun                 => cnfunmimicsplus_inst                           &
          )
 
       ! set time steps

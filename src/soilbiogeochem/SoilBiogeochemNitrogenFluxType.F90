@@ -141,6 +141,8 @@ module SoilBiogeochemNitrogenFluxType
      real(r8),  pointer ::  sminno3_to_am_vr_col(:,:)        ! No3 flux from soil NO3 to AM
      real(r8),  pointer ::  sminnh4_to_ecm_vr_col(:,:)       ! No3 flux from soil NO3 to ECM
      real(r8),  pointer ::  sminnh4_to_am_vr_col(:,:)        ! No3 flux from soil NO3 to AM
+     real(r8),  pointer ::  sminno3_nonmyc_to_plant_col(:,:) ! No3 flux from min soil to plant (only nonmyc pathway can do this)
+     real(r8),  pointer ::  sminnh4_nonmyc_to_plant_col(:,:) ! NH4 flux from min soil to plant (only nonmyc pathway can do this)
      ! track tradiagonal matrix  
 
    contains
@@ -292,6 +294,28 @@ contains
        allocate(this%fates_litter_flux(0:0)); this%fates_litter_flux(:) = nan
     end if
     
+    ! MIMICSplus variables:
+    allocate(this%n_am_growth_vr_col                   (begc:endc,1:nlevdecomp_full                               ))
+    allocate(this%n_ecm_growth_vr_col                  (begc:endc,1:nlevdecomp_full                               ))
+    allocate(this%n_somc2ecm_vr_col                    (begc:endc,1:nlevdecomp_full                               ))
+    allocate(this%n_somp2ecm_vr_col                    (begc:endc,1:nlevdecomp_full                               ))
+    allocate(this%sminno3_to_am_vr_col                 (begc:endc,1:nlevdecomp_full                               ))
+    allocate(this%sminno3_to_ecm_vr_col                (begc:endc,1:nlevdecomp_full                               ))
+    allocate(this%sminno3_nonmyc_to_plant_col          (begc:endc,1:nlevdecomp_full                               ))
+    allocate(this%sminnh4_to_am_vr_col                 (begc:endc,1:nlevdecomp_full                               ))
+    allocate(this%sminnh4_to_ecm_vr_col                (begc:endc,1:nlevdecomp_full                               ))
+    allocate(this%sminnh4_nonmyc_to_plant_col          (begc:endc,1:nlevdecomp_full                               ))
+    this%n_am_growth_vr_col(:,:)          = nan
+    this%n_ecm_growth_vr_col(:,:)         = nan
+    this%n_somc2ecm_vr_col(:,:)           = nan
+    this%n_somp2ecm_vr_col(:,:)           = nan
+    this%sminno3_to_am_vr_col(:,:)        = nan
+    this%sminno3_to_ecm_vr_col(:,:)       = nan
+    this%sminno3_nonmyc_to_plant_col(:,:) = nan
+    this%sminnh4_to_am_vr_col(:,:)        = nan
+    this%sminnh4_to_ecm_vr_col(:,:)       = nan
+    this%sminnh4_nonmyc_to_plant_col(:,:) = nan
+
     ! Allocate soil Matrix setug
     if(use_soil_matrixcn)then
     end if
@@ -1059,6 +1083,21 @@ contains
        end do
     end do
 
+    do j = 1, nlevdecomp_full
+       do fi = 1,num_column
+          i = filter_column(fi)
+          this%n_am_growth_vr_col(i,j)          = value_column
+          this%n_ecm_growth_vr_col(i,j)         = value_column
+          this%n_somc2ecm_vr_col(i,j)           = value_column
+          this%n_somp2ecm_vr_col(i,j)           = value_column
+          this%sminno3_to_am_vr_col(i,j)        = value_column
+          this%sminno3_to_ecm_vr_col(i,j)       = value_column
+          this%sminno3_nonmyc_to_plant_col(i,j) = value_column
+          this%sminnh4_to_am_vr_col(i,j)        = value_column
+          this%sminnh4_to_ecm_vr_col(i,j)       = value_column
+          this%sminnh4_nonmyc_to_plant_col(i,j) = value_column
+       end do
+    end do
   end subroutine SetValues
 
   !-----------------------------------------------------------------------

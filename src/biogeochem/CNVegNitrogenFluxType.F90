@@ -272,11 +272,6 @@ module CNVegNitrogenFluxType
      real(r8), pointer :: cost_nretrans_patch                       (:)     ! Average cost of retranslocation   (gN/m2/s)
      real(r8), pointer :: nuptake_npp_fraction_patch                (:)     ! frac of npp spent on N acquisition   (gN/m2/s)
 
-     real(r8),  pointer ::  sminno3_nonmyc_to_plant_col(:,:) ! No3 flux from min soil to plant (only nonmyc pathway can do this)
-     real(r8),  pointer ::  sminnh4_nonmyc_to_plant_col(:,:) ! NH4 flux from min soil to plant (only nonmyc pathway can do this)
-     real(r8),  pointer ::  no3_myc_to_plant_col(:,:)       ! No3 flux from min soil to plant  by mycorrhiza
-     real(r8),  pointer ::  nh4_myc_to_plant_col(:,:)       ! NH4 flux from min soil to plant by mycorrhiza
-
 
      ! Matrix solution variables
 
