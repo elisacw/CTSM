@@ -2120,7 +2120,7 @@ end subroutine calc_myc_mortality
    ! Nitrogen mining flux
    if (fc_som2soma > small_value) then
      if (npool_myc > small_value) then
-     fn_mining_som = fc_som2soma * (npool_myc / cpool_myc )
+     fn_mining_som = fc_som2soma * (npool_som / cpool_som )
      else
         fn_mining_som = 0.0_r8
         fc_som2soma = 0.0_r8
