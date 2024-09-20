@@ -1952,8 +1952,8 @@ end subroutine calc_myc_mortality
      fn_mining_somc = 0.0_r8
      if (myc_type == 1) then
       ! check units
-      call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_myc,fc_somp2soma,fn_mining_somp) !,r_myc)
-      call calc_myc_mining_rates(dz, cpool_somc,cpool_myc, npool_myc,fc_somc2soma,fn_mining_somc) !,r_myc)
+      call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_somp,fc_somp2soma,fn_mining_somp) !,r_myc)
+      call calc_myc_mining_rates(dz, cpool_somc,cpool_myc, npool_somc,fc_somc2soma,fn_mining_somc) !,r_myc)
      endif
      
  
@@ -2044,8 +2044,8 @@ end subroutine calc_myc_mortality
    fn_mining_somp = 0.0_r8
    fn_mining_somc = 0.0_r8
    if (myc_type == 1) then
-    call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_myc,fc_somp2soma,fn_mining_somp) ! gN/m3/s
-    call calc_myc_mining_rates(dz, cpool_somc,cpool_myc, npool_myc,fc_somc2soma,fn_mining_somc)
+    call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_somp,fc_somp2soma,fn_mining_somp) ! gN/m3/s
+    call calc_myc_mining_rates(dz, cpool_somc,cpool_myc, npool_somc,fc_somc2soma,fn_mining_somc)
    endif
 
 
@@ -2093,7 +2093,7 @@ end subroutine calc_myc_mortality
 
 
 
-  subroutine calc_myc_mining_rates(dz, cpool_som,cpool_myc, npool_myc, fc_som2soma,fn_mining_som)
+  subroutine calc_myc_mining_rates(dz, cpool_som,cpool_myc, npool_som, fc_som2soma,fn_mining_som)
 
    ! DESCRIPTION:
    ! Calculates mining of ectomycorrhizal fungi for nitrogen in soil organic matter pools.
@@ -2106,7 +2106,7 @@ end subroutine calc_myc_mortality
    ! ARGUMENTS:
    real(r8), intent(in) :: cpool_som          ! SOM pool [gC/m3]
    real(r8), intent(in) :: cpool_myc          ! Carbon pool of mycorrhiza [gC/m3]
-   real(r8), intent(in) :: npool_myc          ! Nitrogen pool of mycorrhiza [gC/m3]
+   real(r8), intent(in) :: npool_som          ! Nitrogen pool of soil [gC/m3]
    real(r8), intent(in) :: dz                 ! layer thickness [m]
    real(r8), intent(inout) :: fc_som2soma     ! carbon flux to available SOM pool [gC/m3/s]
    real(r8), intent(inout) :: fn_mining_som   ! nitrogen mining flux [gN/m3/s]
@@ -2119,7 +2119,7 @@ end subroutine calc_myc_mortality
    fc_som2soma = (params_inst%mimicsplus_k_mo / secphr) * dz * cpool_myc * cpool_som
    ! Nitrogen mining flux
    if (fc_som2soma > small_value) then
-     if (npool_myc > small_value) then
+     if (npool_som > small_value) then
      fn_mining_som = fc_som2soma * (npool_som / cpool_som )
      else
         fn_mining_som = 0.0_r8
@@ -2307,8 +2307,8 @@ end subroutine calc_myc_mortality
 
    fc_veg2myc=(fc_veg2myc_no3 + fc_veg2myc_nh4)/dz/dt
    if (myc_type == 1) then                                                ! EcM
-      call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_myc,l_fc_somp2soma,l_fn_mining_somp)
-      call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_myc,l_fc_somc2soma,l_fn_mining_somc)
+      call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_somp,l_fc_somp2soma,l_fn_mining_somp)
+      call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_somc,l_fc_somc2soma,l_fn_mining_somc)
    if ( cpool_somc < 0.0_r8 .or. cpool_myc < 0.0_r8  .or. & 
         npool_myc < 0.0_r8 .or.  cpool_somp < 0.0_r8) then 
      write(iulog,*) 'ERROR: cpool_som,cpool_myc,npool_my',cpool_somp,cpool_somc,cpool_myc, npool_myc,l_fc_somp2soma,l_fn_mining_somp
