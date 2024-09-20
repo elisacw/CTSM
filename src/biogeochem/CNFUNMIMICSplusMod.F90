@@ -791,7 +791,7 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
 
       unmetDemand              = .TRUE.
       plant_ndemand_pool_step(p,imyc)   = plant_ndemand_pool(p)    * n_uptake_myc_frac(p,imyc) 
-      npp_remaining(p,imyc)             = availc(p)*dt             * n_uptake_myc_frac(p,imyc)
+      npp_remaining(p,imyc)             = availc(p)*dt             * n_uptake_myc_frac(p,imyc) ! gC/m2
          
       ! COST FIXATION PATHWAY
       ! checks which photosyntetic pathway plant has (C3 / C4) and if they can do nitrogen fixation   
@@ -839,9 +839,6 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
          costs_paths(p,j,ipnmnh4)      = fun_cost_nonmyc(sminn_layer_step(p,j,imyc) * (1.0_r8 -sminfrc (c,j)) &
          ,big_cost,kc_nonmyc(ivt(p)),kn_nonmyc(ivt(p)) ,rootc_dens_step,crootfr(p,j),smallValue)
       end do
-
-      ! Remove C required to pair with N from passive uptake from the available pool. 
-      npp_remaining(p,imyc)  =   npp_remaining(p,imyc)
 
       total_N_conductance = 0.0_r8 
       fix_loop: do FIX =plants_are_fixing, plants_not_fixing !loop around percentages of fixers and nonfixers, with differnt costs. 
@@ -1114,7 +1111,7 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
                
             if(FIX == plants_are_fixing)then
                n_paths_acc(p,imyc,ipfix)     = n_paths_acc(p,imyc,ipfix)     + n_from_paths(p,j,ipfix)
-               npp_paths_acc(p,imyc,ipfix)   = npp_paths_acc(p,imyc,ipfix)   + npp_to_paths(p,j,ipfix)
+               npp_paths_acc(p,imyc,ipfix)   = npp_paths_acc(p,imyc,ipfix)   + npp_to_paths(p,j,ipfix) 
             end if
        
           end do

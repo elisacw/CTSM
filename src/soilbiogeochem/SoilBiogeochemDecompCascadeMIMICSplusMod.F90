@@ -2015,10 +2015,9 @@ end subroutine calc_myc_mortality
    !LOCAL VARIABLES
    real(r8), parameter :: secphr = 60.0_r8 * 60.0_r8
    real(r8), parameter :: f_enz = 0.1_r8                ! [-]Fraction of C from vegetation to EcM, that goes into SOMa for mining
-   real(r8), parameter :: f_growth = 0.5_r8            ! [-] Fraction of mycorrhizal N uptake that needs to stay within the fungi (not given to plant)
    real(r8), parameter :: small_Value = 1.0e-6_r8
    real(r8)            :: dt
-
+   real(r8) :: f_growth         ! [-] Fraction of mycorrhizal N uptake that needs to stay within the fungi (not given to plant)
    real(r8) :: fn_myc2veg                           ! nitrogen fluxes mycorrhiza to vegetation
    real(r8) :: fn_smin2myc                          ! nitrogen flux from mineral soil to myc [gN/m3/s]
    real(r8) :: fc_somp2soma,fc_somc2soma            ! carbon fluxes som to som due to mining [gC/m3/s]
@@ -2035,7 +2034,7 @@ end subroutine calc_myc_mortality
    else
       c_use_eff = params_inst%mimicsplus_mge_am
    endif
-
+   f_growth = c_use_eff ! in original mimics+ code this is used for some reasom, so here it is for consistency
    fn_smin2myc = (params_inst%mimicsplus_vmax_myc / secphr) * sminn / dz * &
                  (cpool_myc / (cpool_myc + params_inst%mimicsplus_k_m_emyc)) 
 
@@ -2306,7 +2305,7 @@ end subroutine calc_myc_mortality
       l_no3_frac = 1.0_r8
    endif
 
-   fc_veg2myc=fc_veg2myc_no3 + fc_veg2myc_nh4
+   fc_veg2myc=(fc_veg2myc_no3 + fc_veg2myc_nh4)/dz/dt
    if (myc_type == 1) then                                                ! EcM
       call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_myc,l_fc_somp2soma,l_fn_mining_somp)
       call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_myc,l_fc_somc2soma,l_fn_mining_somc)
@@ -2315,23 +2314,23 @@ end subroutine calc_myc_mortality
      write(iulog,*) 'ERROR: cpool_som,cpool_myc,npool_my',cpool_somp,cpool_somc,cpool_myc, npool_myc,l_fc_somp2soma,l_fn_mining_somp
      call endrun(                             msg= errMsg(sourcefile,  __LINE__))
    end if
-      N_demand_myc = c_use_eff * (1 - f_enz) * (fc_veg2myc_no3 + fc_veg2myc_nh4) / params_inst%mimicsplus_cn_myc / dz / dt
+      N_demand_myc = c_use_eff * (1.0_r8 - f_enz) * fc_veg2myc / params_inst%mimicsplus_cn_myc 
       N_uptake_myc = fn_smin2myc + l_fn_mining_somp + l_fn_mining_somc 
       if (N_uptake_myc > N_demand_myc) then
          fn_myc2veg = N_uptake_myc - N_demand_myc                        ! N flux myc -> veg
          n_myc_growth = N_demand_myc                                     ! How much N the need to grow
-         l_c_ecm_enz  = fc_veg2myc * f_enz
+         l_c_ecm_enz  = fc_veg2myc * f_enz * c_use_eff
          ! we add the enzymes here into the EcM pool because we first took them away, but now add them again
-         c_myc_growth = n_myc_growth * params_inst%mimicsplus_cn_myc + l_c_ecm_enz
-         ! enzyme flux will go to soma pool in the next update routine
-         c_myc_resp  = fc_veg2myc - c_myc_growth                          ! C that they don't need to grow
+         c_myc_growth = n_myc_growth * params_inst%mimicsplus_cn_myc
+         ! enzyme flux will go to soma pool in the next update 
+         c_myc_resp  = fc_veg2myc - (c_myc_growth + l_c_ecm_enz)                          ! C that they don't need to grow
       else ! less N in soil, so we limit N flux to vegetaion and mycorrhiza N demand so their sum is equal to N uptake
          fn_myc2veg = (1-f_growth) * N_uptake_myc
+         c_use_eff = f_growth * N_uptake_myc * params_inst%mimicsplus_cn_myc / (1.0_r8 - f_enz) / fc_veg2myc
          n_myc_growth = f_growth * N_uptake_myc
-         l_c_ecm_enz  = fc_veg2myc * f_enz
-         ! we add the enzymes here into the EcM pool because we first took them away, but now add them again
-         c_myc_growth = n_myc_growth * params_inst%mimicsplus_cn_myc + l_c_ecm_enz
-         c_myc_resp  = fc_veg2myc - c_myc_growth                          ! C that they don't need to grow
+         l_c_ecm_enz  = fc_veg2myc * f_enz * c_use_eff
+         c_myc_growth = c_use_eff * fc_veg2myc
+         c_myc_resp  = fc_veg2myc - (c_myc_growth + l_c_ecm_enz)                          ! C that they don't need to grow
       end if
 
       ! update inout optional arguments
@@ -2352,7 +2351,7 @@ end subroutine calc_myc_mortality
       end if
 
    else                                                                   ! AM 
-      N_demand_myc = c_use_eff * (fc_veg2myc_no3 + fc_veg2myc_nh4) / params_inst%mimicsplus_cn_myc / dz / dt
+      N_demand_myc = c_use_eff * (fc_veg2myc) / params_inst%mimicsplus_cn_myc
       N_uptake_myc = fn_smin2myc
       if (N_uptake_myc > N_demand_myc) then
          fn_myc2veg = N_uptake_myc - N_demand_myc                        ! N flux myc -> veg
