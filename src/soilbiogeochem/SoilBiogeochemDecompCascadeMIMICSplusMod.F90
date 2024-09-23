@@ -2035,6 +2035,7 @@ end subroutine calc_myc_mortality
       c_use_eff = params_inst%mimicsplus_mge_am
    endif
    f_growth = c_use_eff ! in original mimics+ code this is used for some reasom, so here it is for consistency
+   ! Change this back to 0.5 coming from parameter file at some point
    fn_smin2myc = (params_inst%mimicsplus_vmax_myc / secphr) * sminn / dz * &
                  (cpool_myc / (cpool_myc + params_inst%mimicsplus_k_m_emyc)) 
 

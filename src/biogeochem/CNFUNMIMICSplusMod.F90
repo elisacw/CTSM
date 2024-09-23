@@ -566,7 +566,7 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
       npp_Nfix               => cnveg_carbonflux_inst%npp_Nfix_patch                 , & ! Output:  [real(r8) (:) ]  Symbiotic BNF used C (gC/m2/s)
       npp_Nretrans           => cnveg_carbonflux_inst%npp_Nretrans_patch             , & ! Output:  [real(r8) (:) ]  Retranslocation N uptake used C (gC/m2/s)
       npp_Nuptake            => cnveg_carbonflux_inst%npp_Nuptake_patch              , & ! Output:  [real(r8) (:) ]  Total N uptake of FUN used C (gC/m2/s)
-      npp_growth             => cnveg_carbonflux_inst%npp_growth_patch               , & ! Output:  [real(r8) (:) ]  Total N uptake of FUN used C (gC/m2/s) 
+      npp_growth             => cnveg_carbonflux_inst%npp_growth_patch               , & ! Output:  [real(r8) (:) ]  Total C used for growth in FUN  (gC/m2/s)  
       npp_burnedoff          => cnveg_carbonflux_inst%npp_burnedoff_patch            , & ! Output:  [real(r8) (:) ]  C  that cannot be used for N uptake(gC/m2/s)   
       leafn_storage_to_xfer  => cnveg_nitrogenflux_inst%leafn_storage_to_xfer_patch  , & ! Output:  [real(r8) (:) ]
       plant_ndemand          => cnveg_nitrogenflux_inst%plant_ndemand_patch          , & ! Iutput:  [real(r8) (:) ]  N flux required to support initial GPP (gN/m2/s)
@@ -774,7 +774,7 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
       end if   ! end for deciduous
 
       ! Avaliable carbon for growth or Nitrogen uptake
-      !availc_pool(p)            =  availc(p)        *  dt
+      availc(p)            =  availc(p)        *  dt !!
 
       if (availc(p) > 0._r8) then
          do j = 1, nlevdecomp
@@ -791,7 +791,7 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
 
       unmetDemand              = .TRUE.
       plant_ndemand_pool_step(p,imyc)   = plant_ndemand_pool(p)    * n_uptake_myc_frac(p,imyc) 
-      npp_remaining(p,imyc)             = availc(p)*dt             * n_uptake_myc_frac(p,imyc) ! gC/m2
+      npp_remaining(p,imyc)             = availc(p)            * n_uptake_myc_frac(p,imyc) ! gC/m2 !og availc(p) *dt
          
       ! COST FIXATION PATHWAY
       ! checks which photosyntetic pathway plant has (C3 / C4) and if they can do nitrogen fixation   

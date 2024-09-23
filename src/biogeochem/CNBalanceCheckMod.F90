@@ -76,7 +76,7 @@ contains
     this%cwarning = 1.e-8_r8
     this%nwarning = 1.e-7_r8
     this%nerror   = 1.e-3_r8
-    this%cerror   = 1.e-7_r8
+    this%cerror   = 1.e-9_r8 ! original 1.e-7_r8 
   end subroutine Init
 
   !-----------------------------------------------------------------------
