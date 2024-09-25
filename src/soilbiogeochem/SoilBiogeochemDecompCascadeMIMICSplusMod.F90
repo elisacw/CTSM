@@ -2388,7 +2388,101 @@ end subroutine calc_myc_mortality
    end if
   end subroutine fun_fluxes_myc_update1
   
+  subroutine myc_n_extraction(dz, sminn, cpool_myc,cpool_somp, npool_somp, cpool_somc, npool_somc,fn_smin_myc, &
+                              fc_somp, fn_mining_somp, fc_somc, fn_mining_somc)
+   ! ! DESCRIPTION:
+   ! Nitrogen fluxes to mycorrhiza (and plant) + associated carbon fluxes
+   !
+   ! ! USES:
+   use clm_time_manager, only: get_step_size_real
 
+   !
+   ! !ARGUMENTS:
+   real(r8), intent(in)  :: dz           ! layer thickness                       [m]
+   real(r8), intent(in)  :: sminn        ! soil mineral nitrogen (NO3+NH4)      [gN/m2]
+   real(r8), intent(in)  :: cpool_myc    ! Carbon pool of mycorrhiza            [gC/m3]
+   real(r8), intent(in)  :: cpool_somp   ! physically protected SOM pool        [gC/m3]
+   real(r8), intent(in)  :: cpool_somc   ! chemically protected SOM pool        [gC/m3] 
+   real(r8), intent(in)  :: npool_somp   ! physically protected SOM pool        [gN/m3]
+   real(r8), intent(in)  :: npool_somc   ! chemically protected SOM pool        [gN/m3]
+   real(r8), intent(out) :: fn_smin_myc
+
+   !optional fluxes for ecm
+   real(r8), intent(out), optional :: fc_somp
+   real(r8), intent(out), optional :: fn_mining_somp
+   real(r8), intent(out), optional :: fc_somc
+   real(r8), intent(out), optional :: fn_mining_somc
+
+   ! !LOCAL VARIABLES:
+   real(r8)            :: dt
+   real(r8), parameter :: secphr = 60.0_r8 * 60.0_r8
+
+   dt           = get_step_size_real()
+   
+   fn_smin_myc = (params_inst%mimicsplus_vmax_myc / secphr) * sminn * &  
+                 (cpool_myc / (cpool_myc + params_inst%mimicsplus_k_m_emyc)) * dt
+
+    if (present(fc_somp)) then
+      call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_somp,fc_somp,fn_mining_somp)
+      call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_somc,fc_somc,fn_mining_somc)
+    end if
+
+  end subroutine myc_n_extraction
+
+  subroutine myc_cn_fluxes(dz, fc_to_myc, fn_to_myc, fn_to_veg, fn_myc_growth, fc_myc_growth, fc_myc_resp, fc_myc_enz)
+   ! ! DESCRIPTION:
+   ! Mycorrhiza uptake and demand reconciliation + fluxes to plant
+   !
+   ! ! USES:
+   use clm_time_manager, only: get_step_size_real
+
+   !
+   ! !ARGUMENTS:
+   real(r8), intent(in)  :: dz                   ! layer thickness                       [m]
+   real(r8), intent(in)  :: fc_to_myc            ! C flux from plant to mycorrhiza       [gC/m3/s]
+   real(r8), intent(in)  :: fn_to_myc            ! N flux to mycorrhiza (mineral + som)  [gN/m3/s]
+
+   real(r8), intent(out) :: fn_to_veg            ! N flux to vegetation from mycorrhiza  [gN/m3/s]
+   real(r8), intent(out) :: fn_myc_growth        ! N allocated to mycorrhiza growth      [gN/m3/s]
+   real(r8), intent(out) :: fc_myc_growth        ! C allocated to mycorrhiza growth      [gC/m3/s]
+   real(r8), intent(out) :: fc_myc_resp          ! C respired in myc-veg exchange        [gC/m3/s]
+
+   real(r8), intent(out), optional :: fc_myc_enz ! C enzyme flux to SOMa (only ECM)      [gC/m3/s]
+
+   ! !LOCAL VARIABLES:
+   real(r8) :: dt
+   real(r8), parameter :: secphr = 60.0_r8 * 60.0_r8
+   real(r8), parameter :: f_growth = 0.5_r8         ! Fraction of mycorrhizal N uptake that needs to stay within the fungi (not given to plant) [-]
+   real(r8), parameter :: f_enz = 0.1_r8            ! Fraction of mycorrhizal C uptake that is released to soil as enzymes [-]
+   real(r8)            :: N_uptake_myc              ! [gN/m3/s]
+   real(r8)            :: N_demand_myc              ! [gN/m3/s]
+   real(r8)            :: c_use_eff                 ! carbon use efficiency [-]
+
+  N_uptake_myc = fn_to_myc
+
+  if (present(fc_myc_enz)) then ! ECM
+     N_demand_myc = c_use_eff * (1.0_r8 - f_enz) * fc_to_myc / params_inst%mimicsplus_cn_myc 
+     if (N_uptake_myc > N_demand_myc) then
+        fn_to_veg = N_uptake_myc - N_demand_myc                        ! N flux myc -> veg
+        fn_myc_growth = N_demand_myc                                     ! How much N the need to grow
+        fc_myc_enz  = fc_to_myc * f_enz * c_use_eff
+        fc_myc_growth = fn_myc_growth * params_inst%mimicsplus_cn_myc
+        ! enzyme flux will go to soma pool in the next update 
+        fc_myc_resp  = fc_to_myc - (fc_myc_growth + fc_myc_enz)                          ! C that they don't need to grow
+     else ! less N in soil, so we limit N flux to vegetaion and mycorrhiza N demand so their sum is equal to N uptake
+        fn_to_veg = (1-f_growth) * N_uptake_myc
+        c_use_eff = f_growth * N_uptake_myc * params_inst%mimicsplus_cn_myc / (1.0_r8 - f_enz) / fc_to_myc
+        fn_myc_growth = f_growth * N_uptake_myc
+        fc_myc_enz  = fc_to_myc * f_enz * c_use_eff
+        fc_myc_growth = c_use_eff * fc_to_myc
+        c_myc_resp  = fc_to_myc - (fc_myc_growth + fc_myc_enz)                          ! C that they don't need to grow
+      end if
+  else
+  N_demand_myc = c_use_eff * (fc_to_myc) / params_inst%mimicsplus_cn_myc
+  end if
+
+
+  end subroutine myc_cn_fluxes
           
   !Moisture function, based on testbed code: https://github.com/wwieder/biogeochem_testbed/blob/957a5c634b9f2d0b4cdba0faa06b5a91216ace33/SOURCE_CODE/mimics_cycle.f90#L401-L419
   real(r8) function r_moist(h2osoi_liq,watsat, h2osoi_ice, dz) !As in testbed (and CLM) version of MIMICS            
