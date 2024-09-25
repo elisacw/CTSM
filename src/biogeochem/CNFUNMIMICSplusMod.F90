@@ -829,7 +829,7 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
             end if
          end if   
       end do
-      
+
       ! Non-mycorrhizal Uptake Cost
       do j = 1,nlevdecomp
          rootc_dens_step             = rootc_dens(p,j)  *  n_uptake_myc_frac(p,imyc)
