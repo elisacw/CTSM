@@ -51,6 +51,7 @@ module SoilBiogeochemNitrogenStateType
      real(r8), pointer :: totlitn_col                  (:)     ! col (gN/m2) total litter nitrogen
      real(r8), pointer :: totmicn_col                  (:)     ! col (gN/m2) total microbial nitrogen
      real(r8), pointer :: totsomn_col                  (:)     ! col (gN/m2) total soil organic matter nitrogen
+     real(r8), pointer :: totmycn_col                  (:)     ! col (gN/m2) total mycorrhiza nitrogen
      real(r8), pointer :: totlitn_1m_col               (:)     ! col (gN/m2) total litter nitrogen to 1 meter
      real(r8), pointer :: totsomn_1m_col               (:)     ! col (gN/m2) total soil organic matter nitrogen to 1 meter
      real(r8), pointer :: dyn_nbal_adjustments_col (:) ! (gN/m2) adjustments to each column made in this timestep via dynamic column adjustments (note: this variable only makes sense at the column-level: it is meaningless if averaged to the gridcell-level)
@@ -131,6 +132,7 @@ contains
     allocate(this%ntrunc_col           (begc:endc))                   ; this%ntrunc_col           (:)   = nan
     allocate(this%totlitn_col          (begc:endc))                   ; this%totlitn_col          (:)   = nan
     allocate(this%totmicn_col          (begc:endc))                   ; this%totmicn_col          (:)   = nan
+    allocate(this%totmycn_col          (begc:endc))                   ; this%totmycn_col          (:)   = nan
     allocate(this%totsomn_col          (begc:endc))                   ; this%totsomn_col          (:)   = nan
     allocate(this%totlitn_1m_col       (begc:endc))                   ; this%totlitn_1m_col       (:)   = nan
     allocate(this%totsomn_1m_col       (begc:endc))                   ; this%totsomn_1m_col       (:)   = nan
@@ -312,6 +314,12 @@ contains
          avgflag='A', long_name='total microbial N', &
          ptr_col=this%totmicn_col)
     end if
+    if ( decomp_method == mimicsplus_decomp) then !ECW do I need to do sth here? Do I need to add myc here?
+       this%totmycn_col(begc:endc) = spval
+       call hist_addfld1d (fname='TOTMYCN', units='gN/m^2', &
+         avgflag='A', long_name='total mycorrhizal N', &
+         ptr_col=this%totmycn_col)
+    end if
 
     this%totsomn_col(begc:endc) = spval
     call hist_addfld1d (fname='TOTSOMN', units='gN/m^2', &
@@ -435,6 +443,7 @@ contains
           end if
           this%totlitn_col(c)    = 0._r8
           this%totmicn_col(c)    = 0._r8
+          this%totmycn_col(c)    = 0._r8
           this%totsomn_col(c)    = 0._r8
           this%totlitn_1m_col(c) = 0._r8
           this%totsomn_1m_col(c) = 0._r8
@@ -753,6 +762,7 @@ contains
        end if
        this%totlitn_col(i)     = value_column
        this%totmicn_col(i)     = value_column
+       this%totmycn_col(i)     = value_column
        this%totsomn_col(i)     = value_column
        this%totsomn_1m_col(i)  = value_column
        this%totlitn_1m_col(i)  = value_column
@@ -991,6 +1001,21 @@ contains
       end if
    end do
 
+   ! total mycorrhyzal nitrogen (TOTMYCN)
+   do fc = 1,num_allc
+      c = filter_allc(fc)
+      this%totmycn_col(c) = 0._r8
+   end do
+   do l = 1, ndecomp_pools
+      if ( decomp_cascade_con%is_mycorrhiza(l) ) then
+         do fc = 1,num_allc
+            c = filter_allc(fc)
+            this%totmycn_col(c) = &
+                 this%totmycn_col(c) + &
+                 this%decomp_npools_col(c,l)
+         end do
+      end if
+   end do
    ! total soil organic matter nitrogen (TOTSOMN)
    do fc = 1,num_allc
       c = filter_allc(fc)
@@ -1070,6 +1095,7 @@ contains
            this%cwdn_col(c)    + &
            this%totlitn_col(c) + &
            this%totmicn_col(c) + &
+           this%totmycn_col(c) + &
            this%totsomn_col(c) + &
            this%sminn_col(c)   + &
            ecovegn_col 
@@ -1080,6 +1106,7 @@ contains
            this%cwdn_col(c)    + &
            this%totlitn_col(c) + &
            this%totmicn_col(c) + &
+           this%totmycn_col(c) + &
            this%totsomn_col(c) + &
            this%sminn_col(c)   + &
            this%ntrunc_col(c)  + &

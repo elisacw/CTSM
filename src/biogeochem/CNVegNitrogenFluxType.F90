@@ -272,6 +272,7 @@ module CNVegNitrogenFluxType
      real(r8), pointer :: cost_nretrans_patch                       (:)     ! Average cost of retranslocation   (gN/m2/s)
      real(r8), pointer :: nuptake_npp_fraction_patch                (:)     ! frac of npp spent on N acquisition   (gN/m2/s)
 
+
      ! Matrix solution variables
 
    contains

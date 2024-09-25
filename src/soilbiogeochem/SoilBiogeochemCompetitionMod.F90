@@ -19,6 +19,7 @@ module SoilBiogeochemCompetitionMod
   use SoilBiogeochemNitrogenFluxType  , only : soilbiogeochem_nitrogenflux_type
   use SoilBiogeochemNitrogenUptakeMod , only : SoilBiogeochemNitrogenUptake
   use ColumnType                      , only : col                
+  use PatchType                       , only : patch
   use CNVegstateType                  , only : cnveg_state_type
   use CNVegCarbonStateType            , only : cnveg_carbonstate_type
   use CNVegCarbonFluxType             , only : cnveg_carbonflux_type
@@ -216,7 +217,7 @@ contains
     !
     ! !LOCAL VARIABLES:
     integer  :: c,p,l,pi,j,k                                          ! indices
-    integer  :: fc                                                    ! filter column index
+    integer  :: fc,fp                                                 ! filter column index, filter patch index
     logical :: local_use_fun                                          ! local version of use_fun
     real(r8) :: amnf_immob_vr                                         ! actual mineral N flux from immobilization (gN/m3/s)
     real(r8) :: n_deficit_vr                                          ! microbial N deficit, vertically resolved (gN/m3/s)
@@ -246,6 +247,8 @@ contains
     real(r8) :: residual_smin_no3(bounds%begc:bounds%endc)
     real(r8) :: residual_plant_ndemand(bounds%begc:bounds%endc)
     real(r8) :: sminn_to_plant_new(bounds%begc:bounds%endc)
+    real(r8) :: unmet_plant_demand_no3(bounds%begc:bounds%endc,1:nlevdecomp)  ! plant demand that has not been met by sminno3 uptake.
+    real(r8) :: unmet_plant_demand_nh4(bounds%begc:bounds%endc,1:nlevdecomp)  ! plant demand that has not been met by sminnh4 uptake.
     !-----------------------------------------------------------------------
 
     associate(                                                                                           &
@@ -297,6 +300,8 @@ contains
       sminn_to_plant_new(bounds%begc:bounds%endc)  =  0._r8
 
       local_use_fun = (use_fun .or. decomp_method == mimicsplus_decomp)
+      unmet_plant_demand_no3(bounds%begc:bounds%endc,1:nlevdecomp) = 0._r8
+      unmet_plant_demand_nh4(bounds%begc:bounds%endc,1:nlevdecomp) = 0._r8
 
       if_nitrif: if (.not. use_nitrif_denitrif) then
          ! init sminn_tot
@@ -391,16 +396,6 @@ contains
                       soilbiogeochem_nitrogenflux_inst%sminn_to_plant_fun_vr_col(bounds%begc:bounds%endc,1:nlevdecomp), &
                       'unity')
             call t_stopf( 'CNFUN' )
-         end if
-
-         if ( decomp_method == mimicsplus_decomp ) then
-            call t_startf( 'CNFUNMIMICSplus' )
-            call CNFUNMIMICSplus(bounds,num_bgc_soilc,filter_bgc_soilc,num_bgc_vegp,filter_bgc_vegp,waterstatebulk_inst, &
-                      waterfluxbulk_inst,temperature_inst,soilstate_inst,cnveg_state_inst,cnveg_carbonstate_inst,&
-                      cnveg_carbonflux_inst,cnveg_nitrogenstate_inst,cnveg_nitrogenflux_inst                ,&
-                      soilbiogeochem_nitrogenflux_inst,soilbiogeochem_carbonflux_inst,canopystate_inst,      &
-                      soilbiogeochem_nitrogenstate_inst, soilbiogeochem_carbonstate_inst, cnfunmimicsplus_inst)
-            call t_stopf( 'CNFUNMIMICSplus' )
          end if
 
          ! sum up N fluxes to plant
@@ -767,6 +762,11 @@ contains
             end do
          end do
 
+        ! do j = 1, nlevdecomp
+        !    do fp = 1, num_bgc_vegp
+        !    p = filter_bgc_vegp(fp)
+        !    c = patch%column(p)
+        !       if (plant_ndemand(c)*nuptake_prof(c,j) > )
          if ( use_fun ) then
             call t_startf( 'CNFUN' )
             call CNFUN(bounds,num_bgc_soilc,filter_bgc_soilc,num_bgc_vegp,filter_bgc_vegp,waterstatebulk_inst,&
@@ -821,17 +821,21 @@ contains
                ! sum up N fluxes to plant after initial competition
                sminn_to_plant(c) = 0._r8 !this isn't use in fun. 
                do j = 1, nlevdecomp
-                  if ((cnfunmimicsplus_inst%sminno3_nonmyc_to_plant_col(c,j) + cnfunmimicsplus_inst%no3_myc_to_plant_col &
-                       - smin_no3_to_plant_vr(c,j)).gt.0.0000000000001_r8) then
+                  if ((soilbiogeochem_nitrogenflux_inst%sminno3_nonmyc_to_plant_col(c,j) + &
+                      soilbiogeochem_nitrogenflux_inst%sminno3_to_ecm_vr_col(c,j) +  &
+                      soilbiogeochem_nitrogenflux_inst%sminno3_to_am_vr_col(c,j) - &
+                      smin_no3_to_plant_vr(c,j)).gt.0.0000000000001_r8) then
                       write(iulog,*) 'problem with limitations on no3 uptake', &
-                              cnfunmimicsplus_inst%sminno3_nonmyc_to_plant_col(c,j) + cnfunmimicsplus_inst%no3_myc_to_plant_col, &
+                              soilbiogeochem_nitrogenflux_inst%sminno3_nonmyc_to_plant_col(c,j) + cnfunmimicsplus_inst%no3_myc_to_plant_col(c,j), &
                               smin_no3_to_plant_vr(c,j)
                       call endrun("too much NO3 uptake predicted by CNFUNMIMICSplus")
                   end if
-                  if ((cnfunmimicsplus_inst%sminnh4_nonmyc_to_plant_col(c,j) + cnfunmimicsplus_inst%nh4_myc_to_plant_col &
-                       - smin_nh4_to_plant_vr(c,j)).gt.0.0000000000001_r8) then
+                  if ((soilbiogeochem_nitrogenflux_inst%sminnh4_nonmyc_to_plant_col(c,j) + &
+                       soilbiogeochem_nitrogenflux_inst%sminnh4_to_ecm_vr_col(c,j) + &
+                       soilbiogeochem_nitrogenflux_inst%sminnh4_to_am_vr_col(c,j) - &
+                       smin_nh4_to_plant_vr(c,j)).gt.0.0000000000001_r8) then
                       write(iulog,*) 'problem with limitations on nh4 uptake', &
-                              cnfunmimicsplus_inst%sminnh4_nonmyc_to_plant_col(c,j) + cnfunmimicsplus_inst%nh4_myc_to_plant_col, &
+                              soilbiogeochem_nitrogenflux_inst%sminnh4_nonmyc_to_plant_col(c,j) + cnfunmimicsplus_inst%nh4_myc_to_plant_col(c,j), &
                               smin_nh4_to_plant_vr(c,j)
                       call endrun("too much NH4 uptake predicted by CNFUNMIMICSplus")
                   end if

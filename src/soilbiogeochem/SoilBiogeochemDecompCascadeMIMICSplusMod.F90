@@ -33,7 +33,7 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
   use clm_varpar                         , only : i_litr_min, i_litr_max, i_cwdl2
   use clm_varctl                         , only : iulog, spinup_state, anoxia, use_lch4, use_fates
   use clm_varcon                         , only : zsoi
-  use decompMod                          , only : bounds_type
+  use decompMod                          , only : bounds_type, subgrid_level_patch
   use spmdMod                            , only : masterproc
   use abortutils                         , only : endrun
   use CNSharedParamsMod                  , only : CNParamsShareInst, nlev_soildecomp_standard 
@@ -72,7 +72,7 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
   public :: readParams                          ! Read in parameters from params file
   public :: init_decompcascade_mimicsplus       ! Initialization
   public :: decomp_rates_mimicsplus             ! Figure out decomposition rates
-  public :: decomp_rates_after_FUN
+  !public :: decomp_rates_after_FUN
   public :: calc_myc_mining_rates
   public :: calc_myc_mortality
   public :: calc_myc_roi
@@ -1767,113 +1767,113 @@ end subroutine decomp_rates_mimicsplus
 
 
 
-subroutine decomp_rates_after_FUN (bounds, num_bgc_soilc, filter_bgc_soilc, &
-   num_soilp, filter_soilp, &
-   soilstate_inst, cnveg_carbonflux_inst, &
-   soilbiogeochem_carbonflux_inst, soilbiogeochem_nitrogenflux_inst, &
-   soilbiogeochem_carbonstate_inst, soilbiogeochem_nitrogenstate_inst,& 
-   soilbiogeochem_state_inst &
-   )
-! 
-! DESCRIPTION
-!! add a new subroutine decomp_rates_after_FUN, will be called in FUN 
-! col variables, do we have corresponding patch variables
-! patch variables have to be p2c
+! subroutine decomp_rates_after_FUN (bounds, num_bgc_soilc, filter_bgc_soilc, &
+!    num_soilp, filter_soilp, &
+!    soilstate_inst, cnveg_carbonflux_inst, &
+!    soilbiogeochem_carbonflux_inst, soilbiogeochem_nitrogenflux_inst, &
+!    soilbiogeochem_carbonstate_inst, soilbiogeochem_nitrogenstate_inst,& 
+!    soilbiogeochem_state_inst &
+!    )
+! ! 
+! ! DESCRIPTION
+! !! add a new subroutine decomp_rates_after_FUN, will be called in FUN 
+! ! col variables, do we have corresponding patch variables
+! ! patch variables have to be p2c
 
-! USES:
-   use SoilBiogeochemNitrogenFluxType  , only : soilbiogeochem_nitrogenflux_type
-   use SoilBiogeochemNitrogenStateType  , only : soilbiogeochem_nitrogenstate_type
-   use subgridAveMod                    , only : p2c
+! ! USES:
+!    use SoilBiogeochemNitrogenFluxType  , only : soilbiogeochem_nitrogenflux_type
+!    use SoilBiogeochemNitrogenStateType  , only : soilbiogeochem_nitrogenstate_type
+!    use subgridAveMod                    , only : p2c
 
-! ARGUMENTS:
-   type(bounds_type)                    , intent(in)    :: bounds          
-   integer                              , intent(in)    :: num_soilp       ! number of soil patches in filter
-   integer                              , intent(in)    :: filter_soilp(:) ! filter for soil patches
-   integer                              , intent(in)    :: num_bgc_soilc       ! number of soil columns in filter
-   integer                              , intent(in)    :: filter_bgc_soilc(:) ! filter for soil columns
-   type(soilstate_type)                 , intent(in)    :: soilstate_inst
-   type(cnveg_carbonflux_type)          , intent(in)    :: cnveg_carbonflux_inst
-   type(soilbiogeochem_carbonflux_type) , intent(inout) :: soilbiogeochem_carbonflux_inst
-   type(soilbiogeochem_carbonstate_type), intent(in)    :: soilbiogeochem_carbonstate_inst
-   type(soilbiogeochem_carbonflux_type) , intent(inout) :: soilbiogeochem_nitrogenflux_inst
-   type(soilbiogeochem_carbonstate_type), intent(in)    :: soilbiogeochem_nitrogenstate_inst
-   type(soilbiogeochem_state_type)      , intent(in)    :: soilbiogeochem_state_inst
+! ! ARGUMENTS:
+!    type(bounds_type)                    , intent(in)    :: bounds          
+!    integer                              , intent(in)    :: num_soilp       ! number of soil patches in filter
+!    integer                              , intent(in)    :: filter_soilp(:) ! filter for soil patches
+!    integer                              , intent(in)    :: num_bgc_soilc       ! number of soil columns in filter
+!    integer                              , intent(in)    :: filter_bgc_soilc(:) ! filter for soil columns
+!    type(soilstate_type)                 , intent(in)    :: soilstate_inst
+!    type(cnveg_carbonflux_type)          , intent(in)    :: cnveg_carbonflux_inst
+!    type(soilbiogeochem_carbonflux_type) , intent(inout) :: soilbiogeochem_carbonflux_inst
+!    type(soilbiogeochem_carbonstate_type), intent(in)    :: soilbiogeochem_carbonstate_inst
+!    type(soilbiogeochem_carbonflux_type) , intent(inout) :: soilbiogeochem_nitrogenflux_inst
+!    type(soilbiogeochem_carbonstate_type), intent(in)    :: soilbiogeochem_nitrogenstate_inst
+!    type(soilbiogeochem_state_type)      , intent(in)    :: soilbiogeochem_state_inst
 
 
-   !LOCAL VARIABLES:
-   integer   :: fn                    ! number of values in pft filter
-   integer   :: fp                    ! lake filter pft index 
-   integer   :: fc                    ! lake filter column index
-   integer   :: p, c                  ! pft index
-   integer   :: g, l                  ! indices
-   integer   :: j, i, k               ! soil/snow level index
-   real(r8), parameter :: eps = 1.e-6_r8
-   real(r8):: tau_myc ! Mycorrhizal turnover rate for EcM & AM 
-   real(r8):: myc1_conc     ! Carbon concentration in ectomycorrhiza pool
-   real(r8):: myc2_conc     ! Carbon concentration in abruscular mycorrhiza pool
-   real(r8):: avl_som_conc  ! Carbon concentration in avaliable SOM pool
-   real(r8):: chem_som_conc ! Carbon concentration in chemically protected SOM pool
-   real(r8):: phys_som_conc ! Carbon concentration in physically protected SOM pool
-   real(r8):: term_1  !
-   real(r8):: term_2  !
-   real(r8):: t_soi_degC
+!    !LOCAL VARIABLES:
+!    integer   :: fn                    ! number of values in pft filter
+!    integer   :: fp                    ! lake filter pft index 
+!    integer   :: fc                    ! lake filter column index
+!    integer   :: p, c                  ! pft index
+!    integer   :: g, l                  ! indices
+!    integer   :: j, i, k               ! soil/snow level index
+!    real(r8), parameter :: eps = 1.e-6_r8
+!    real(r8):: tau_myc ! Mycorrhizal turnover rate for EcM & AM 
+!    real(r8):: myc1_conc     ! Carbon concentration in ectomycorrhiza pool
+!    real(r8):: myc2_conc     ! Carbon concentration in abruscular mycorrhiza pool
+!    real(r8):: avl_som_conc  ! Carbon concentration in avaliable SOM pool
+!    real(r8):: chem_som_conc ! Carbon concentration in chemically protected SOM pool
+!    real(r8):: phys_som_conc ! Carbon concentration in physically protected SOM pool
+!    real(r8):: term_1  !
+!    real(r8):: term_2  !
+!    real(r8):: t_soi_degC
 
-   associate ( &
-      ! Carbon
-      decomp_cpools_vr => soilbiogeochem_carbonstate_inst%decomp_cpools_vr_col , &  ! Input: [real(r8) (:,:,:) ] (gC/m3)  vertically-resolved decomposing (litter, cwd, soil) C pools
-      pathfrac_decomp_cascade => soilbiogeochem_carbonflux_inst%pathfrac_decomp_cascade_col, &  ! Output: [real(r8) (:,:,:) ]  what fraction of C leaving a given pool passes through a given transition (frac)
-      rf_decomp_cascade       => soilbiogeochem_carbonflux_inst%rf_decomp_cascade_col    , & ! Input:  [real(r8)          (:,:,:) ]  respired fraction in decomposition step (frac)
+!    associate ( &
+!       ! Carbon
+!       decomp_cpools_vr => soilbiogeochem_carbonstate_inst%decomp_cpools_vr_col , &  ! Input: [real(r8) (:,:,:) ] (gC/m3)  vertically-resolved decomposing (litter, cwd, soil) C pools
+!       pathfrac_decomp_cascade => soilbiogeochem_carbonflux_inst%pathfrac_decomp_cascade_col, &  ! Output: [real(r8) (:,:,:) ]  what fraction of C leaving a given pool passes through a given transition (frac)
+!       rf_decomp_cascade       => soilbiogeochem_carbonflux_inst%rf_decomp_cascade_col    , & ! Input:  [real(r8)          (:,:,:) ]  respired fraction in decomposition step (frac)
         
-      decomp_npools_vr      => soilbiogeochem_nitrogenstate_inst%decomp_npools_vr_col         , &
+!       decomp_npools_vr      => soilbiogeochem_nitrogenstate_inst%decomp_npools_vr_col         
 
-      )
+!       )
 
-      ! prep
-      tau_myc = mimicsplus_k_myc_som / secsphr ! Turnover rate mycorrhiza with unit conversions (hourly -> second)
-      tau_myc1 = min(1._r8, max(0._r8, mimicsplus_tau_ecm))
-      fchem_myc1 = min(1._r8, max(0._r8, mimicsplus_fchem_ecm))
-      fphys_myc1 = min(1._r8, max(0._r8, mimicsplus_fphys_ecm))
-      tau_myc2 = min(1._r8, max(0._r8, mimicsplus_tau_am))
-      fchem_myc2 = min(1._r8, max(0._r8, mimicsplus_fchem_am))
-      fphys_myc2 = min(1._r8, max(0._r8, mimicsplus_fphys_am))
-      ! main column loop
-      do fc = 1,num_bgc_soilc
-         c = filter_bgc_soilc(fc)
+!       ! prep
+!       tau_myc = mimicsplus_k_myc_som / secsphr ! Turnover rate mycorrhiza with unit conversions (hourly -> second)
+!       tau_myc1 = min(1._r8, max(0._r8, mimicsplus_tau_ecm))
+!       fchem_myc1 = min(1._r8, max(0._r8, mimicsplus_fchem_ecm))
+!       fphys_myc1 = min(1._r8, max(0._r8, mimicsplus_fphys_ecm))
+!       tau_myc2 = min(1._r8, max(0._r8, mimicsplus_tau_am))
+!       fchem_myc2 = min(1._r8, max(0._r8, mimicsplus_fchem_am))
+!       fphys_myc2 = min(1._r8, max(0._r8, mimicsplus_fphys_am))
+!       ! main column loop
+!       do fc = 1,num_bgc_soilc
+!          c = filter_bgc_soilc(fc)
 
-              ! Mycorrhizal concentration with necerssary unit conversions
-                        ! mgC/cm3 = gC/m3 * (1e3 mg/g) / (1e6 cm3/m3)
-         myc1_conc = (decomp_cpools_vr(c,j,i_ecm_myc) / col%dz(c,j)) * & !ECW is this what goes into ROI function (see end of module)
-         g_to_mg * cm3_to_m3
-         myc2_conc = (decomp_cpools_vr(c,j,i_am_myc) / col%dz(c,j)) * &
-         g_to_mg * cm3_to_m3
+!               ! Mycorrhizal concentration with necerssary unit conversions
+!                         ! mgC/cm3 = gC/m3 * (1e3 mg/g) / (1e6 cm3/m3)
+!          myc1_conc = (decomp_cpools_vr(c,j,i_ecm_myc) / col%dz(c,j)) * & !ECW is this what goes into ROI function (see end of module)
+!          g_to_mg * cm3_to_m3
+!          myc2_conc = (decomp_cpools_vr(c,j,i_am_myc) / col%dz(c,j)) * &
+!          g_to_mg * cm3_to_m3
 
-         ! Soil organic matter concentration with necerssary unit conversions
-         ! mgC/cm3 = gC/m3 * (1e3 mg/g) / (1e6 cm3/m3)
-         avl_som_conc = (decomp_cpools_vr(c,j,i_avl_som) / col%dz(c,j)) * & !ECW This is for Baskaram N mining
-         g_to_mg * cm3_to_m3
-         chem_som_conc = (decomp_cpools_vr(c,j,i_chem_som) / col%dz(c,j)) * &
-         g_to_mg * cm3_to_m3
-         phys_som_conc = (decomp_cpools_vr(c,j,i_phys_som) / col%dz(c,j)) * &
-         g_to_mg * cm3_to_m3
+!          ! Soil organic matter concentration with necerssary unit conversions
+!          ! mgC/cm3 = gC/m3 * (1e3 mg/g) / (1e6 cm3/m3)
+!          avl_som_conc = (decomp_cpools_vr(c,j,i_avl_som) / col%dz(c,j)) * & !ECW This is for Baskaram N mining
+!          g_to_mg * cm3_to_m3
+!          chem_som_conc = (decomp_cpools_vr(c,j,i_chem_som) / col%dz(c,j)) * &
+!          g_to_mg * cm3_to_m3
+!          phys_som_conc = (decomp_cpools_vr(c,j,i_phys_som) / col%dz(c,j)) * &
+!          g_to_mg * cm3_to_m3
 
 
-      ! FLUXES from SOMC 
+!       ! FLUXES from SOMC 
 
-      ! FLUXES from SOMP
+!       ! FLUXES from SOMP
 
-      ! FLUXES from ECM
+!       ! FLUXES from ECM
       
-      ! FLUXES from AM
+!       ! FLUXES from AM
 
-      ! CALCULATE MORTALITY FLUXES
+!       ! CALCULATE MORTALITY FLUXES
 
 
-      ! CALCULATE FLUXES CARBON FLUXES
+!       ! CALCULATE FLUXES CARBON FLUXES
 
-      !
-      end do
-   end associate
-end subroutine decomp_rates_after_FUN
+!       !
+!       end do
+!    end associate
+! end subroutine decomp_rates_after_FUN
 
 subroutine calc_myc_mortality(cpool_myc, npool_myc, m_fr,fc_myc2som, fn_myc2som)
    ! DESCRIPTION:
@@ -1952,8 +1952,8 @@ end subroutine calc_myc_mortality
      fn_mining_somc = 0.0_r8
      if (myc_type == 1) then
       ! check units
-      call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_myc,fc_somp2soma,fn_mining_somp) !,r_myc)
-      call calc_myc_mining_rates(dz, cpool_somc,cpool_myc, npool_myc,fc_somc2soma,fn_mining_somc) !,r_myc)
+      call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_somp,fc_somp2soma,fn_mining_somp) !,r_myc)
+      call calc_myc_mining_rates(dz, cpool_somc,cpool_myc, npool_somc,fc_somc2soma,fn_mining_somc) !,r_myc)
      endif
      
  
@@ -1965,7 +1965,7 @@ end subroutine calc_myc_mortality
       if (cpool_myc > 0.0_r8) then
       roi = (fn_smin2myc + fn_mining_somc + fn_mining_somp) / (params_inst%mimicsplus_k_myc_som / secsphr ) * &
              params_inst%mimicsplus_mge_ecm / cpool_myc
-             if (roi == 0.0_r8) then
+             if (roi <= 0.0_r8) then
                roi = 1.0_r8/big_roi
              end if 
       else
@@ -1975,11 +1975,11 @@ end subroutine calc_myc_mortality
       if (cpool_myc > 0.0_r8) then
          roi = fn_smin2myc/ (params_inst%mimicsplus_k_myc_som / secsphr ) * &
                 params_inst%mimicsplus_mge_am / cpool_myc
-         if (roi == 0.0_r8) then
+         if (roi <= 0.0_r8) then
             roi = 1.0_r8/big_roi
          end if 
       else
-         roi = big_roi
+         roi = 1.0_r8/big_roi
       endif
 
      endif
@@ -1994,8 +1994,9 @@ end subroutine calc_myc_mortality
    ! Mycorrhizal pools have ac constant C:N ratio, these are fullfilled by uptake fluxes from inorganic nitrogen (to EcM & AM), and mining (to EcM). 
    ! The Nitrogen that is left after C:N ratio is fullfilled can go to vegetation (uptake - demand equation)
    ! Under limited nitrogen soil ocnditions, the carbon use efficiency can be lowered
+   use clm_time_manager, only: get_step_size_real
    ! !ARGUMENTS:
-      real(r8), intent(in) :: fc_veg2myc   ! Carbon flux from plant to mycorrhiza
+      real(r8), intent(in) :: fc_veg2myc   ! Carbon flux from plant to mycorrhiza [gC/m2]
       real(r8), intent(in) :: cpool_myc    ! Carbon pool of mycorrhiza [gC/m3] ()
       real(r8), intent(in) :: npool_myc    ! Nitrogen pool of mycorrhiza [gN/m3] ()
       real(r8), intent(in) :: cpool_somp   ! physically protected SOM pool [gC/m3]
@@ -2012,27 +2013,31 @@ end subroutine calc_myc_mortality
       real(r8), intent(out) :: cost_myc_nh4    ! cost function for mycorrhiza in FUN UNITS!!!!
 
    !LOCAL VARIABLES
-   real(r8) :: secphr = 60.0_r8 * 60.0_r8
+   real(r8), parameter :: secphr = 60.0_r8 * 60.0_r8
    real(r8), parameter :: f_enz = 0.1_r8                ! [-]Fraction of C from vegetation to EcM, that goes into SOMa for mining
-   real(r8), parameter :: f_growth = 0.5_r8            ! [-] Fraction of mycorrhizal N uptake that needs to stay within the fungi (not given to plant)
-
+   real(r8), parameter :: small_Value = 1.0e-6_r8
+   real(r8)            :: dt
+   real(r8) :: f_growth         ! [-] Fraction of mycorrhizal N uptake that needs to stay within the fungi (not given to plant)
    real(r8) :: fn_myc2veg                           ! nitrogen fluxes mycorrhiza to vegetation
-   real(r8) :: fn_smin2myc                          ! nitrogen flux from mineral soil to myc [gN/m2/s]
-   real(r8) :: fc_somp2soma,fc_somc2soma            ! carbon fluxes som to som due to mining [gC/m2/s]
-   real(r8) :: fn_mining_somc,fn_mining_somp        ! nitrogen fluxes to som to myc (mining + scavenging) [gN/m2/s]
+   real(r8) :: fn_smin2myc                          ! nitrogen flux from mineral soil to myc [gN/m3/s]
+   real(r8) :: fc_somp2soma,fc_somc2soma            ! carbon fluxes som to som due to mining [gC/m3/s]
+   real(r8) :: fn_mining_somc,fn_mining_somp        ! nitrogen fluxes to som to myc (mining + scavenging) [gN/m3/s]
 
    real(r8) ::     N_demand_myc   ![gN/m3 h]
    real(r8) ::     N_uptake_myc   ![gN/m3 h]
    real(r8) ::     c_use_eff      ! carbon use efficiency [-]
+
+   dt=get_step_size_real()
 
    if (myc_type == 1) then
       c_use_eff = params_inst%mimicsplus_mge_ecm
    else
       c_use_eff = params_inst%mimicsplus_mge_am
    endif
-
+   f_growth = c_use_eff ! in original mimics+ code this is used for some reasom, so here it is for consistency
+   ! Change this back to 0.5 coming from parameter file at some point
    fn_smin2myc = (params_inst%mimicsplus_vmax_myc / secphr) * sminn / dz * &
-                 (cpool_myc / (cpool_myc + params_inst%mimicsplus_k_m_emyc)) !ECW double check thats ecphr is correct here
+                 (cpool_myc / (cpool_myc + params_inst%mimicsplus_k_m_emyc)) 
 
    ! Initialize mining rates
    fc_somp2soma = 0.0_r8
@@ -2040,8 +2045,8 @@ end subroutine calc_myc_mortality
    fn_mining_somp = 0.0_r8
    fn_mining_somc = 0.0_r8
    if (myc_type == 1) then
-    call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_myc,fc_somp2soma,fn_mining_somp)
-    call calc_myc_mining_rates(dz, cpool_somc,cpool_myc, npool_myc,fc_somc2soma,fn_mining_somc)
+    call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_somp,fc_somp2soma,fn_mining_somp) ! gN/m3/s
+    call calc_myc_mining_rates(dz, cpool_somc,cpool_myc, npool_somc,fc_somc2soma,fn_mining_somc)
    endif
 
 
@@ -2049,7 +2054,7 @@ end subroutine calc_myc_mortality
    if (myc_type == 1) then 
       !fn_myc_veg = (fn_smin2myc + fn_somc2myc_ecm + fn_somp2myc_ecm) - c_use_eff * fc_veg2myc * (1.0_r8 - f_enz) / params_inst%mimicsplus_cn_myc
       N_uptake_myc = fn_smin2myc + fn_mining_somc + fn_mining_somp
-      N_demand_myc = c_use_eff * fc_veg2myc * (1.0_r8 - f_enz) / params_inst%mimicsplus_cn_myc
+      N_demand_myc = c_use_eff * fc_veg2myc * (1.0_r8 - f_enz) / params_inst%mimicsplus_cn_myc / dz / dt !gC/m3/s
       if (N_uptake_myc > N_demand_myc) then
          fn_myc2veg = N_uptake_myc - N_demand_myc
       else
@@ -2067,17 +2072,17 @@ end subroutine calc_myc_mortality
          end if
    end if
 
-   if (fn_myc2veg > 0) then
-      if (sminfrc_no3 > 0) then
-         cost_myc_no3 = fc_veg2myc / (fn_myc2veg) / sminfrc_no3
-         if ( (1.0_r8 - sminfrc_no3)> 0) then
-            cost_myc_nh4 = fc_veg2myc / (fn_myc2veg) / (1.0_r8 - sminfrc_no3)
+   if (fn_myc2veg > small_Value) then
+      if (sminfrc_no3 > small_Value) then
+         cost_myc_no3 = fc_veg2myc / (fn_myc2veg) / sminfrc_no3 / dz / dt
+         if ( (1.0_r8 - sminfrc_no3)> small_Value) then
+            cost_myc_nh4 = fc_veg2myc / (fn_myc2veg) / (1.0_r8 - sminfrc_no3) / dz / dt
          else
             cost_myc_nh4 = big_cost
          end if
       else
          cost_myc_no3 = big_cost
-         cost_myc_nh4 = fc_veg2myc / (fn_myc2veg) / (1.0_r8 - sminfrc_no3)
+         cost_myc_nh4 = fc_veg2myc / (fn_myc2veg) / (1.0_r8 - sminfrc_no3) / dz / dt
       endif
    else 
       cost_myc_no3 = big_cost
@@ -2089,7 +2094,7 @@ end subroutine calc_myc_mortality
 
 
 
-  subroutine calc_myc_mining_rates(dz, cpool_som,cpool_myc, npool_myc, fc_som2soma,fn_mining_som)
+  subroutine calc_myc_mining_rates(dz, cpool_som,cpool_myc, npool_som, fc_som2soma,fn_mining_som)
 
    ! DESCRIPTION:
    ! Calculates mining of ectomycorrhizal fungi for nitrogen in soil organic matter pools.
@@ -2102,20 +2107,25 @@ end subroutine calc_myc_mortality
    ! ARGUMENTS:
    real(r8), intent(in) :: cpool_som          ! SOM pool [gC/m3]
    real(r8), intent(in) :: cpool_myc          ! Carbon pool of mycorrhiza [gC/m3]
-   real(r8), intent(in) :: npool_myc          ! Nitrogen pool of mycorrhiza [gC/m3]
+   real(r8), intent(in) :: npool_som          ! Nitrogen pool of soil [gC/m3]
    real(r8), intent(in) :: dz                 ! layer thickness [m]
    real(r8), intent(inout) :: fc_som2soma     ! carbon flux to available SOM pool [gC/m3/s]
    real(r8), intent(inout) :: fn_mining_som   ! nitrogen mining flux [gN/m3/s]
 
    ! LOCAL VARIABLES:
    real(r8) :: secphr = 60.0_r8 * 60.0_r8
-   real(r8), parameter :: small_flux = 1.e-14_r8
+   real(r8), parameter :: small_value = 1.e-10_r8
    
    ! SOM carbon flux
    fc_som2soma = (params_inst%mimicsplus_k_mo / secphr) * dz * cpool_myc * cpool_som
    ! Nitrogen mining flux
-   if (cpool_myc > small_flux) then
-     fn_mining_som = fc_som2soma * (npool_myc / cpool_myc )
+   if (fc_som2soma > small_value) then
+     if (npool_som > small_value) then
+     fn_mining_som = fc_som2soma * (npool_som / cpool_som )
+     else
+        fn_mining_som = 0.0_r8
+        fc_som2soma = 0.0_r8
+     endif
    else 
      fn_mining_som = 0.0_r8
      fc_som2soma = 0.0_r8
@@ -2155,10 +2165,10 @@ end subroutine calc_myc_mortality
       ! FUN fluxes 
    real(r8), intent(inout) :: fc_veg2myc_no3           ! Carbon flux from plant to mycorrhiza                        [gC/m2] 
    real(r8), intent(inout) :: fc_veg2myc_nh4           ! Carbon flux from plant to mycorrhiza                        [gC/m2]
-   real(r8), intent(inout) :: no3_from_nonmyc          ! nitrogen flux from non mycorrhizal pool to vegetation (NO3) [gN/m2]
-   real(r8), intent(inout) :: nh4_from_nonmyc          ! nitrogen flux from non mycorrhizal pool to vegetation (NH4) [gN/m2]
-   real(r8), intent(inout) :: no3_from_myc             ! nitrogen flux from mycorrhizal pool to vegetation (NO3)     [gN/m2]
-   real(r8), intent(inout) :: nh4_from_myc             ! nitrogen flux from mycorrhizal pool to vegetation (NH4)     [gN/m2]
+   real(r8), intent(inout) :: no3_from_nonmyc          ! nitrogen flux from non mycorrhizal pool to vegetation (NO3) [gN/m3]
+   real(r8), intent(inout) :: nh4_from_nonmyc          ! nitrogen flux from non mycorrhizal pool to vegetation (NH4) [gN/m3]
+   real(r8), intent(inout) :: no3_from_myc             ! nitrogen flux from mycorrhizal pool to vegetation (NO3)     [gN/m3]
+   real(r8), intent(inout) :: nh4_from_myc             ! nitrogen flux from mycorrhizal pool to vegetation (NH4)     [gN/m3]
 
    real(r8), intent(inout) :: fn_smin_no3_2myc         ! nitrogen flux from inorganic NO3 pool to mycorrhiza [gN/m2]
    real(r8), intent(inout) :: fn_smin_nh4_2myc         ! nitrogen flux from inorganic NH4 pool to mycorrhiza [gN/m2]
@@ -2191,6 +2201,7 @@ end subroutine calc_myc_mortality
    real(r8) :: no3_unpaid, nh4_unpaid                   ! nitrogen that did not actually reach the plant [gN/m2]
    real(r8) :: smin_overflow                            ! How much N mycorrhiza and non mycorrhiza promised to take out of soil and give to plant
    real(r8) :: l_no3_frac
+   real(r8), parameter :: small_value =1.0e-7_r8 
 
    character(len=256) :: message
 
@@ -2253,17 +2264,39 @@ end subroutine calc_myc_mortality
    (cpool_myc / (cpool_myc + params_inst%mimicsplus_k_m_emyc)) * dt ! multiplied by dt to get it in same units as no3_from_nonmyc
    fn_smin_no3_2myc = fn_smin2myc * sminfrc_no3
    fn_smin_nh4_2myc = fn_smin2myc * (1.0_r8 - sminfrc_no3)
-   ! If there is not enough nitrogen in the soil mineral, NO3 and NH4
-   if (fn_smin_no3_2myc + no3_from_nonmyc > sminn * sminfrc_no3) then
-      smin_overflow = sminn * sminfrc_no3 - (fn_smin_no3_2myc + no3_from_nonmyc) ! NO3 that is actually in soil - 
-      fn_smin_no3_2myc = fn_smin_no3_2myc - smin_overflow * fn_smin_no3_2myc / (fn_smin_no3_2myc + no3_from_nonmyc) ! mycorrhiza limit uptake from inorganic N pools
-      no3_from_nonmyc = no3_from_nonmyc - smin_overflow * no3_from_nonmyc / (fn_smin_no3_2myc + no3_from_nonmyc)    ! non mycorrhiza limit uptake from inorganic N pools
+   if (sminn * sminfrc_no3 <= small_value) then
+      fn_smin_no3_2myc = 0.0_r8
+      no3_from_nonmyc = 0.0_r8
+   else
+     ! If there is not enough nitrogen in the soil mineral, NO3 and NH4
+      if (fn_smin_no3_2myc + no3_from_nonmyc > sminn * sminfrc_no3) then
+         smin_overflow =  (fn_smin_no3_2myc + no3_from_nonmyc) -  sminn * sminfrc_no3! NO3 that is actually in soil - 
+         fn_smin_no3_2myc = fn_smin_no3_2myc - smin_overflow * fn_smin_no3_2myc / (sminn * sminfrc_no3 + smin_overflow ) ! mycorrhiza limit uptake from inorganic N pools
+         no3_from_nonmyc = no3_from_nonmyc - smin_overflow * no3_from_nonmyc / (sminn * sminfrc_no3 + smin_overflow)    ! non mycorrhiza limit uptake from inorganic N pools
+         if (& 
+            no3_from_nonmyc < 0.0_r8 .or. fn_smin_no3_2myc < 0.0_r8) then 
+            write(iulog,*) 'ERROR: type,myc, nonmyc, sminno3', myc_type, fn_smin_no3_2myc, no3_from_nonmyc, sminn *sminfrc_no3 - smin_overflow, sminfrc_no3 * sminn, fn_smin2myc
+            call endrun(                             msg= errMsg(sourcefile,  __LINE__))
+         end if
+      endif
+    end if 
+    if (sminn *(1.0_r8 - sminfrc_no3) <= small_value) then
+      nh4_from_nonmyc = 0.0_r8
+      fn_smin_nh4_2myc = 0.0_r8
+   else
+      if (fn_smin_nh4_2myc + nh4_from_nonmyc > sminn * (1.0_r8 - sminfrc_no3)) then
+         smin_overflow = (fn_smin_nh4_2myc + nh4_from_nonmyc) - sminn * (1.0_r8 - sminfrc_no3)
+         fn_smin_nh4_2myc = fn_smin_nh4_2myc - smin_overflow * fn_smin_nh4_2myc / (sminn * (1.0_r8 - sminfrc_no3) + smin_overflow)
+         nh4_from_nonmyc = nh4_from_nonmyc - smin_overflow * nh4_from_nonmyc / (sminn * (1.0_r8 - sminfrc_no3) + smin_overflow)
+         if ( & 
+            nh4_from_nonmyc < 0.0_r8 .or. fn_smin_nh4_2myc < 0.0_r8) then 
+            write(iulog,*) 'ERROR: type,myc, nonmyc, sminnh4', myc_type, fn_smin_nh4_2myc, nh4_from_nonmyc, sminn * (1.0_r8 - sminfrc_no3) - smin_overflow, (1.0_r8 - sminfrc_no3) * sminn, fn_smin2myc
+            call endrun(                             msg= errMsg(sourcefile,  __LINE__))
+         end if
+      endif
    endif
-   if (fn_smin_nh4_2myc + nh4_from_nonmyc > sminn * (1.0_r8 - sminfrc_no3)) then
-      smin_overflow = sminn * (1.0_r8 - sminfrc_no3) - (fn_smin_nh4_2myc + nh4_from_nonmyc)
-      fn_smin_nh4_2myc = fn_smin_nh4_2myc - smin_overflow * fn_smin_nh4_2myc / (fn_smin_nh4_2myc + nh4_from_nonmyc)
-      nh4_from_nonmyc = nh4_from_nonmyc - smin_overflow * nh4_from_nonmyc / (fn_smin_nh4_2myc + nh4_from_nonmyc)
-   endif
+
+
 
    ! use new fraction and sminn if they got limited
    fn_smin2myc = (fn_smin_no3_2myc + fn_smin_nh4_2myc) /dz /dt ! put it back to gN/m3/s to be consistent with mining fluxes
@@ -2273,28 +2306,32 @@ end subroutine calc_myc_mortality
       l_no3_frac = 1.0_r8
    endif
 
-
-   
+   fc_veg2myc=(fc_veg2myc_no3 + fc_veg2myc_nh4)/dz/dt
    if (myc_type == 1) then                                                ! EcM
-      call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_myc,l_fc_somp2soma,l_fn_mining_somp)
-      call calc_myc_mining_rates(dz, cpool_somc,cpool_myc, npool_myc,l_fc_somc2soma,l_fn_mining_somc)
-      N_demand_myc = c_use_eff * (1 - f_enz) * (fc_veg2myc_no3 + fc_veg2myc_nh4) / params_inst%mimicsplus_cn_myc / dz / dt
+      call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_somp,l_fc_somp2soma,l_fn_mining_somp)
+      call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_somc,l_fc_somc2soma,l_fn_mining_somc)
+   if ( cpool_somc < 0.0_r8 .or. cpool_myc < 0.0_r8  .or. & 
+        npool_myc < 0.0_r8 .or.  cpool_somp < 0.0_r8) then 
+     write(iulog,*) 'ERROR: cpool_som,cpool_myc,npool_my',cpool_somp,cpool_somc,cpool_myc, npool_myc,l_fc_somp2soma,l_fn_mining_somp
+     call endrun(                             msg= errMsg(sourcefile,  __LINE__))
+   end if
+      N_demand_myc = c_use_eff * (1.0_r8 - f_enz) * fc_veg2myc / params_inst%mimicsplus_cn_myc 
       N_uptake_myc = fn_smin2myc + l_fn_mining_somp + l_fn_mining_somc 
       if (N_uptake_myc > N_demand_myc) then
          fn_myc2veg = N_uptake_myc - N_demand_myc                        ! N flux myc -> veg
          n_myc_growth = N_demand_myc                                     ! How much N the need to grow
-         l_c_ecm_enz  = fc_veg2myc * f_enz
+         l_c_ecm_enz  = fc_veg2myc * f_enz * c_use_eff
          ! we add the enzymes here into the EcM pool because we first took them away, but now add them again
-         c_myc_growth = n_myc_growth * params_inst%mimicsplus_cn_myc + l_c_ecm_enz
-         ! enzyme flux will go to soma pool in the next update routine
-         c_myc_resp  = fc_veg2myc - c_myc_growth                          ! C that they don't need to grow
+         c_myc_growth = n_myc_growth * params_inst%mimicsplus_cn_myc
+         ! enzyme flux will go to soma pool in the next update 
+         c_myc_resp  = fc_veg2myc - (c_myc_growth + l_c_ecm_enz)                          ! C that they don't need to grow
       else ! less N in soil, so we limit N flux to vegetaion and mycorrhiza N demand so their sum is equal to N uptake
          fn_myc2veg = (1-f_growth) * N_uptake_myc
+         c_use_eff = f_growth * N_uptake_myc * params_inst%mimicsplus_cn_myc / (1.0_r8 - f_enz) / fc_veg2myc
          n_myc_growth = f_growth * N_uptake_myc
-         l_c_ecm_enz  = fc_veg2myc * f_enz
-         ! we add the enzymes here into the EcM pool because we first took them away, but now add them again
-         c_myc_growth = n_myc_growth * params_inst%mimicsplus_cn_myc + l_c_ecm_enz
-         c_myc_resp  = fc_veg2myc - c_myc_growth                          ! C that they don't need to grow
+         l_c_ecm_enz  = fc_veg2myc * f_enz * c_use_eff
+         c_myc_growth = c_use_eff * fc_veg2myc
+         c_myc_resp  = fc_veg2myc - (c_myc_growth + l_c_ecm_enz)                          ! C that they don't need to grow
       end if
 
       ! update inout optional arguments
@@ -2315,7 +2352,7 @@ end subroutine calc_myc_mortality
       end if
 
    else                                                                   ! AM 
-      N_demand_myc = c_use_eff * (fc_veg2myc_no3 + fc_veg2myc_nh4) / params_inst%mimicsplus_cn_myc / dz / dt
+      N_demand_myc = c_use_eff * (fc_veg2myc) / params_inst%mimicsplus_cn_myc
       N_uptake_myc = fn_smin2myc
       if (N_uptake_myc > N_demand_myc) then
          fn_myc2veg = N_uptake_myc - N_demand_myc                        ! N flux myc -> veg
@@ -2335,6 +2372,7 @@ end subroutine calc_myc_mortality
    fnh4_myc2veg = fn_myc2veg * (1 - l_no3_frac)
    no3_unpaid = fno3_myc2veg * dz * dt - no3_from_myc ! plants did not actually get all the promised nitrogen (NO3 / NH4)
    nh4_unpaid = fnh4_myc2veg * dz * dt - nh4_from_myc
+
    !if (no3_unpaid + nh4_unpaid < 0) then
    !   message = "N flux from AM mycorrhiza to plant is greater than mycorrhiza can actually give to the plant"
    !   call endrun(msg=message)
@@ -2343,10 +2381,14 @@ end subroutine calc_myc_mortality
       no3_from_myc = fno3_myc2veg * dz * dt   ! if we can give more nitrogen than we promised just give it
       nh4_from_myc = fnh4_myc2veg * dz * dt 
    !endif
-
+   if ( no3_from_myc < 0.0_r8 .or. nh4_from_myc < 0.0_r8  & 
+        ) then 
+     write(iulog,*) 'ERROR: type,no3_from_myc, nh4_from_myc',myc_type, no3_from_myc, nh4_from_myc, fc_veg2myc_no3,fc_veg2myc_nh4, l_no3_frac, l_fn_mining_somp,l_fn_mining_somc
+     call endrun(                             msg= errMsg(sourcefile,  __LINE__))
+   end if
   end subroutine fun_fluxes_myc_update1
   
-  
+
           
   !Moisture function, based on testbed code: https://github.com/wwieder/biogeochem_testbed/blob/957a5c634b9f2d0b4cdba0faa06b5a91216ace33/SOURCE_CODE/mimics_cycle.f90#L401-L419
   real(r8) function r_moist(h2osoi_liq,watsat, h2osoi_ice, dz) !As in testbed (and CLM) version of MIMICS            
