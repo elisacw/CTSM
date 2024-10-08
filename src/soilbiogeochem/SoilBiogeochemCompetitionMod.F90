@@ -604,6 +604,7 @@ contains
                      else
                         ! RF added new term. send rest of N to plant - which decides whether it should pay or not? 
                         smin_nh4_to_plant_vr(c,j) = smin_nh4_vr(c,j)/dt - actual_immob_nh4_vr(c,j) - f_nit_vr(c,j)
+                        unmet_plant_demand_nh4(c,j) = plant_ndemand(c) * nuptake_prof(c,j) - smin_nh4_to_plant_vr(c,j)
                      end if
                     
                   else
@@ -696,7 +697,7 @@ contains
                                   
                         ! RF added new term. send rest of N to plant - which decides whether it should pay or not? 
                         smin_no3_to_plant_vr(c,j) = (smin_no3_vr(c,j) / dt) - actual_immob_no3_vr(c,j) - f_denit_vr(c,j)
-                        
+                        unmet_plant_demand_no3(c,j) = (plant_ndemand(c)*nuptake_prof(c,j)-smin_nh4_to_plant_vr(c,j)) - smin_no3_to_plant_vr(c,j)
   
                      end if ! use_fun
 
