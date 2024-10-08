@@ -2422,7 +2422,7 @@ end subroutine calc_myc_mortality
    fn_smin_myc = (params_inst%mimicsplus_vmax_myc / secphr) * sminn * &  
                  (cpool_myc / (cpool_myc + params_inst%mimicsplus_k_m_emyc)) * dt
 
-    if (present(fc_somp)) then                                                                  !checks if flux SOMp to SOMa avaliable, to check for mining
+    if (present(fc_somp)) then
       call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_somp,fc_somp,fn_mining_somp)
       call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_somc,fc_somc,fn_mining_somc)
     end if
@@ -2460,11 +2460,11 @@ end subroutine calc_myc_mortality
 
   N_uptake_myc = fn_to_myc
 
-  if (present(fc_myc_enz)) then                                                          ! ECM
+  if (present(fc_myc_enz)) then ! ECM
      N_demand_myc = c_use_eff * (1.0_r8 - f_enz) * fc_to_myc / params_inst%mimicsplus_cn_myc 
      if (N_uptake_myc > N_demand_myc) then
-        fn_to_veg = N_uptake_myc - N_demand_myc                                          ! N flux myc -> veg
-        fn_myc_growth = N_demand_myc                                                     ! How much N the need to grow
+        fn_to_veg = N_uptake_myc - N_demand_myc                        ! N flux myc -> veg
+        fn_myc_growth = N_demand_myc                                     ! How much N the need to grow
         fc_myc_enz  = fc_to_myc * f_enz * c_use_eff
         fc_myc_growth = fn_myc_growth * params_inst%mimicsplus_cn_myc
         ! enzyme flux will go to soma pool in the next update 
@@ -2475,10 +2475,10 @@ end subroutine calc_myc_mortality
         fn_myc_growth = f_growth * N_uptake_myc
         fc_myc_enz  = fc_to_myc * f_enz * c_use_eff
         fc_myc_growth = c_use_eff * fc_to_myc
-        fc_myc_resp  = fc_to_myc - (fc_myc_growth + fc_myc_enz)                           ! C that they don't need to grow
+        c_myc_resp  = fc_to_myc - (fc_myc_growth + fc_myc_enz)                          ! C that they don't need to grow
       end if
   else
-  N_demand_myc = c_use_eff * (fc_to_myc) / params_inst%mimicsplus_cn_myc                 ! AM
+  N_demand_myc = c_use_eff * (fc_to_myc) / params_inst%mimicsplus_cn_myc
   end if
 
 
