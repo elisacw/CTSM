@@ -800,7 +800,7 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
       ! Mycorrhizal Uptake Cost
       do j = 1,nlevdecomp
          rootc_dens_step             = rootc_dens(p,j)
-         costs_paths(p,j,ipano3:ipnmnh4)=big_cost
+         costs_paths(p,j,ipecm:ipam)=big_cost
          if (rootc_dens_step > 0.0_r8) then
          call calc_myc_roi(decomp_cpools_vr(c,j,i_ecm_myc),decomp_npools_vr(c,j,i_ecm_myc) , &
          decomp_cpools_vr(c,j,i_phys_som),decomp_cpools_vr(c,j,i_avl_som),decomp_cpools_vr(c,j,i_chem_som), &
@@ -858,7 +858,7 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
              rootc_dens_step             = rootc_dens(p,j) 
              if (rootc_dens_step > 0._r8) then
                npp_frac_paths(p,j,ipecm) = (1._r8/costs_paths(p,j,ipecm)) / total_N_conductance
-               npp_frac_paths(p,j,ipan) = (1._r8/costs_paths(p,j,ipan)) / total_N_conductance
+               npp_frac_paths(p,j,ipam) = (1._r8/costs_paths(p,j,ipam)) / total_N_conductance
                npp_frac_paths(p,j,ipnmno3) = (1._r8/costs_paths(p,j,ipnmno3)) / total_N_conductance
                if(FIX==plants_are_fixing)then
                   npp_frac_paths(p,j,ipfix) = (1.0_r8 * 1._r8/costs_paths(p,j,ipfix)) / total_N_conductance
@@ -997,7 +997,7 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
           do j = 1,nlevdecomp
             N_before_corr(1:npaths) = n_from_paths(p,j,1:npaths)
             C_before_corr(1:npaths) = npp_to_paths(p,j,1:npaths)
-            if ((sminn_layer_step(p,j,imyc)) > 0.0_r8 .) then
+            if ((sminn_layer_step(p,j,imyc)) > 0.0_r8) then
                 sminno3_to_ecm_vr_patch(p,j) = 0.0_r8
                 sminnh4_to_ecm_vr_patch(p,j) = 0.0_r8
                 call fun_fluxes_myc_update1 (decomp_cpools_vr(c,j,i_ecm_myc),decomp_npools_vr(c,j,i_ecm_myc), &
