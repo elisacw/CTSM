@@ -2475,7 +2475,7 @@ end subroutine calc_myc_mortality
         fn_myc_growth = f_growth * N_uptake_myc
         fc_myc_enz  = fc_to_myc * f_enz * c_use_eff
         fc_myc_growth = c_use_eff * fc_to_myc
-        c_myc_resp  = fc_to_myc - (fc_myc_growth + fc_myc_enz)                          ! C that they don't need to grow
+        fc_myc_resp  = fc_to_myc - (fc_myc_growth + fc_myc_enz)                          ! C that they don't need to grow
       end if
   else
   N_demand_myc = c_use_eff * (fc_to_myc) / params_inst%mimicsplus_cn_myc
