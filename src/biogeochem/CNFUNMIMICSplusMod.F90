@@ -666,7 +666,7 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
       p = filter_soilp(fp)
       c = patch%column(p)
       ! make sure the accumulated vars are zeroed before accumulating
-      n_uptake_myc_frac(p,:)=0.0_r8
+      n_uptake_myc_frac(p)=0.0_r8
       do j = 1, nlevdecomp
          c_am_resp_vr_patch(p,j)       =0.0_r8     ! carbon respiration flux for AM mycorrhiza
          c_ecm_resp_vr_patch(p,j)      =0.0_r8    ! carbon respiration flux for ECM mycorrhiza
@@ -700,10 +700,10 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
          (smin_no3_to_plant_vr(c,j) + smin_nh4_to_plant_vr(c,j)) * dt, am_step , dzsoi_decomp(j),big_cost, roi_am)
          frac_alloc_ecm=(roi_ecm)/(roi_ecm + roi_am) !
          if (crootfr(p,j)>0.0_r8) then
-            n_uptake_myc_frac(p,ecm_step) = n_uptake_myc_frac(p,ecm_step) + frac_alloc_ecm * crootfr(p,j)
+            n_uptake_myc_frac(p) = n_uptake_myc_frac(p) + frac_alloc_ecm * crootfr(p,j)
          endif
       end do
-      n_uptake_myc_frac(p,am_step) = 1.0_r8 - n_uptake_myc_frac(p,ecm_step)
+      n_uptake_myc_frac(p) = 1.0_r8 - n_uptake_myc_frac(p)
 
      if(leafc(p)>0.0_r8)then                       ! N available in leaf which fell off in this timestep. Same fraction loss as C.    
           litterfall_c_step(p)         =   dt * leafc_to_litter_fun(p) 
@@ -885,7 +885,7 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
 
           free_n_retrans = 0.0_r8
           !  Calculate appropriate degree of retranslocation
-          if(leafc(p).gt.0.0_r8.and.litterfall_n_step(p,1)* fixerfrac>0.0_r8.and.ivt(p) <npcropmin)then
+          if(leafc(p).gt.0.0_r8.and.litterfall_n_step(p)* fixerfrac>0.0_r8.and.ivt(p) <npcropmin)then
              call fun_retranslocation(p,dt,npp_to_spend,&
                            litterfall_c_step(p)* fixerfrac,&
                            litterfall_n_step(p)* fixerfrac,&
@@ -996,13 +996,13 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
           do j = 1,nlevdecomp
             N_before_corr(1:npaths) = n_from_paths(p,j,1:npaths)
             C_before_corr(1:npaths) = npp_to_paths(p,j,1:npaths)
-            if ((sminn_layer_step(p,j,imyc)) > 0.0_r8) then
+            if ((sminn_layer_step(p,j)) > 0.0_r8) then
                 sminno3_to_ecm_vr_patch(p,j) = 0.0_r8
                 sminnh4_to_ecm_vr_patch(p,j) = 0.0_r8
                 call fun_fluxes_myc_update1 (decomp_cpools_vr(c,j,i_ecm_myc),decomp_npools_vr(c,j,i_ecm_myc), &
                 decomp_cpools_vr(c,j,i_phys_som),decomp_cpools_vr(c,j,i_avl_som),decomp_cpools_vr(c,j,i_chem_som), &
                 decomp_npools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_chem_som), &
-                sminn_layer_step(p,j,imyc), sminfrc(c,j), ecm_step, dzsoi_decomp(j), &
+                sminn_layer_step(p,j), sminfrc(c,j), ecm_step, dzsoi_decomp(j), &
                 npp_to_paths(p,j,ipano3), npp_to_paths(p,j,ipanh4), &
                 n_from_paths(p,j,ipnmno3), n_from_paths(p,j,ipnmnh4),n_from_paths(p,j,ipano3), n_from_paths(p,j,ipanh4), &
                 sminno3_to_ecm_vr_patch(p,j), sminnh4_to_ecm_vr_patch(p,j), &
@@ -1015,7 +1015,7 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
               sminnh4_to_ecm_vr_patch(p,j) = sminnh4_to_ecm_vr_patch(p,j)/(dzsoi_decomp(j)*dt)
               if (sminno3_to_am_vr_patch(p,j) + sminno3_to_am_vr_patch(p,j) + &
                   sminnh4_to_ecm_vr_patch(p,j) + sminnh4_to_ecm_vr_patch(p,j) + &
-                   n_from_paths(p,j,ipnmno3) +  n_from_paths(p,j,ipnmnh4) > sminn_layer_step(p,j,imyc) ) then 
+                   n_from_paths(p,j,ipnmno3) +  n_from_paths(p,j,ipnmnh4) > sminn_layer_step(p,j) ) then 
                  write(iulog,*) 'ERROR: myc_type is=',imyc
                  write(iulog,*) 'ERROR: N before corrections=',N_before_corr
                  write(iulog,*) 'ERROR: More N acquired before correcting for sminn diff: ', sum(n_from_paths(p,j,ipano3:ipnmnh4)), n_from_paths(p,j,:)
@@ -1066,22 +1066,22 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
             npp_to_spend    = npp_to_spend   - C_spent - (N_acquired  * plantCN(p)*(1.0_r8+ grperc(ivt(p))))
             
             ! Accumulate those fluxes
-            nt_uptake(p,imyc)             = nt_uptake(p,imyc)       + N_acquired
-            npp_uptake(p,imyc)            = npp_uptake(p,imyc)      + C_spent
+            nt_uptake(p)             = nt_uptake(p)       + N_acquired
+            npp_uptake(p)            = npp_uptake(p)      + C_spent
 
 
             !-------------------- N flux accumulation------------!
             do ipath = ipano3,ipnmnh4
-               n_paths_acc(p,imyc,ipath) = n_paths_acc(p,imyc,ipath) + n_from_paths(p,j,ipath)
+               n_paths_acc(p,ipath) = n_paths_acc(p,ipath) + n_from_paths(p,ipath)
             end do
             !-------------------- C flux accumulation------------!
             do ipath = ipano3,ipnmnh4
-               npp_paths_acc(p,imyc,ipath) = npp_paths_acc(p,imyc,ipath) + npp_to_paths(p,j,ipath)
+               npp_paths_acc(p,ipath) = npp_paths_acc(p,ipath) + npp_to_paths(p,ipath)
             end do
                
             if(FIX == plants_are_fixing)then
-               n_paths_acc(p,imyc,ipfix)     = n_paths_acc(p,imyc,ipfix)     + n_from_paths(p,j,ipfix)
-               npp_paths_acc(p,imyc,ipfix)   = npp_paths_acc(p,imyc,ipfix)   + npp_to_paths(p,j,ipfix) 
+               n_paths_acc(p,ipfix)     = n_paths_acc(p,ipfix)     + n_from_paths(p,ipfix)
+               npp_paths_acc(p,ipfix)   = npp_paths_acc(p,ipfix)   + npp_to_paths(p,ipfix) 
             end if
        
           end do
@@ -1127,10 +1127,10 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
               if (sminn_to_plant_fun_vr(p,j) < 0.0_r8) then
                  write(iulog,*) 'ERROR: sminn_to_plant_fun_vr=', sminn_to_plant_fun_vr(p,j)
                  write(iulog,*) 'ERROR: free_retransn_to_npool=', free_retransn_to_npool(p)
-                 write(iulog,*)  'n_uptake_myc_frac_ecm=',   n_uptake_myc_frac(p,ecm_step)
-                  write(iulog,*)  'n_uptake_myc_frac_ecm=',   n_uptake_myc_frac(p,am_step)
-                  write(iulog,*)  ' sminn_layer_step_ecm=', sminn_layer_step(p,j,ecm_step)
-                  write(iulog,*)  ' sminn_layer_step_am=', sminn_layer_step(p,j,am_step)
+                 write(iulog,*)  'n_uptake_myc_frac_ecm=',   n_uptake_myc_frac(p)
+                  write(iulog,*)  'n_uptake_myc_frac_ecm=',   n_uptake_myc_frac(p)
+                  write(iulog,*)  ' sminn_layer_step_ecm=', sminn_layer_step(p,j)
+                  write(iulog,*)  ' sminn_layer_step_am=', sminn_layer_step(p,j)
                  do ipath = 1, npaths
                  write(iulog,*) 'n_from_paths:', n_from_paths(p,j,ipath), npp_to_paths(p,j,ipath)
                  end do
@@ -1145,8 +1145,8 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
              Nactive_nh4(p) = sum(n_paths_acc(p,ipanh4)) / dt
              Nnonmyc_no3(p) = sum(n_paths_acc(p,ipnmno3)) / dt
              Nnonmyc_nh4(p) = sum(n_paths_acc(p,ipnmnh4)) / dt
-             Necm(p) = sum(n_paths_acc(p,ecm_step,ipano3:ipanh4)) / dt
-             Nam(p) = sum(n_paths_acc(p,am_step,ipano3:ipanh4)) / dt
+             Necm(p) = sum(n_paths_acc(p,ipano3:ipanh4)) / dt
+             Nam(p) = sum(n_paths_acc(p,ipano3:ipanh4)) / dt
              Nnonmyc(p) = Nnonmyc_no3(p) + Nnonmyc_nh4(p)
             
              plant_ndemand_retrans(p)  = plant_ndemand_retrans(p)/dt
