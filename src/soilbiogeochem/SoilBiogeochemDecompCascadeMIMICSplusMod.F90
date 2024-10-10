@@ -78,6 +78,8 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
   public :: calc_myc_roi
   public :: cost_FUN
   public :: fun_fluxes_myc_update1
+  public :: myc_n_extraction
+  public :: myc_cn_fluxes
   private :: r_moist                            ! calculates moisture modifier according to CORPSE
   !
   ! !PUBLIC DATA MEMBERS 

@@ -1085,14 +1085,14 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
                   n_from_paths(p,j,ipam), n_am_growth_vr_patch(p,j), &
                   c_am_growth_vr_patch(p,j), c_am_resp_vr_patch(p,j))
 
-
              ! MVD Here should the carbon and nitrogen fluxes to the plant be summed up
+             !MVD  n_ecm_to_plant(p) = n_ecm_to_plant(p) + n_from_paths(p,j,ipecm)
           end do layer_loop
-
+            !if (carbong_spent(p)>availc(p)) then
 
              ! MVD here we check for availible carbon from plant and plant n demand
 
-
+            !if (n_toplant>ndemand(p)) then
           do j = 1,nlevdecomp
               N_acquired     =  sum(n_from_paths(p,j,ipano3:ipnmnh4))        ! How much N did we end up with
                                 
