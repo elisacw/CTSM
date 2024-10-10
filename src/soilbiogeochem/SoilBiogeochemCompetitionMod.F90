@@ -796,7 +796,8 @@ contains
                       waterfluxbulk_inst,temperature_inst,soilstate_inst,cnveg_state_inst,cnveg_carbonstate_inst,&
                       cnveg_carbonflux_inst,cnveg_nitrogenstate_inst,cnveg_nitrogenflux_inst                ,&
                       soilbiogeochem_nitrogenflux_inst,soilbiogeochem_carbonflux_inst,canopystate_inst,      &
-                      soilbiogeochem_nitrogenstate_inst, soilbiogeochem_carbonstate_inst, cnfunmimicsplus_inst)
+                      soilbiogeochem_nitrogenstate_inst, soilbiogeochem_carbonstate_inst, cnfunmimicsplus_inst, &
+                      soilbiogeochem_state_inst)
             call t_stopf( 'CNFUNMIMICSplus' )
          end if
 
