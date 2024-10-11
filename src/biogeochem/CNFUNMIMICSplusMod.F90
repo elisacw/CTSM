@@ -608,7 +608,6 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
       retransn_to_npool      => cnveg_nitrogenflux_inst%retransn_to_npool_patch               , & ! Output: [real(r8) (:)   ]  deployment of retranslocated N (gN/m2/s)
       free_retransn_to_npool => cnveg_nitrogenflux_inst%free_retransn_to_npool_patch          , & ! Output: [real(r8) uptake of free N from leaves (needed to allow RT during the night with no NPP
       sminn_to_plant_fun     => cnveg_nitrogenflux_inst%sminn_to_plant_fun_patch              , & ! Output: [real(r8) (:) ]  Total soil N uptake of FUN (gN/m2/s)
-      sminn_to_plant_fun_vr  => cnveg_nitrogenflux_inst%sminn_to_plant_fun_vr_patch           , & ! Output: [real(r8) (:) ]  Total layer soil N uptake of FUN (gN/m2/s) 
       sminn_to_plant_fun_no3_vr  => cnveg_nitrogenflux_inst%sminn_to_plant_fun_no3_vr_patch   , & ! Output:  [real(r8) (:) ]  Total layer no3 uptake of FUN (gN/m2/s)
       sminn_to_plant_fun_nh4_vr  => cnveg_nitrogenflux_inst%sminn_to_plant_fun_nh4_vr_patch   , & ! Output:  [real(r8) (:) ]  Total layer nh4 uptake of FUN (gN/m2/s)
       sminn_to_plant_vr      => soilbiogeochem_nitrogenflux_inst%sminn_to_plant_vr_col        , & ! Output:  [real(r8) (: ,:) ] [gN/m3/s]  
@@ -1049,11 +1048,11 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
              call myc_cn_fluxes(dzsoi_decomp(j), npp_to_paths(p,j,ipecm), sminno3_to_ecm_vr_patch(p,j) + & 
                   n_somc2ecm_vr_patch(p,j) + n_somc2ecm_vr_patch(p,j), &
                   n_from_paths(p,j,ipecm), n_ecm_growth_vr_patch(p,j), &
-                  c_ecm_growth_vr_patch(p,j), c_ecm_resp_vr_patch(p,j), c_ecm_enz_vr_patch(p,j))
+                  c_ecm_growth_vr_patch(p,j), c_ecm_resp_vr_patch(p,j), ecm_step, c_ecm_enz_vr_patch(p,j))
 
              call myc_cn_fluxes(dzsoi_decomp(j), npp_to_paths(p,j,ipam), sminno3_to_am_vr_patch(p,j), &
                   n_from_paths(p,j,ipam), n_am_growth_vr_patch(p,j), &
-                  c_am_growth_vr_patch(p,j), c_am_resp_vr_patch(p,j))
+                  c_am_growth_vr_patch(p,j), c_am_resp_vr_patch(p,j), am_step)
 
           ! MVD Here should the carbon and nitrogen fluxes to the plant be summed up       
             
@@ -1117,25 +1116,11 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
              !Extract active uptake N from soil pools. 
              do j = 1, nlevdecomp
              !RF change. The N fixed doesn't actually come out of the soil mineral pools, it is 'new'... 
-             !ECW sminn_to_plant_fun_vr(p,j)    =  n_active_vr(p,j) + n_nonmyc_vr(p,j)/(dzsoi_decomp(j)*dt)
              ! we have  these variable instead of smin*_to_plant_fun_vr, just need give them proper units
              n_ecm(p,j)  =  n_ecm(p,j)/(dzsoi_decomp(j)*dt)
              n_am(p,j)  =  n_am(p,j)/(dzsoi_decomp(j)*dt)
              n_nonmyc_no3_vr(p,j)  =  n_nonmyc_no3_vr(p,j)/(dzsoi_decomp(j)*dt)
              n_nonmyc_nh4_vr(p,j)  =  n_nonmyc_nh4_vr(p,j)/(dzsoi_decomp(j)*dt)
-              if (sminn_to_plant_fun_vr(p,j) < 0.0_r8) then
-                 write(iulog,*) 'ERROR: sminn_to_plant_fun_vr=', sminn_to_plant_fun_vr(p,j)
-                 write(iulog,*) 'ERROR: free_retransn_to_npool=', free_retransn_to_npool(p)
-                 write(iulog,*)  'n_uptake_myc_frac_ecm=',   n_uptake_myc_frac(p)
-                  write(iulog,*)  'n_uptake_myc_frac_ecm=',   n_uptake_myc_frac(p)
-                  write(iulog,*)  ' sminn_layer_step_ecm=', sminn_layer_step(p,j)
-                  write(iulog,*)  ' sminn_layer_step_am=', sminn_layer_step(p,j)
-                 do ipath = 1, npaths
-                 write(iulog,*) 'n_from_paths:', n_from_paths(p,j,ipath), npp_to_paths(p,j,ipath)
-                 end do
-                 call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
-                             msg= errMsg(sourcefile,  __LINE__))
-              end if
              end do
     
              !SPLIT TO NO3 and NH4 like in original fun
@@ -1363,12 +1348,6 @@ subroutine updateCNFUNMIMICSplus (bounds, num_soilc, filter_soilc, &
 
    else
 
-      call p2c(bounds, nlevdecomp, &
-               nf%sminn_to_plant_fun_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp),&
-               snf%sminn_to_plant_fun_vr_col(bounds%begc:bounds%endc,1:nlevdecomp), &
-               'unity')
-      ! add sminn for mycorrhiza when fun can work with nitrification/dinitrification off
-      
    endif
 
    ! fluxes that will be used in decomposition:
