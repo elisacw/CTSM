@@ -577,7 +577,7 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
       npp_growth             => cnveg_carbonflux_inst%npp_growth_patch               , & ! Output:  [real(r8) (:) ]  Total C used for growth in FUN  (gC/m2/s)  
       npp_burnedoff          => cnveg_carbonflux_inst%npp_burnedoff_patch            , & ! Output:  [real(r8) (:) ]  C  that cannot be used for N uptake(gC/m2/s)   
       leafn_storage_to_xfer  => cnveg_nitrogenflux_inst%leafn_storage_to_xfer_patch  , & ! Output:  [real(r8) (:) ]
-      !plant_ndemand_col     => soilbiogeochem_state_inst%plant_ndemand_col                   , & ! Input:  [real(r8) (:)   ]  column-level plant N demand
+      plant_ndemand_col     => soilbiogeochem_state_inst%plant_ndemand_col                   , & ! Input:  [real(r8) (:)   ]  column-level plant N demand
       plant_ndemand          => cnveg_nitrogenflux_inst%plant_ndemand_patch          , & ! Iutput:  [real(r8) (:) ]  N flux required to support initial GPP (gN/m2/s)
       plant_ndemand_retrans  => cnveg_nitrogenflux_inst%plant_ndemand_retrans_patch  , & ! Output:  [real(r8) (:) ]  N demand generated for FUN (gN/m2/s)
       Nactive                => cnveg_nitrogenflux_inst%Nactive_patch                , & ! Output:  [real(r8) (:) ]  Mycorrhizal N uptake (gN/m2/s)
@@ -1055,29 +1055,8 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
                   n_from_paths(p,j,ipam), n_am_growth_vr_patch(p,j), &
                   c_am_growth_vr_patch(p,j), c_am_resp_vr_patch(p,j))
 
-
-             ! CHECK Nitrogen amount:
-             if (npp_to_spend .ge. 0.0000000000001_r8)then
-                burned_off_carbon =  burned_off_carbon + npp_to_spend
-             end if
-
-
-             ! MVD Here should the carbon and nitrogen fluxes to the plant be summed up
-             
+          ! MVD Here should the carbon and nitrogen fluxes to the plant be summed up       
             
-             ! add vertical fluxes to patch arrays 
-           ! do j = 1,nlevdecomp
-               n_active_vr(p,j)      =  n_active_vr(p,j)      + sum(n_from_paths(p,j,ipecm:ipam))
-               n_nonmyc_vr(p,j)      =  n_nonmyc_vr(p,j)      + sum(n_from_paths(p,j,ipnmno3:ipnmnh4))
-               n_ecm(p,j) = n_ecm(p,j) + n_from_paths(p,j,ipecm)
-               n_am(p,j) = n_am(p,j) + n_from_paths(p,j,ipam)
-               n_nonmyc_no3_vr(p,j)  =  n_nonmyc_no3_vr(p,j)  + n_from_paths(p,j,ipnmno3)
-               n_nonmyc_nh4_vr(p,j)  =  n_nonmyc_nh4_vr(p,j)  + n_from_paths(p,j,ipnmnh4)
-           ! end do
-          
-            
-
-
           end do layer_loop
             !if (carbong_spent(p)>availc(p)) then
 
@@ -1138,7 +1117,7 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
              !Extract active uptake N from soil pools. 
              do j = 1, nlevdecomp
              !RF change. The N fixed doesn't actually come out of the soil mineral pools, it is 'new'... 
-             sminn_to_plant_fun_vr(p,j)    =  n_active_vr(p,j) + n_nonmyc_vr(p,j)/(dzsoi_decomp(j)*dt)
+             !ECW sminn_to_plant_fun_vr(p,j)    =  n_active_vr(p,j) + n_nonmyc_vr(p,j)/(dzsoi_decomp(j)*dt)
              ! we have  these variable instead of smin*_to_plant_fun_vr, just need give them proper units
              n_ecm(p,j)  =  n_ecm(p,j)/(dzsoi_decomp(j)*dt)
              n_am(p,j)  =  n_am(p,j)/(dzsoi_decomp(j)*dt)
@@ -1165,8 +1144,8 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
              Nactive_nh4(p) = 0.0_r8
              Nnonmyc_no3(p) = (n_paths_acc(p,ipnmno3)) / dt
              Nnonmyc_nh4(p) = (n_paths_acc(p,ipnmnh4)) / dt
-             Necm(p) = sum(n_paths_acc(p,ipecm:ipam)) / dt
-             Nam(p) = sum(n_paths_acc(p,ipecm:ipam)) / dt
+             Necm(p) = (n_paths_acc(p,ipecm)) / dt
+             Nam(p) = (n_paths_acc(p,ipam)) / dt
              Nnonmyc(p) = Nnonmyc_no3(p) + Nnonmyc_nh4(p)
             
              plant_ndemand_retrans(p)  = plant_ndemand_retrans(p)/dt
@@ -1190,20 +1169,19 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
              ! free N goes straight to the npool, not throught Nuptake...
              sminn_to_plant_fun(p)     = Nactive_no3(p) + Nactive_nh4(p) + Nnonmyc_no3(p) + Nnonmyc_nh4(p) + Nfix(p) 
     
-             soil_n_extraction = ( sum(n_ecm(p,1: nlevdecomp))+sum(n_nonmyc_no3_vr(p,1: nlevdecomp))+&
-                                   sum(n_am(p,1: nlevdecomp)) + sum(n_nonmyc_nh4_vr(p,1: nlevdecomp)))
-    
              !---------------------------C fluxes--------------------!
 
-             npp_Nactive_no3(p) = (npp_paths_acc(p,ipecm)) / dt
-             npp_Nactive_nh4(p) = (npp_paths_acc(p,ipam)) / dt
+             npp_Nactive_no3(p) = 0.0_r8
+             npp_Nactive_nh4(p) = 0.0_r8
+             npp_Necm(p) = (npp_paths_acc(p,ipecm)) / dt
+             npp_Nam(p) = (npp_paths_acc(p,ipam)) / dt
              npp_Nnonmyc_no3(p) = (npp_paths_acc(p,ipnmno3)) / dt
              npp_Nnonmyc_nh4(p) = (npp_paths_acc(p,ipnmnh4)) / dt
-             npp_Nfix(p) = (npp_paths_acc(p,ipfix)) /dt
-             npp_Nactive(p) = npp_Nactive_no3(p) + npp_Nactive_nh4(p)
              npp_Nnonmyc(p) = npp_Nnonmyc_no3(p) + npp_Nnonmyc_nh4(p)
+             npp_Nfix(p) = (npp_paths_acc(p,ipfix)) /dt
              npp_Nretrans(p) = (npp_retrans_acc(p))/dt
-             
+             npp_Nactive(p) = npp_Necm(p) + npp_Nam(p) + npp_Nnonmyc_no3(p) + npp_Nnonmyc_nh4(p)
+
              !---------------------------Extra Respiration Fluxes--------------------!      
              soilc_change(p)           = npp_Nactive(p) + npp_Nfix(p) + npp_Nnonmyc(p) + npp_Nretrans(p)
              soilc_change(p)           = soilc_change(p) + burned_off_carbon / dt                 
@@ -1219,13 +1197,6 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
               write(iulog,*) 'ERROR: excess_carbon_acc: ', (npp_uptake(p))
               write(iulog,*) 'ERROR: npp_Nretrans(p): ', npp_Nretrans(p)
               write(iulog,*) 'npp_growth(p): ',npp_growth(p)
-
-              do ipath = 1,npaths
-                write(iulog,*) 'ERROR nppaths_ecm:',ipath, npp_paths_acc(p,ipath)
-                write(iulog,*) 'ERROR nppaths_am:',ipath, npp_paths_acc(p,ipath)
-              enddo
-                 call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
-                             msg= errMsg(sourcefile,  __LINE__))
              endif
 
              if (npp_growth(p) < -1.0e-7_r8 .or. npp_growth(p) > 10000._r8) then
@@ -1244,12 +1215,6 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
               write(iulog,*) 'Acailc, npp_Nuptake/growth:',availc(p), npp_Nuptake(p),npp_growth(p)
               write(iulog,*)  'soilchange, burned off c', soilc_change(p), burned_off_carbon/dt
               write(iulog,*), 'Excess carbon, npp_Nretrans,freeretrans',excess_carbon_acc/dt,npp_Nretrans(p),free_retransn_to_npool(p)
-              do ipath = 1,npaths
-                write(iulog,*) 'ERROR nppaths_ecm:',ipath, npp_paths_acc(p,ipath)
-                write(iulog,*) 'ERROR nppaths_am:',ipath, npp_paths_acc(p,ipath)
-              enddo
-                 call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
-                             msg= errMsg(sourcefile,  __LINE__))
              endif
              !-----------------------Diagnostic Fluxes------------------------------!
              if(availc(p).gt.0.0_r8)then !what happens in the night? 
