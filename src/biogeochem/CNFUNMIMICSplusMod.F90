@@ -487,6 +487,7 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
    !  WITHOUT GROWTH RESP
    real(r8) ::                    fixerfrac            ! what fraction of plants can fix?
    real(r8) ::                    npp_to_spend         ! how much carbon do we need to get rid of? 
+   real(r8) ::                    npp_to_spend_fix     ! temporary variable to check if npp from fixation is sammaler than all pathways
    real(r8) ::                    soil_n_extraction    ! calculates total N pulled from soil
    real(r8) ::                    total_N_conductance  ! inverse of C to of N for whole soil-leaf pathway
    real(r8) ::                    total_N_resistance   ! C to of N for whole soil -leaf pathway
@@ -809,6 +810,13 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
       end do
       npp_to_spend = 0.0_r8
       total_N_conductance = 1.0_r8/ (npaths * nlevdecomp * big_cost) 
+
+       if (sum(npp_to_paths(p,j,ipecm:ipfix)) > npp_to_spend_fix) then
+              write(iulog,*) 'ERROR: NPP from fixation to small: ', npp_to_spend_fix
+                 call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
+                             msg= errMsg(sourcefile,  __LINE__))
+             endif       
+
       fix_loop: do FIX =plants_are_fixing, plants_not_fixing !loop around percentages of fixers and nonfixers, with differnt costs. 
 
           if(FIX==plants_are_fixing)then ! How much of the carbon in this PFT can in principle be used for fixation? 
@@ -818,7 +826,8 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
           else
             fixerfrac = 1.0_r8 - FUN_fracfixers(ivt(p))
           endif 
-          npp_to_spend = npp_remaining(p)  * fixerfrac !put parameter here.
+          npp_to_spend = npp_remaining(p)  * fixerfrac ! put parameter here.
+          npp_to_spend_fix = npp_to_spend              ! temporary variable to check 
           ! has to be zeroed since depend on accumula
           n_from_paths(p,:,:) = 0.0_r8 !act and nonmyc boths nh4 and no3
           npp_frac_paths(p,:,:) = 0.0_r8
@@ -1099,6 +1108,12 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
           end do
 
          end if !unmet demand`
+
+         if (sum(npp_to_paths(p,j,ipecm:ipfix)) > npp_to_spend_fix) then
+            write(iulog,*) 'ERROR: NPP from fixation to small: ', npp_to_spend_fix
+               call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
+                           msg= errMsg(sourcefile,  __LINE__))
+           endif      
          
       end do fix_loop ! FIXER. 
              ! Turn step level quantities back into fluxes per second. 
