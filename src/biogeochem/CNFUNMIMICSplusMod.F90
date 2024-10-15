@@ -505,6 +505,7 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
    real(r8) :: sminnh4_extracted                                         !
    real(r8) :: sminno3_overlimit                                         !
    real(r8) :: sminnh4_overlimit                                         !
+   !MVD Put tmp vars for soil carbon/nitrogen myc fluxes to accumulate over fixers loop.
 
    real(r8) :: c_am_resp_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)          ! carbon respiration flux for AM mycorrhiza
    real(r8) :: c_ecm_resp_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)         ! carbon respiration flux for ECM mycorrhiza
@@ -839,7 +840,8 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
           
           do j = 1, nlevdecomp
 
-
+            !path_eff(ipath) = [perecm, 1-perecm, 1, 1, fracfix] / sum([perecm, 1-perecm, 1, 1, fracfix])
+            ! MVD Proposed variable to get rid of ecm and fixer loops
              ! Calculate npp allocation to pathways proportional to their exchange rate (N/C) 
              rootc_dens_step             = rootc_dens(p,j) 
              if (rootc_dens_step > 0._r8) then
@@ -1046,16 +1048,20 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
              ! Calculate actual myc fluxes now:
              ! ecm
              call myc_cn_fluxes(dzsoi_decomp(j), npp_to_paths(p,j,ipecm), sminno3_to_ecm_vr_patch(p,j) + & 
-                  n_somc2ecm_vr_patch(p,j) + n_somc2ecm_vr_patch(p,j), &
+                  n_somc2ecm_vr_patch(p,j) + n_somp2ecm_vr_patch(p,j), &
                   n_from_paths(p,j,ipecm), n_ecm_growth_vr_patch(p,j), &
-                  c_ecm_growth_vr_patch(p,j), c_ecm_resp_vr_patch(p,j), ecm_step, c_ecm_enz_vr_patch(p,j))
+                  c_ecm_growth_vr_patch(p,j), c_ecm_resp_vr_patch(p,j), c_ecm_enz_vr_patch(p,j))
 
              call myc_cn_fluxes(dzsoi_decomp(j), npp_to_paths(p,j,ipam), sminno3_to_am_vr_patch(p,j), &
                   n_from_paths(p,j,ipam), n_am_growth_vr_patch(p,j), &
-                  c_am_growth_vr_patch(p,j), c_am_resp_vr_patch(p,j), am_step)
+                  c_am_growth_vr_patch(p,j), c_am_resp_vr_patch(p,j))
+
+            ! call myc_nc_fluxes (..., n_am_groth_tmp, c_am.._tmp
 
           ! MVD Here should the carbon and nitrogen fluxes to the plant be summed up       
-            
+
+            !MVD accumulate myc C and N fluxes:
+            ! c_am_growth(p,j) = c_am_growth(p,j) + c_am_growth_tmp
           end do layer_loop
             !if (carbong_spent(p)>availc(p)) then
 
@@ -1112,8 +1118,10 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
                 write(iulog,*) 'npp to path:', ipath, npp_paths_acc(p,ipath)
             end do
         end if
-
+        
       end do fix_loop ! FIXER. 
+
+
              ! Turn step level quantities back into fluxes per second. 
              Nfix(p)                   = (n_paths_acc(p,ipfix)) / dt                   
              retransn_to_npool(p)      = (n_retrans_acc(p)) / dt 
@@ -1152,7 +1160,7 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
                                   retransn_to_npool(p)+free_retransn_to_npool(p) 
 
             ! Nactive(p) = Nactive_no3(p)  + Nactive_nh4(p) + Nnonmyc_no3(p) + Nnonmyc_nh4(p)
-             Nactive(p) = Necm(p)  +   Nam(p) + Nnonmyc_no3(p) + Nnonmyc_nh4(p)
+             !Nactive(p) = Necm(p)  +   Nam(p) + Nnonmyc_no3(p) + Nnonmyc_nh4(p)
              if (Nuptake(p) > 10000._r8) then
               !write(iulog,*) 'ERROR: Nactive_no3 negative: ', Nactive_no3(p)
               !write(iulog,*) 'ERROR: Nactive_nh4 negative: ', Nactive_nh4(p)
@@ -1166,7 +1174,7 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
                              msg= errMsg(sourcefile,  __LINE__))
              endif                                          
              ! free N goes straight to the npool, not throught Nuptake...
-             sminn_to_plant_fun(p)     = Nactive_no3(p) + Nactive_nh4(p) + Nnonmyc_no3(p) + Nnonmyc_nh4(p) + Nfix(p) 
+             sminn_to_plant_fun(p)     = Necm(p) + Nam(p) + Nnonmyc_no3(p) + Nnonmyc_nh4(p) + Nfix(p) 
     
              !---------------------------C fluxes--------------------!
 
@@ -1211,7 +1219,7 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
                  call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
                              msg= errMsg(sourcefile,  __LINE__))
              endif
-             if (availc(p) - npp_Nuptake(p) - npp_growth(p) < -1.e-8_r8) then
+             if (availc(p) - npp_growth(p) < -1.e-8_r8) then
               write(iulog,*) 'ERROR: balance Cfun is negative: '
               write(iulog,*) 'Acailc, npp_Nuptake/growth:',availc(p), npp_Nuptake(p),npp_growth(p)
               write(iulog,*)  'soilchange, burned off c', soilc_change(p), burned_off_carbon/dt

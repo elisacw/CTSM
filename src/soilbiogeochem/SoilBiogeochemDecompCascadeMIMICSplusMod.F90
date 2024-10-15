@@ -2431,7 +2431,7 @@ end subroutine calc_myc_mortality
 
   end subroutine myc_n_extraction
 
-  subroutine myc_cn_fluxes(dz, fc_to_myc, fn_to_myc, fn_to_veg, fn_myc_growth, fc_myc_growth, fc_myc_resp, myc_type, fc_myc_enz)
+  subroutine myc_cn_fluxes(dz, fc_to_myc, fn_to_myc, fn_to_veg, fn_myc_growth, fc_myc_growth, fc_myc_resp, fc_myc_enz)
    ! ! DESCRIPTION:
    ! Mycorrhiza uptake and demand reconciliation + fluxes to plant
    !
@@ -2448,7 +2448,6 @@ end subroutine calc_myc_mortality
    real(r8), intent(out) :: fn_myc_growth        ! N allocated to mycorrhiza growth      [gN/m3/s]
    real(r8), intent(out) :: fc_myc_growth        ! C allocated to mycorrhiza growth      [gC/m3/s]
    real(r8), intent(out) :: fc_myc_resp          ! C respired in myc-veg exchange        [gC/m3/s]
-   integer,  intent(in)  :: myc_type             ! type of mycorrhiza EcM=1, AM=2        [-]
 
    real(r8), intent(out), optional :: fc_myc_enz ! C enzyme flux to SOMa (only ECM)      [gC/m3/s]
 
@@ -2461,7 +2460,7 @@ end subroutine calc_myc_mortality
    real(r8)            :: N_demand_myc              ! [gN/m3/s]
    real(r8)            :: c_use_eff                 ! carbon use efficiency [-]
 
-   if (myc_type == 1) then
+   if (present(fc_myc_enz)) then
       c_use_eff = params_inst%mimicsplus_mge_ecm
    else
       c_use_eff = params_inst%mimicsplus_mge_am
