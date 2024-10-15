@@ -484,9 +484,10 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
    
    !  WITHOUT GROWTH RESP
    real(r8) ::                    fixerfrac            ! what fraction of plants can fix?
-   real(r8) ::                    npp_to_spend         ! how much carbon do we need to get rid of? 
+   real(r8) ::                    npp_to_spend         ! how much carbon do we need to get rid of?
+   real(r8) ::                    npp_to_spend_init    ! npp that is available for nuptake
    real(r8) ::                    npp_to_spend_fix     ! temporary variable to check if npp from fixation is sammaler than all pathways
-   !real(r8) ::                    npp_spent            ! temporary
+   real(r8) ::                    npp_spent            ! temporary
    real(r8) ::                    soil_n_extraction    ! calculates total N pulled from soil
    real(r8) ::                    total_N_conductance  ! inverse of C to of N for whole soil-leaf pathway
    real(r8) ::                    total_N_resistance   ! C to of N for whole soil -leaf pathway
@@ -817,7 +818,7 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
             fixerfrac = 1.0_r8 - FUN_fracfixers(ivt(p))
           endif 
           npp_to_spend = npp_remaining(p)  * fixerfrac ! put parameter here.
-         
+          npp_to_spend_init = npp_to_spend
          ! has to be zeroed since depend on accumula
           n_from_paths(p,:,:) = 0.0_r8 !act and nonmyc boths nh4 and no3
           npp_frac_paths(p,:,:) = 0.0_r8
@@ -1101,10 +1102,11 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
 
 
          npp_to_spend_fix = sum(npp_paths_acc(p,1:ipfix)) +  total_c_spent_retrans + total_c_accounted_retrans 
- 
-           if(npp_to_spend - npp_to_spend_fix > 1.0e-10_r8) then
+         npp_spent = sum(npp_paths_acc(p,1:ipfix)) +  total_c_spent_retrans + total_c_accounted_retrans
+         
+           if(npp_spent - npp_to_spend_init > 1.0e-10_r8) then
             write(iulog,*) 'ERROR: TO MUCH CARBON HAS BEEN SPENT ON N UPTAKE'
-            write(iulog,*) 'npp_to_spend_fix, npp before', npp_to_spend, npp_to_spend_fix
+            write(iulog,*) 'npp_to_spend_fix, npp before', npp_spent, npp_to_spend_init
             write(iulog,*) 'npp retrans:', total_c_spent_retrans, total_c_accounted_retrans
             do ipath = ipecm,ipfix
                 write(iulog,*) 'npp to path:', ipath, npp_paths_acc(p,ipath)
@@ -1180,6 +1182,7 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
              npp_Nactive(p) = npp_Necm(p) + npp_Nam(p) + npp_Nnonmyc_no3(p) + npp_Nnonmyc_nh4(p)
 
              !---------------------------Extra Respiration Fluxes--------------------!      
+             soilc_change(p)           = npp_Nactive(p) + npp_Nfix(p) + npp_Nretrans(p)
             ! soilc_change(p)           = npp_Nactive(p) + npp_Nfix(p) + npp_Nnonmyc(p) + npp_Nretrans(p)
              soilc_change(p)           = npp_Necm(p) + npp_Nam(p) + npp_Nnonmyc_no3(p) + npp_Nnonmyc_nh4(p) + npp_Nfix(p) + npp_Nretrans(p)
              soilc_change(p)           = soilc_change(p) + burned_off_carbon / dt                 
