@@ -505,8 +505,7 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
    real(r8) :: sminnh4_extracted                                         !
    real(r8) :: sminno3_overlimit                                         !
    real(r8) :: sminnh4_overlimit                                         !
-   !MVD Put tmp vars for soil carbon/nitrogen myc fluxes to accumulate over fixers loop.
-
+   
    real(r8) :: c_am_resp_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)          ! carbon respiration flux for AM mycorrhiza
    real(r8) :: c_ecm_resp_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)         ! carbon respiration flux for ECM mycorrhiza
    real(r8) :: c_am_growth_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)        ! carbon growth flux for AM mycorrhiza
@@ -518,6 +517,14 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
    real(r8) :: n_somp2ecm_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)         ! nitrogen mining from ECM mycorrhiza
    real(r8) :: c_somc2soma_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)        ! carbon release from mining from somc pool
    real(r8) :: c_somp2soma_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)        ! carbon release from mining from somp pool
+
+   real(r8) :: n_ecm_growth_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
+   real(r8) :: c_ecm_growth_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
+   real(r8) :: c_ecm_resp_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
+   real(r8) :: c_ecm_enz_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
+   real(r8) :: n_am_growth_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
+   real(r8) :: c_am_growth_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
+   real(r8) :: c_am_resp_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
    
    real(r8) :: n_ecm(bounds%begp:bounds%endp, 1:nlevdecomp)             ! Layer mycorrhizal no3 uptake (gN/m2)
    real(r8) :: n_nonmyc_no3_vr(bounds%begp:bounds%endp, 1:nlevdecomp)             ! Layer non-myc no3 uptake (gN/m2)
@@ -689,6 +696,14 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
          n_somp2ecm_vr_patch(p,j)      =0.0_r8    ! nitrogen mining from ECM mycorrhiza
          c_somc2soma_vr_patch(p,j)     =0.0_r8    ! carbon release from mining from somc pool
          c_somp2soma_vr_patch(p,j)     =0.0_r8    ! carbon release from mining from somp pool
+
+         n_ecm_growth_vr_patch_tmp(p,j)=0.0_r8
+         c_ecm_growth_vr_patch_tmp(p,j)=0.0_r8
+         c_ecm_resp_vr_patch_tmp(p,j)  =0.0_r8
+         c_ecm_enz_vr_patch_tmp(p,j)   =0.0_r8
+         n_am_growth_vr_patch_tmp(p,j) =0.0_r8
+         c_am_growth_vr_patch_tmp(p,j) =0.0_r8
+         c_am_resp_vr_patch_tmp(p,j)   =0.0_r8
        
           n_ecm(p,j)                   =0.0_r8    ! Layer mycorrhizal no3 uptake (gN/m2)
           n_am(p,j)                    =0.0_r8    ! Layer mycorrhizal nh4 uptake (gN/m2)
@@ -1046,22 +1061,25 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
 
 
              ! Calculate actual myc fluxes now:
-             ! ecm
              call myc_cn_fluxes(dzsoi_decomp(j), npp_to_paths(p,j,ipecm), sminno3_to_ecm_vr_patch(p,j) + & 
                   n_somc2ecm_vr_patch(p,j) + n_somp2ecm_vr_patch(p,j), &
-                  n_from_paths(p,j,ipecm), n_ecm_growth_vr_patch(p,j), &
-                  c_ecm_growth_vr_patch(p,j), c_ecm_resp_vr_patch(p,j), c_ecm_enz_vr_patch(p,j))
+                  n_from_paths(p,j,ipecm), n_ecm_growth_vr_patch_tmp(p,j), &
+                  c_ecm_growth_vr_patch_tmp(p,j), c_ecm_resp_vr_patch_tmp(p,j), c_ecm_enz_vr_patch_tmp(p,j))
 
              call myc_cn_fluxes(dzsoi_decomp(j), npp_to_paths(p,j,ipam), sminno3_to_am_vr_patch(p,j), &
-                  n_from_paths(p,j,ipam), n_am_growth_vr_patch(p,j), &
-                  c_am_growth_vr_patch(p,j), c_am_resp_vr_patch(p,j))
+                  n_from_paths(p,j,ipam), n_am_growth_vr_patch_tmp(p,j), &
+                  c_am_growth_vr_patch_tmp(p,j), c_am_resp_vr_patch_tmp(p,j))
 
-            ! call myc_nc_fluxes (..., n_am_groth_tmp, c_am.._tmp
+             ! Accumulating mycorrhizal C and N fluxes with temporary fluxes:
+                  n_ecm_growth_vr_patch(p,j) = n_ecm_growth_vr_patch(p,j) + n_ecm_growth_vr_patch_tmp(p,j)
+                  c_ecm_growth_vr_patch(p,j) = c_ecm_growth_vr_patch(p,j) + c_ecm_growth_vr_patch_tmp(p,j)
+                  c_ecm_resp_vr_patch(p,j)   = c_ecm_resp_vr_patch(p,j)   + c_ecm_resp_vr_patch_tmp(p,j) 
+                  c_ecm_enz_vr_patch(p,j)    = c_ecm_enz_vr_patch(p,j)    + c_ecm_enz_vr_patch_tmp(p,j)
 
-          ! MVD Here should the carbon and nitrogen fluxes to the plant be summed up       
+                  n_am_growth_vr_patch(p,j) = n_am_growth_vr_patch(p,j) + n_am_growth_vr_patch_tmp(p,j)
+                  c_am_growth_vr_patch(p,j) = c_am_growth_vr_patch(p,j) + c_am_growth_vr_patch_tmp(p,j)
+                  c_am_resp_vr_patch(p,j)   = c_am_resp_vr_patch(p,j)   + c_am_resp_vr_patch_tmp(p,j) 
 
-            !MVD accumulate myc C and N fluxes:
-            ! c_am_growth(p,j) = c_am_growth(p,j) + c_am_growth_tmp
           end do layer_loop
             !if (carbong_spent(p)>availc(p)) then
 
@@ -1236,7 +1254,7 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
              else
                 cost_nfix(p) = spval
              endif 
-             if((npp_Nactive(p)+npp_Nnonmyc(p)).gt.0.0_r8)then
+             if(npp_Nactive(p).gt.0.0_r8)then
                 cost_nactive(p) = (Nactive(p)+Nnonmyc(p))/(npp_Nactive(p)+npp_Nnonmyc(p))
              else
                 cost_nactive(p) = spval
