@@ -1035,7 +1035,7 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
                    n_from_paths(p,j,ipnmno3)    = n_from_paths(p,j,ipnmno3) * (1.0_r8 - sminno3_overlimit / sminno3_extracted)
                 endif
              else
-                sminno3_overlimit = 0.0_r8
+                sminno3_overlimit            = 0.0_r8
                 sminno3_to_ecm_vr_patch(p,j) = 0.0_r8
                 sminno3_to_am_vr_patch(p,j)  = 0.0_r8
                 n_from_paths(p,j,ipnmno3)    = 0.0_r8
@@ -1101,13 +1101,7 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
 
 
          npp_to_spend_fix = sum(npp_paths_acc(p,1:ipfix)) +  total_c_spent_retrans + total_c_accounted_retrans 
-
-         if (sum(npp_to_paths(p,:,ipecm:ipfix)) > npp_to_spend_fix) then
-            write(iulog,*) 'ERROR: NPP from fixation to small: ', npp_to_spend_fix
-               call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
-                           msg= errMsg(sourcefile,  __LINE__))
-           endif      
-         
+ 
            if(npp_to_spend - npp_to_spend_fix > 1.0e-10_r8) then
             write(iulog,*) 'ERROR: TO MUCH CARBON HAS BEEN SPENT ON N UPTAKE'
             write(iulog,*) 'npp_to_spend_fix, npp before', npp_to_spend, npp_to_spend_fix
@@ -1155,7 +1149,8 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
              Nuptake(p) = Necm(p) + Nam(p) + Nnonmyc_no3(p) + Nnonmyc_nh4(p) + Nfix(p)+ &
                                   retransn_to_npool(p)+free_retransn_to_npool(p) 
 
-             Nactive(p) = Nactive_no3(p)  + Nactive_nh4(p) + Nnonmyc_no3(p) + Nnonmyc_nh4(p)
+            ! Nactive(p) = Nactive_no3(p)  + Nactive_nh4(p) + Nnonmyc_no3(p) + Nnonmyc_nh4(p)
+             Nactive(p) = Necm(p)  +   Nam(p) + Nnonmyc_no3(p) + Nnonmyc_nh4(p)
              if (Nuptake(p) > 10000._r8) then
               !write(iulog,*) 'ERROR: Nactive_no3 negative: ', Nactive_no3(p)
               !write(iulog,*) 'ERROR: Nactive_nh4 negative: ', Nactive_nh4(p)
@@ -1185,7 +1180,8 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
              npp_Nactive(p) = npp_Necm(p) + npp_Nam(p) + npp_Nnonmyc_no3(p) + npp_Nnonmyc_nh4(p)
 
              !---------------------------Extra Respiration Fluxes--------------------!      
-             soilc_change(p)           = npp_Nactive(p) + npp_Nfix(p) + npp_Nnonmyc(p) + npp_Nretrans(p)
+            ! soilc_change(p)           = npp_Nactive(p) + npp_Nfix(p) + npp_Nnonmyc(p) + npp_Nretrans(p)
+             soilc_change(p)           = npp_Necm(p) + npp_Nam(p) + npp_Nnonmyc_no3(p) + npp_Nnonmyc_nh4(p) + npp_Nfix(p) + npp_Nretrans(p)
              soilc_change(p)           = soilc_change(p) + burned_off_carbon / dt                 
              npp_burnedoff(p)          = burned_off_carbon/dt          
              npp_Nuptake(p)            = soilc_change(p)
