@@ -749,7 +749,7 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
       end if   ! end for deciduous
 
       ! Avaliable carbon for growth or Nitrogen uptake
-      availc(p)            =  availc(p)        *  dt !!
+      !availc(p)            =  availc(p)        *  dt !!
 
       if (availc(p) > 0._r8) then
          do j = 1, nlevdecomp
@@ -764,7 +764,7 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
       ! Nitrogen demand of plant & remaining carbon (NPP) per timestep
       unmetDemand              = .TRUE.
       plant_ndemand_pool_step(p)   = plant_ndemand_pool(p)
-      npp_remaining(p)             = availc(p) ! gC/m2 !og availc(p) *dt
+      npp_remaining(p)             = availc(p) * dt ! gC/m2 !og availc(p) *dt
          
       ! COST FIXATION PATHWAY
       ! checks which photosyntetic pathway plant has (C3 / C4) and if they can do nitrogen fixation   
