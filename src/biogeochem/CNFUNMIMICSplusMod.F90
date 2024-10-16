@@ -113,8 +113,6 @@ module CNFUNMIMICSplusMod
   
   ! Uptake fluxes for COST_METHOD=2
   ! Update Fluxes
-  real(r8),  pointer ::  no3_myc_to_plant_col(:,:)       ! No3 flux from min soil to plant  by mycorrhiza
-  real(r8),  pointer ::  nh4_myc_to_plant_col(:,:)       ! NH4 flux from min soil to plant by mycorrhiza
 
 contains
   procedure , public  :: Init
@@ -225,10 +223,6 @@ end type params_type
 
      allocate(this%npp_paths_acc(bounds%begp:bounds%endp,1:npaths));                 this%npp_paths_acc(:,:) = spval
 
-     allocate(this%no3_myc_to_plant_col(bounds%begc:bounds%endc, 1:nlevdecomp));     this%no3_myc_to_plant_col(:,:) = spval
-
-     allocate(this%nh4_myc_to_plant_col(bounds%begc:bounds%endc, 1:nlevdecomp));     this%nh4_myc_to_plant_col(:,:) = spval
-
   end subroutine InitAllocate
 
   subroutine SetZeros (this, bounds, soilbiogeochem_carbonflux_inst,soilbiogeochem_nitrogenflux_inst)
@@ -299,9 +293,7 @@ end type params_type
      nf%sminnh4_to_am_vr_col(begc:endc,1:nlevdecomp)                    = 0._r8
      nf%sminno3_nonmyc_to_plant_col(begc:endc,1:nlevdecomp)             = 0._r8
      nf%sminnh4_nonmyc_to_plant_col(begc:endc,1:nlevdecomp)             = 0._r8
-     this%no3_myc_to_plant_col(begc:endc,1:nlevdecomp)                  = 0._r8
-     this%nh4_myc_to_plant_col(begc:endc,1:nlevdecomp)                  = 0._r8
-
+     
    end associate
   end subroutine SetZeros
 
@@ -525,7 +517,11 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
    real(r8) :: n_am_growth_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
    real(r8) :: c_am_growth_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
    real(r8) :: c_am_resp_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
-   
+   real(r8) :: sminno3_to_ecm_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
+   real(r8) :: sminno3_to_am_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
+   real(r8) :: n_somc2ecm_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
+   real(r8) :: n_somp2ecm_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
+
    real(r8) :: n_ecm(bounds%begp:bounds%endp, 1:nlevdecomp)             ! Layer mycorrhizal no3 uptake (gN/m2)
    real(r8) :: n_nonmyc_no3_vr(bounds%begp:bounds%endp, 1:nlevdecomp)             ! Layer non-myc no3 uptake (gN/m2)
    real(r8) :: n_am(bounds%begp:bounds%endp, 1:nlevdecomp)             ! Layer mycorrhizal nh4 uptake (gN/m2)
@@ -534,6 +530,7 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
    real(r8) :: sminno3_to_am_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)      ! No3 flux from soil to AM
    real(r8) :: sminnh4_to_ecm_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)     ! NH4 flux from soil to ECM
    real(r8) :: sminnh4_to_am_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)      ! NH4 flux from soil to AM
+   
 
    associate(ivt             => patch%itype                                          , & ! Input:   [integer  (:) ]  p
       leafcn                 => pftcon%leafcn                                        , & ! Input:   leaf C:N (gC/gN)
@@ -704,6 +701,10 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
          n_am_growth_vr_patch_tmp(p,j) =0.0_r8
          c_am_growth_vr_patch_tmp(p,j) =0.0_r8
          c_am_resp_vr_patch_tmp(p,j)   =0.0_r8
+         sminno3_to_ecm_vr_patch_tmp(p,j)   =0.0_r8
+         sminno3_to_am_vr_patch_tmp(p,j)    =0.0_r8
+         n_somc2ecm_vr_patch_tmp(p,j) =0.0_r8
+         n_somp2ecm_vr_patch_tmp(p,j) =0.0_r8
        
           n_ecm(p,j)                   =0.0_r8    ! Layer mycorrhizal no3 uptake (gN/m2)
           n_am(p,j)                    =0.0_r8    ! Layer mycorrhizal nh4 uptake (gN/m2)
@@ -1061,12 +1062,12 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
 
 
              ! Calculate actual myc fluxes now:
-             call myc_cn_fluxes(dzsoi_decomp(j), npp_to_paths(p,j,ipecm), sminno3_to_ecm_vr_patch(p,j) + & 
-                  n_somc2ecm_vr_patch(p,j) + n_somp2ecm_vr_patch(p,j), &
+             call myc_cn_fluxes(dzsoi_decomp(j), npp_to_paths(p,j,ipecm), sminno3_to_ecm_vr_patch_tmp(p,j) + & 
+                  n_somc2ecm_vr_patch_tmp(p,j) + n_somp2ecm_vr_patch_tmp(p,j), &
                   n_from_paths(p,j,ipecm), n_ecm_growth_vr_patch_tmp(p,j), &
                   c_ecm_growth_vr_patch_tmp(p,j), c_ecm_resp_vr_patch_tmp(p,j), c_ecm_enz_vr_patch_tmp(p,j))
 
-             call myc_cn_fluxes(dzsoi_decomp(j), npp_to_paths(p,j,ipam), sminno3_to_am_vr_patch(p,j), &
+             call myc_cn_fluxes(dzsoi_decomp(j), npp_to_paths(p,j,ipam), sminno3_to_am_vr_patch_tmp(p,j), &
                   n_from_paths(p,j,ipam), n_am_growth_vr_patch_tmp(p,j), &
                   c_am_growth_vr_patch_tmp(p,j), c_am_resp_vr_patch_tmp(p,j))
 
@@ -1079,6 +1080,11 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
                   n_am_growth_vr_patch(p,j) = n_am_growth_vr_patch(p,j) + n_am_growth_vr_patch_tmp(p,j)
                   c_am_growth_vr_patch(p,j) = c_am_growth_vr_patch(p,j) + c_am_growth_vr_patch_tmp(p,j)
                   c_am_resp_vr_patch(p,j)   = c_am_resp_vr_patch(p,j)   + c_am_resp_vr_patch_tmp(p,j) 
+
+                  sminno3_to_ecm_vr_patch(p,j) = sminno3_to_ecm_vr_patch(p,j) + sminno3_to_ecm_vr_patch_tmp(p,j)
+                  sminno3_to_am_vr_patch(p,j) = sminno3_to_am_vr_patch(p,j) + sminno3_to_am_vr_patch_tmp(p,j)
+                  n_somc2ecm_vr_patch(p,j) = n_somc2ecm_vr_patch(p,j) + n_somc2ecm_vr_patch_tmp(p,j)
+                  n_somp2ecm_vr_patch(p,j) = n_somp2ecm_vr_patch(p,j) + n_somp2ecm_vr_patch_tmp(p,j)
 
           end do layer_loop
             !if (carbong_spent(p)>availc(p)) then
@@ -1215,7 +1221,8 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
              npp_burnedoff(p)          = burned_off_carbon/dt          
              npp_Nuptake(p)            = soilc_change(p)
              ! how much carbon goes to growth of tissues?  
-             npp_growth(p)             = (Nuptake(p)- free_retransn_to_npool(p))*plantCN(p)+(excess_carbon_acc/dt) !does not include gresp, since this is calculated from growth 
+             !npp_growth(p)             = (Nuptake(p)- free_retransn_to_npool(p))*plantCN(p)+(excess_carbon_acc/dt) !does not include gresp, since this is calculated from growth 
+             npp_growth(p)             = npp_Nuptake(p)+(excess_carbon_acc/dt) !does not include gresp, since this is calculated from growth 
              if (availc(p) <= 0.0_r8 .and. soilc_change(p) > 0.0_r8) then
               write(iulog,*) 'ERROR: availc(p): ', availc(p)
               write(iulog,*) 'ERROR: soilc_change(p): ', soilc_change(p)
@@ -1354,16 +1361,8 @@ subroutine updateCNFUNMIMICSplus (bounds, num_soilc, filter_soilc, &
    if (use_nitrif_denitrif) then
       ! plant fluxes
       call p2c(bounds,nlevdecomp, &
-               n_ecm(bounds%begp:bounds%endp,1:nlevdecomp),&
-               cnfun%no3_myc_to_plant_col(bounds%begc:bounds%endc,1:nlevdecomp),&
-               'unity')
-      call p2c(bounds,nlevdecomp, &
                n_nonmyc_no3_vr(bounds%begp:bounds%endp,1:nlevdecomp),&
                snf%sminno3_nonmyc_to_plant_col(bounds%begc:bounds%endc,1:nlevdecomp),&
-               'unity')
-      call p2c(bounds,nlevdecomp, &
-               n_am(bounds%begp:bounds%endp,1:nlevdecomp),&
-               cnfun%nh4_myc_to_plant_col(bounds%begc:bounds%endc,1:nlevdecomp),&
                'unity')
       call p2c(bounds,nlevdecomp, &
                n_nonmyc_nh4_vr(bounds%begp:bounds%endp,1:nlevdecomp),&
