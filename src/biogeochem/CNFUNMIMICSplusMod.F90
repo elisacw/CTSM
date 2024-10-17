@@ -816,7 +816,7 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
          call calc_myc_roi(decomp_cpools_vr(c,j,i_am_myc),decomp_npools_vr(c,j,i_am_myc) , &
          decomp_cpools_vr(c,j,i_phys_som),decomp_cpools_vr(c,j,i_avl_som),decomp_cpools_vr(c,j,i_chem_som), &
          decomp_npools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_chem_som), &
-         (smin_no3_to_plant_vr(c,j) + smin_nh4_to_plant_vr(c,j)) * dt, am_step , dzsoi_decomp(j),big_cost, costs_paths(p,j,am))
+         (smin_no3_to_plant_vr(c,j) + smin_nh4_to_plant_vr(c,j)) * dt, am_step , dzsoi_decomp(j),big_cost, costs_paths(p,j,ipam))
          end if
          costs_paths(p,j,ipecm)=1./costs_paths(p,j,ipecm)
          costs_paths(p,j,ipam)=1./costs_paths(p,j,ipam) ! convert to C/N
