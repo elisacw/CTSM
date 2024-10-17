@@ -523,6 +523,8 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
    real(r8) :: sminnh4_to_am_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
    real(r8) :: n_somc2ecm_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
    real(r8) :: n_somp2ecm_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
+   real(r8) :: c_somc2soma_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)        ! carbon release from mining from somc pool
+   real(r8) :: c_somp2soma_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)        ! carbon release from mining from somp pool
 
    real(r8) :: n_ecm(bounds%begp:bounds%endp, 1:nlevdecomp)             ! Layer mycorrhizal no3 uptake (gN/m2)
    real(r8) :: n_nonmyc_no3_vr(bounds%begp:bounds%endp, 1:nlevdecomp)             ! Layer non-myc no3 uptake (gN/m2)
@@ -707,8 +709,10 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
          sminno3_to_am_vr_patch_tmp(p,j)  =0.0_r8
          sminnh4_to_ecm_vr_patch_tmp(p,j) =0.0_r8
          sminnh4_to_am_vr_patch_tmp(p,j)  =0.0_r8
-         n_somc2ecm_vr_patch_tmp(p,j) =0.0_r8
-         n_somp2ecm_vr_patch_tmp(p,j) =0.0_r8
+         n_somc2ecm_vr_patch_tmp(p,j)     =0.0_r8
+         n_somp2ecm_vr_patch_tmp(p,j)     =0.0_r8
+         c_somc2soma_vr_patch_tmp(p,j)    =0.0_r8
+         c_somp2soma_vr_patch_tmp(p,j)    =0.0_r8
        
           n_ecm(p,j)                   =0.0_r8    ! Layer mycorrhizal no3 uptake (gN/m2)
           n_am(p,j)                    =0.0_r8    ! Layer mycorrhizal nh4 uptake (gN/m2)
@@ -808,11 +812,11 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
          call calc_myc_roi(decomp_cpools_vr(c,j,i_ecm_myc),decomp_npools_vr(c,j,i_ecm_myc) , &
          decomp_cpools_vr(c,j,i_phys_som),decomp_cpools_vr(c,j,i_avl_som),decomp_cpools_vr(c,j,i_chem_som), &
          decomp_npools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_chem_som), &
-         (smin_no3_to_plant_vr(c,j) + smin_nh4_to_plant_vr(c,j)) * dt , ecm_step , dzsoi_decomp(j),big_cost, roi_ecm)
+         (smin_no3_to_plant_vr(c,j) + smin_nh4_to_plant_vr(c,j)) * dt , ecm_step , dzsoi_decomp(j),big_cost, costs_paths(p,j,ipecm))
          call calc_myc_roi(decomp_cpools_vr(c,j,i_am_myc),decomp_npools_vr(c,j,i_am_myc) , &
          decomp_cpools_vr(c,j,i_phys_som),decomp_cpools_vr(c,j,i_avl_som),decomp_cpools_vr(c,j,i_chem_som), &
          decomp_npools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_chem_som), &
-         (smin_no3_to_plant_vr(c,j) + smin_nh4_to_plant_vr(c,j)) * dt, am_step , dzsoi_decomp(j),big_cost, roi_am)
+         (smin_no3_to_plant_vr(c,j) + smin_nh4_to_plant_vr(c,j)) * dt, am_step , dzsoi_decomp(j),big_cost, costs_paths(p,j,am))
          end if
          costs_paths(p,j,ipecm)=1./costs_paths(p,j,ipecm)
          costs_paths(p,j,ipam)=1./costs_paths(p,j,ipam) ! convert to C/N
@@ -1009,26 +1013,38 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
              sminnh4_extracted = 0.0_r8
              sminno3_extracted = 0.0_r8
              ! get mining fluxes:
-             ! ecm no3 and mining
-             call myc_n_extraction(dzsoi_decomp(j),(smin_no3_to_plant_vr(c,j)) * dt, &
-                  decomp_cpools_vr(c,j,i_ecm_myc),decomp_cpools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_phys_som), &
-                  decomp_cpools_vr(c,j,i_chem_som),decomp_npools_vr(c,j,i_chem_som), sminno3_to_ecm_vr_patch_tmp(p,j), & 
-                  c_somp2soma_vr_patch(p,j),n_somp2ecm_vr_patch_tmp(p,j), &
-                  c_somc2soma_vr_patch(p,j),n_somc2ecm_vr_patch_tmp(p,j))
-             ! ecm nh4
-             call myc_n_extraction(dzsoi_decomp(j),(smin_nh4_to_plant_vr(c,j)) * dt, &
-                  decomp_cpools_vr(c,j,i_ecm_myc),decomp_cpools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_phys_som), &
-                  decomp_cpools_vr(c,j,i_chem_som),decomp_npools_vr(c,j,i_chem_som), sminnh4_to_ecm_vr_patch_tmp(p,j))
+             if (npp_to_paths(p,j,ipecm) > 0.0_r8) then
+                ! ecm no3 and mining
+                call myc_n_extraction(dzsoi_decomp(j),(smin_no3_to_plant_vr(c,j)) * dt, &
+                      decomp_cpools_vr(c,j,i_ecm_myc),decomp_cpools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_phys_som), &
+                      decomp_cpools_vr(c,j,i_chem_som),decomp_npools_vr(c,j,i_chem_som), sminno3_to_ecm_vr_patch_tmp(p,j), & 
+                      c_somp2soma_vr_patch_tmp(p,j),n_somp2ecm_vr_patch_tmp(p,j), &
+                      c_somc2soma_vr_patch_tmp(p,j),n_somc2ecm_vr_patch_tmp(p,j))
+                ! ecm nh4
+                call myc_n_extraction(dzsoi_decomp(j),(smin_nh4_to_plant_vr(c,j)) * dt, &
+                      decomp_cpools_vr(c,j,i_ecm_myc),decomp_cpools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_phys_som), &
+                      decomp_cpools_vr(c,j,i_chem_som),decomp_npools_vr(c,j,i_chem_som), sminnh4_to_ecm_vr_patch_tmp(p,j))
+             else
+                sminno3_to_ecm_vr_patch_tmp(p,j) = 0.0_r8
+                c_somp2soma_vr_patch_tmp(p,j)    = 0.0_r8
+                n_somp2ecm_vr_patch_tmp(p,j)     = 0.0_r8
+                c_somc2soma_vr_patch_tmp(p,j)    = 0.0_r8
+                n_somc2ecm_vr_patch_tmp(p,j)     = 0.0_r8
+                sminnh4_to_ecm_vr_patch_tmp(p,j) = 0.0_r8
+             end if
              ! am no3
-             call myc_n_extraction(dzsoi_decomp(j),(smin_no3_to_plant_vr(c,j)) * dt, &
-                  decomp_cpools_vr(c,j,i_am_myc),decomp_cpools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_phys_som), &
-                  decomp_cpools_vr(c,j,i_chem_som),decomp_npools_vr(c,j,i_chem_som), sminno3_to_am_vr_patch_tmp(p,j))
-             ! am nh4
-             call myc_n_extraction(dzsoi_decomp(j),(smin_nh4_to_plant_vr(c,j)) * dt, &
-                  decomp_cpools_vr(c,j,i_am_myc),decomp_cpools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_phys_som), &
-                  decomp_cpools_vr(c,j,i_chem_som),decomp_npools_vr(c,j,i_chem_som), sminnh4_to_am_vr_patch_tmp(p,j))
-
-
+             if (npp_to_paths(p,j,ipam) > 0.0_r8) then
+                call myc_n_extraction(dzsoi_decomp(j),(smin_no3_to_plant_vr(c,j)) * dt, &
+                     decomp_cpools_vr(c,j,i_am_myc),decomp_cpools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_phys_som), &
+                     decomp_cpools_vr(c,j,i_chem_som),decomp_npools_vr(c,j,i_chem_som), sminno3_to_am_vr_patch_tmp(p,j))
+                ! am nh4
+                call myc_n_extraction(dzsoi_decomp(j),(smin_nh4_to_plant_vr(c,j)) * dt, &
+                     decomp_cpools_vr(c,j,i_am_myc),decomp_cpools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_phys_som), &
+                     decomp_cpools_vr(c,j,i_chem_som),decomp_npools_vr(c,j,i_chem_som), sminnh4_to_am_vr_patch_tmp(p,j))
+             else
+                sminnh4_to_am_vr_patch_tmp(p,j) = 0.0_r8
+                sminno3_to_am_vr_patch_tmp(p,j) = 0.0_r8
+             end if
              ! nonmyc gives to plant all the mineral nitrogen it extracts.
              sminnh4_extracted = sminnh4_to_ecm_vr_patch_tmp(p,j) + sminnh4_to_am_vr_patch_tmp(p,j) + n_from_paths(p,j,ipnmnh4)
              sminno3_extracted = sminno3_to_ecm_vr_patch_tmp(p,j) + sminno3_to_am_vr_patch_tmp(p,j) + n_from_paths(p,j,ipnmno3)
@@ -1089,6 +1105,8 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
                   sminno3_to_am_vr_patch(p,j) = sminno3_to_am_vr_patch(p,j) + sminno3_to_am_vr_patch_tmp(p,j)
                   n_somc2ecm_vr_patch(p,j) = n_somc2ecm_vr_patch(p,j) + n_somc2ecm_vr_patch_tmp(p,j)
                   n_somp2ecm_vr_patch(p,j) = n_somp2ecm_vr_patch(p,j) + n_somp2ecm_vr_patch_tmp(p,j)
+                  c_somc2soma_vr_patch(p,j) = c_somc2soma_vr_patch(p,j) + c_somc2soma_vr_patch_tmp(p,j)
+                  c_somp2soma_vr_patch(p,j) = c_somp2soma_vr_patch(p,j) + c_somp2soma_vr_patch_tmp(p,j)
 
           end do layer_loop
             !if (carbong_spent(p)>availc(p)) then

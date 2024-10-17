@@ -2469,38 +2469,51 @@ end subroutine calc_myc_mortality
   N_uptake_myc = fn_to_myc
 
   if (present(fc_myc_enz)) then ! ECM
-     N_demand_myc = c_use_eff * (1.0_r8 - f_enz) * fc_to_myc / params_inst%mimicsplus_cn_myc 
-     if (N_uptake_myc >= N_demand_myc) then
-        fn_to_veg = N_uptake_myc - N_demand_myc                        ! N flux myc -> veg
-        fn_myc_growth = N_demand_myc                                     ! How much N the need to grow
-        fc_myc_enz  = fc_to_myc * f_enz * c_use_eff
-        fc_myc_growth = fn_myc_growth * params_inst%mimicsplus_cn_myc
-        ! enzyme flux will go to soma pool in the next update 
-        fc_myc_resp  = fc_to_myc - (fc_myc_growth + fc_myc_enz)                          ! C that they don't need to grow
-     else ! less N in soil, so we limit N flux to vegetaion and mycorrhiza N demand so their sum is equal to N uptake
-        fn_to_veg = (1-f_growth) * N_uptake_myc
-        c_use_eff = f_growth * N_uptake_myc * params_inst%mimicsplus_cn_myc / (1.0_r8 - f_enz) / fc_to_myc
-        fn_myc_growth = f_growth * N_uptake_myc
-        fc_myc_enz  = fc_to_myc * f_enz * c_use_eff
-        fc_myc_growth = c_use_eff * fc_to_myc
-        fc_myc_resp  = fc_to_myc - (fc_myc_growth + fc_myc_enz)                          ! C that they don't need to grow
+     if (fc_to_myc > 0) then
+        N_demand_myc = c_use_eff * (1.0_r8 - f_enz) * fc_to_myc / params_inst%mimicsplus_cn_myc 
+        if (N_uptake_myc >= N_demand_myc) then
+            fn_to_veg = N_uptake_myc - N_demand_myc                        ! N flux myc -> veg
+            fn_myc_growth = N_demand_myc                                     ! How much N the need to grow
+            fc_myc_enz  = fc_to_myc * f_enz * c_use_eff
+            fc_myc_growth = fn_myc_growth * params_inst%mimicsplus_cn_myc
+            ! enzyme flux will go to soma pool in the next update 
+            fc_myc_resp  = fc_to_myc - (fc_myc_growth + fc_myc_enz)                          ! C that they don't need to grow
+        else ! less N in soil, so we limit N flux to vegetaion and mycorrhiza N demand so their sum is equal to N uptake
+            fn_to_veg = (1-f_growth) * N_uptake_myc
+            c_use_eff = f_growth * N_uptake_myc * params_inst%mimicsplus_cn_myc / (1.0_r8 - f_enz) / fc_to_myc
+            fn_myc_growth = f_growth * N_uptake_myc
+            fc_myc_enz  = fc_to_myc * f_enz * c_use_eff
+            fc_myc_growth = c_use_eff * fc_to_myc
+            fc_myc_resp  = fc_to_myc - (fc_myc_growth + fc_myc_enz)                          ! C that they don't need to grow
+          end if
+     else
+        fn_to_veg     = 0.0_r8
+        fn_myc_growth = 0.0_r8
+        fc_myc_enz    = 0.0_r8
+        fc_myc_resp   = 0.0_r8
       end if
   else
-     N_demand_myc = c_use_eff * (fc_to_myc) / params_inst%mimicsplus_cn_myc !AM
-     if (N_uptake_myc >= N_demand_myc) then
-      fn_to_veg = N_uptake_myc - N_demand_myc                        ! N flux myc -> veg
-      fn_myc_growth = N_demand_myc                                     ! How much N the need to grow
-      fc_myc_growth = fn_myc_growth * params_inst%mimicsplus_cn_myc
-      ! enzyme flux will go to soma pool in the next update 
-      fc_myc_resp  = fc_to_myc - fc_myc_growth                          ! C that they don't need to grow
-   else ! less N in soil, so we limit N flux to vegetaion and mycorrhiza N demand so their sum is equal to N uptake
-      fn_to_veg = (1-f_growth) * N_uptake_myc
-      c_use_eff = f_growth * N_uptake_myc
-      fn_myc_growth = f_growth * N_uptake_myc
-      !fc_myc_growth = c_use_eff * fc_to_myc !ECW double check this or nex line
-      fc_myc_growth = fn_myc_growth * params_inst%mimicsplus_cn_myc / fc_to_myc
-      fc_myc_resp  = fc_to_myc - fc_myc_growth                         ! C that they don't need to grow
-    end if
+     if (fc_to_myc > 0) then
+        N_demand_myc = c_use_eff * (fc_to_myc) / params_inst%mimicsplus_cn_myc !AM
+        if (N_uptake_myc >= N_demand_myc) then
+           fn_to_veg = N_uptake_myc - N_demand_myc                        ! N flux myc -> veg
+           fn_myc_growth = N_demand_myc                                     ! How much N the need to grow
+           fc_myc_growth = fn_myc_growth * params_inst%mimicsplus_cn_myc
+           ! enzyme flux will go to soma pool in the next update 
+           fc_myc_resp  = fc_to_myc - fc_myc_growth                          ! C that they don't need to grow
+        else ! less N in soil, so we limit N flux to vegetaion and mycorrhiza N demand so their sum is equal to N uptake
+           fn_to_veg = (1-f_growth) * N_uptake_myc
+           c_use_eff = f_growth * N_uptake_myc
+           fn_myc_growth = f_growth * N_uptake_myc
+           !fc_myc_growth = c_use_eff * fc_to_myc !ECW double check this or nex line
+           fc_myc_growth = fn_myc_growth * params_inst%mimicsplus_cn_myc / fc_to_myc
+           fc_myc_resp  = fc_to_myc - fc_myc_growth                         ! C that they don't need to grow
+        end if
+     else
+        fn_to_veg     = 0.0_r8
+        fn_myc_growth = 0.0_r8
+        fc_myc_resp   = 0.0_r8
+      end if
   end if
 
   end subroutine myc_cn_fluxes
