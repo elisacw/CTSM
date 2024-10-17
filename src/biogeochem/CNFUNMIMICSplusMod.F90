@@ -519,6 +519,8 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
    real(r8) :: c_am_resp_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
    real(r8) :: sminno3_to_ecm_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
    real(r8) :: sminno3_to_am_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
+   real(r8) :: sminnh4_to_ecm_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
+   real(r8) :: sminnh4_to_am_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
    real(r8) :: n_somc2ecm_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
    real(r8) :: n_somp2ecm_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
 
@@ -701,8 +703,10 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
          n_am_growth_vr_patch_tmp(p,j) =0.0_r8
          c_am_growth_vr_patch_tmp(p,j) =0.0_r8
          c_am_resp_vr_patch_tmp(p,j)   =0.0_r8
-         sminno3_to_ecm_vr_patch_tmp(p,j)   =0.0_r8
-         sminno3_to_am_vr_patch_tmp(p,j)    =0.0_r8
+         sminno3_to_ecm_vr_patch_tmp(p,j) =0.0_r8
+         sminno3_to_am_vr_patch_tmp(p,j)  =0.0_r8
+         sminnh4_to_ecm_vr_patch_tmp(p,j) =0.0_r8
+         sminnh4_to_am_vr_patch_tmp(p,j)  =0.0_r8
          n_somc2ecm_vr_patch_tmp(p,j) =0.0_r8
          n_somp2ecm_vr_patch_tmp(p,j) =0.0_r8
        
@@ -1008,40 +1012,40 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
              ! ecm no3 and mining
              call myc_n_extraction(dzsoi_decomp(j),(smin_no3_to_plant_vr(c,j)) * dt, &
                   decomp_cpools_vr(c,j,i_ecm_myc),decomp_cpools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_phys_som), &
-                  decomp_cpools_vr(c,j,i_chem_som),decomp_npools_vr(c,j,i_chem_som), sminno3_to_ecm_vr_patch(p,j), & 
-                  c_somp2soma_vr_patch(p,j),n_somp2ecm_vr_patch(p,j), &
-                  c_somc2soma_vr_patch(p,j),n_somc2ecm_vr_patch(p,j))
+                  decomp_cpools_vr(c,j,i_chem_som),decomp_npools_vr(c,j,i_chem_som), sminno3_to_ecm_vr_patch_tmp(p,j), & 
+                  c_somp2soma_vr_patch(p,j),n_somp2ecm_vr_patch_tmp(p,j), &
+                  c_somc2soma_vr_patch(p,j),n_somc2ecm_vr_patch_tmp(p,j))
              ! ecm nh4
              call myc_n_extraction(dzsoi_decomp(j),(smin_nh4_to_plant_vr(c,j)) * dt, &
                   decomp_cpools_vr(c,j,i_ecm_myc),decomp_cpools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_phys_som), &
-                  decomp_cpools_vr(c,j,i_chem_som),decomp_npools_vr(c,j,i_chem_som), sminnh4_to_ecm_vr_patch(p,j))
+                  decomp_cpools_vr(c,j,i_chem_som),decomp_npools_vr(c,j,i_chem_som), sminnh4_to_ecm_vr_patch_tmp(p,j))
              ! am no3
              call myc_n_extraction(dzsoi_decomp(j),(smin_no3_to_plant_vr(c,j)) * dt, &
                   decomp_cpools_vr(c,j,i_am_myc),decomp_cpools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_phys_som), &
-                  decomp_cpools_vr(c,j,i_chem_som),decomp_npools_vr(c,j,i_chem_som), sminno3_to_am_vr_patch(p,j))
+                  decomp_cpools_vr(c,j,i_chem_som),decomp_npools_vr(c,j,i_chem_som), sminno3_to_am_vr_patch_tmp(p,j))
              ! am nh4
              call myc_n_extraction(dzsoi_decomp(j),(smin_nh4_to_plant_vr(c,j)) * dt, &
                   decomp_cpools_vr(c,j,i_am_myc),decomp_cpools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_phys_som), &
-                  decomp_cpools_vr(c,j,i_chem_som),decomp_npools_vr(c,j,i_chem_som), sminnh4_to_am_vr_patch(p,j))
+                  decomp_cpools_vr(c,j,i_chem_som),decomp_npools_vr(c,j,i_chem_som), sminnh4_to_am_vr_patch_tmp(p,j))
 
 
              ! nonmyc gives to plant all the mineral nitrogen it extracts.
-             sminnh4_extracted = sminnh4_to_ecm_vr_patch(p,j) + sminnh4_to_am_vr_patch(p,j) + n_from_paths(p,j,ipnmnh4)
-             sminno3_extracted = sminno3_to_ecm_vr_patch(p,j) + sminno3_to_am_vr_patch(p,j) + n_from_paths(p,j,ipnmno3)
+             sminnh4_extracted = sminnh4_to_ecm_vr_patch_tmp(p,j) + sminnh4_to_am_vr_patch_tmp(p,j) + n_from_paths(p,j,ipnmnh4)
+             sminno3_extracted = sminno3_to_ecm_vr_patch_tmp(p,j) + sminno3_to_am_vr_patch_tmp(p,j) + n_from_paths(p,j,ipnmno3)
              ! Limiting nh4 extraction.
              if (sminnh4_to_paths(p,j) > 0.0_r8 .and. sminnh4_extracted > 0.0_r8) then
                 ! extracted more than  there is possibly available
                 if (sminnh4_to_paths(p,j) < sminnh4_extracted) then
                    sminnh4_overlimit = sminnh4_extracted - sminnh4_to_paths(p,j)
-                   sminnh4_to_ecm_vr_patch(p,j) = sminnh4_to_ecm_vr_patch(p,j) * (1.0_r8 - sminnh4_overlimit / sminnh4_extracted)
-                   sminnh4_to_am_vr_patch(p,j)  = sminnh4_to_am_vr_patch(p,j) * (1.0_r8 - sminnh4_overlimit / sminnh4_extracted)
+                   sminnh4_to_ecm_vr_patch_tmp(p,j) = sminnh4_to_ecm_vr_patch_tmp(p,j) * (1.0_r8 - sminnh4_overlimit / sminnh4_extracted)
+                   sminnh4_to_am_vr_patch_tmp(p,j)  = sminnh4_to_am_vr_patch_tmp(p,j) * (1.0_r8 - sminnh4_overlimit / sminnh4_extracted)
                    n_from_paths(p,j,ipnmnh4)    = n_from_paths(p,j,ipnmnh4) * (1.0_r8 - sminnh4_overlimit / sminnh4_extracted)
                 endif
 
              else
                 sminnh4_overlimit = 0.0_r8
-                sminnh4_to_ecm_vr_patch(p,j) = 0.0_r8
-                sminnh4_to_am_vr_patch(p,j)  = 0.0_r8
+                sminnh4_to_ecm_vr_patch_tmp(p,j) = 0.0_r8
+                sminnh4_to_am_vr_patch_tmp(p,j)  = 0.0_r8
                 n_from_paths(p,j,ipnmnh4)    = 0.0_r8
              endif
              ! Limiting no3 extraction.
@@ -1049,14 +1053,14 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
                 ! extracted more than  there is possibly available
                 if (sminno3_to_paths(p,j) < sminno3_extracted) then
                    sminno3_overlimit = sminno3_extracted - sminno3_to_paths(p,j)
-                   sminno3_to_ecm_vr_patch(p,j) = sminno3_to_ecm_vr_patch(p,j) * (1.0_r8 - sminno3_overlimit / sminno3_extracted)
-                   sminno3_to_am_vr_patch(p,j)  = sminno3_to_am_vr_patch(p,j) * (1.0_r8 - sminno3_overlimit / sminno3_extracted)
+                   sminno3_to_ecm_vr_patch_tmp(p,j) = sminno3_to_ecm_vr_patch_tmp(p,j) * (1.0_r8 - sminno3_overlimit / sminno3_extracted)
+                   sminno3_to_am_vr_patch_tmp(p,j)  = sminno3_to_am_vr_patch_tmp(p,j) * (1.0_r8 - sminno3_overlimit / sminno3_extracted)
                    n_from_paths(p,j,ipnmno3)    = n_from_paths(p,j,ipnmno3) * (1.0_r8 - sminno3_overlimit / sminno3_extracted)
                 endif
              else
                 sminno3_overlimit            = 0.0_r8
-                sminno3_to_ecm_vr_patch(p,j) = 0.0_r8
-                sminno3_to_am_vr_patch(p,j)  = 0.0_r8
+                sminno3_to_ecm_vr_patch_tmp(p,j) = 0.0_r8
+                sminno3_to_am_vr_patch_tmp(p,j)  = 0.0_r8
                 n_from_paths(p,j,ipnmno3)    = 0.0_r8
              endif
 
