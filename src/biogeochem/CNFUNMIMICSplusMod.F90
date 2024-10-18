@@ -1109,7 +1109,7 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
                   c_somp2soma_vr_patch(p,j) = c_somp2soma_vr_patch(p,j) + c_somp2soma_vr_patch_tmp(p,j)
 
           end do layer_loop
-            !if (carbong_spent(p)>availc(p)) then
+            !if (carbon_spent(p)>availc(p)) then
 
              ! MVD here we check for availible carbon from plant and plant n demand
 

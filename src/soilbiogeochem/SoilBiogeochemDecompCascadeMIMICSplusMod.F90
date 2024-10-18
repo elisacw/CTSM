@@ -184,7 +184,6 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
       real(r8) :: mimicsplus_k_m_emyc    ! 'Half saturation constant of ectomycorrhizal uptake of inorg N', 'units': 'gNm⁻²'
       real(r8) :: mimicsplus_mge_ecm     ! 'Microbial growth efficiency (mg/mg) for ectomycorrhiza ', 'units': 'unitless'
       real(r8) :: mimicsplus_mge_am      ! 'Growth efficiency of arbuscular mycorrhiza ', 'units': 'unitless'
-      !real(r8) :: mimicsplus_r_myc       ! 'Mycorrhizal modifier', 'units': 'unitless'
       real(r8) :: mimicsplus_fphys_ecm   ! 'Fraction ectomycorrhizal necromass into physically protected soil organic matter pool', 'units': 'unitless'
       real(r8) :: mimicsplus_fchem_ecm   ! 'Fraction ectomycorrhizal necromass into chemically protected soil organic matter pool', 'units': 'unitless'
       real(r8) :: mimicsplus_tau_ecm     ! 'Fraction ectomycorrhizal necromass into avaliable soil organic matter pool', 'units': 'unitless'
@@ -192,7 +191,6 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
       real(r8) :: mimicsplus_fchem_am    ! 'Fraction arbuscular mycorrhizal necromass into chemically protected soil organic matter pool', 'units': 'unitless'
       real(r8) :: mimicsplus_tau_am      ! 'Fraction arbuscular mycorrhizal necromass into avaliable soil organic matter pool', 'units': 'unitless'
       real(r8) :: mimicsplus_cn_myc      ! 'Optimal CN ratio for mycorrhizal fungi', 'units': 'unitless'
-      real(r8) :: mimicsplus_fi          ! 
   end type params_type
   !
   type(params_type), private :: params_inst
@@ -439,11 +437,6 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
       call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
       if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
       params_inst%mimicsplus_cn_myc = tempr
-
-      tString='mimicsplus_fi'
-      call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-      if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-      params_inst%mimicsplus_fi = tempr
 
   end subroutine readParams  
 
@@ -1661,8 +1654,7 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
               pathfrac_decomp_cascade(c,j,i_m2s2) = fchem_m2                             !stores parameter to be transferred in next module
 
               
-              !ECW parameter for fraction of mycorrjizal necromass to SOM pools
-
+              ! Fraction of mycorrizal necromass to SOM pools
               tau_myc1 = min(1._r8, max(0._r8, mimicsplus_tau_ecm))
               fchem_myc1 = min(1._r8, max(0._r8, mimicsplus_fchem_ecm))
               fphys_myc1 = min(1._r8, max(0._r8, mimicsplus_fphys_ecm))
@@ -1670,14 +1662,14 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
               fchem_myc2 = min(1._r8, max(0._r8, mimicsplus_fchem_am))
               fphys_myc2 = min(1._r8, max(0._r8, mimicsplus_fphys_am))
               
-              decomp_k(c,j,i_ecm_myc) = tau_myc * &
-                    myc1_conc**((mimicsplus_densdep - 1.0_r8) * moist_mod) !w_d_o_scalars)     !decomposition rate for ecm !not sure
-              pathfrac_decomp_cascade(c,j,i_myc1s1) = tau_myc1 !ECW should I add the enzyme flux here
+              decomp_k(c,j,i_ecm_myc) = tau_myc * &                              !ECW I think these lines don't do anything
+                    myc1_conc**((mimicsplus_densdep - 1.0_r8) * moist_mod) 
+              pathfrac_decomp_cascade(c,j,i_myc1s1) = tau_myc1 
               pathfrac_decomp_cascade(c,j,i_myc1s2) = fchem_myc1
               pathfrac_decomp_cascade(c,j,i_myc1s3) = fphys_myc1
 
               decomp_k(c,j,i_am_myc) = tau_myc * &
-                    myc2_conc**((mimicsplus_densdep - 1.0_r8) * moist_mod) !w_d_o_scalars)     !decomposition rate for am
+                    myc2_conc**((mimicsplus_densdep - 1.0_r8) * moist_mod)
               pathfrac_decomp_cascade(c,j,i_myc2s1) = tau_myc2
               pathfrac_decomp_cascade(c,j,i_myc2s2) = fchem_myc2
               pathfrac_decomp_cascade(c,j,i_myc2s3) = fphys_myc2
@@ -1689,10 +1681,6 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
                   decomp_k(c,j,i_cwd) = k_frag * moist_mod !w_d_o_scalars  ! * spinup_geogterm_cwd(c)
               end if
 
-               ! Tillage
-             ! if (get_do_tillage()) then
-             !  call get_apply_tillage_multipliers(idop, c, j, decomp_k(c,j,:))
-           ! end if
             end do
         end do
 
@@ -1796,7 +1784,6 @@ end subroutine calc_myc_mortality
      real(r8) :: fn_mining_somc,fn_mining_somp        ! nitrogen fluxes to som to myc (mining + scavenging) [gN/m2/s]
      real(r8) :: fn_smin2myc                          ! nitrogen flux from mineral soil to myc [gN/m3/s2]
 
-     !real(r8)            :: r_myc ! mycorrhizal modifier (constrains mining and scavaging) [-]
      real(r8), parameter :: small_flux = 1.e-14_r8
      real(r8), parameter :: eps = 0.5
 
@@ -1820,8 +1807,10 @@ end subroutine calc_myc_mortality
      endif
      if (myc_type == 1) then 
       if (cpool_myc > 0.0_r8) then
-      roi = (fn_smin2myc + fn_mining_somc + fn_mining_somp) / (params_inst%mimicsplus_k_myc_som / secsphr ) * &
-             params_inst%mimicsplus_mge_ecm / cpool_myc
+      roi = ((fn_smin2myc + fn_mining_somc + fn_mining_somp) / (params_inst%mimicsplus_k_myc_som / secsphr ) * &
+             params_inst%mimicsplus_mge_ecm / cpool_myc) 
+      !roi = (fn_smin2myc + fn_mining_somc + fn_mining_somp/(params_inst%mimicsplus_mge_am / cpool_myc))*& !ECW 
+        !    (params_inst%mimicsplus_k_myc_som / secsphr )*eps
              if (roi <= 0.0_r8) then
                roi = 1.0_r8/big_roi
              end if 
@@ -1830,8 +1819,9 @@ end subroutine calc_myc_mortality
       endif
      else
       if (cpool_myc > 0.0_r8) then
-         roi = fn_smin2myc/ (params_inst%mimicsplus_k_myc_som / secsphr ) * &
-                params_inst%mimicsplus_mge_am / cpool_myc
+         roi = (fn_smin2myc/ (params_inst%mimicsplus_k_myc_som / secsphr ) * &
+                params_inst%mimicsplus_mge_am / cpool_myc)
+        ! roi = (fn_smin2myc/(params_inst%mimicsplus_mge_am / cpool_myc))*(params_inst%mimicsplus_k_myc_som / secsphr )*eps
          if (roi <= 0.0_r8) then
             roi = 1.0_r8/big_roi
          end if 
@@ -2166,7 +2156,7 @@ end subroutine calc_myc_mortality
    fc_veg2myc=(fc_veg2myc_no3 + fc_veg2myc_nh4)/dz/dt
    if (myc_type == 1) then                                                ! EcM
       call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_somp,l_fc_somp2soma,l_fn_mining_somp)
-      call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_somc,l_fc_somc2soma,l_fn_mining_somc)
+      call calc_myc_mining_rates(dz, cpool_somc,cpool_myc, npool_somc,l_fc_somc2soma,l_fn_mining_somc)
    if ( cpool_somc < 0.0_r8 .or. cpool_myc < 0.0_r8  .or. & 
         npool_myc < 0.0_r8 .or.  cpool_somp < 0.0_r8) then 
      write(iulog,*) 'ERROR: cpool_som,cpool_myc,npool_my',cpool_somp,cpool_somc,cpool_myc, npool_myc,l_fc_somp2soma,l_fn_mining_somp
@@ -2281,7 +2271,7 @@ end subroutine calc_myc_mortality
 
     if (present(fc_somp)) then
       call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_somp,fc_somp,fn_mining_somp)
-      call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_somc,fc_somc,fn_mining_somc)
+      call calc_myc_mining_rates(dz, cpool_somc,cpool_myc, npool_somc,fc_somc,fn_mining_somc)
     end if
 
   end subroutine myc_n_extraction
