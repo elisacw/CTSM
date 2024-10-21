@@ -3,17 +3,12 @@ hist_dov2xy    = .true., .true.
 ! tapes, for the sake of mods that extend these default mods and may add other history tapes
  hist_nhtfrq    = 1,1,1,1,1,1,1
  hist_mfilt     = 1,1,1,1,1,1,1
- hist_fincl1    = 'TRAFFICFLUX', 'SNOWLIQ:A','SNOWICE:A'
 ! Add FCO2 because few (if any) tests send this flux to the coupler, so it isn't checked via cpl hist files
  hist_fincl1   += 'FCO2'
- 
 
  use_ssre = .true.
  paramfile = '/cluster/projects/nn2806k/elisacw/parameters/clm_params_mimicsplus_netcdf5_11.09.24.nc'
 
 
 soil_decomp_method = 'MIMICSplusAas2023'
-hist_fincl1 += 'TOTMYCC', 'SOILC_vr', 'TOTMICC', 'TOTMYCC', 'TOTLITC', 'TOTSOMC', 'TOTLITC_1m', 'TOTSOMC_1m',
-               'DYN_COL_SOIL_ADJUSTMENTS_C', 'TOTCOLC', 'TOTECOSYSC', 'LIT_MET_C_vr', 'LIT_STR_C_vr', 'SOM_AVL_C_vr', 
-               'SOM_CHEM_C_vr', 'SOM_PHYS_C_vr', 'MIC_COP_C_vr', 'MIC_OLI_C_vr', 'MYC_ECM_C_vr', 'MYC_AM_C_vr'
-
+hist_fincl1 += 'TBOT'

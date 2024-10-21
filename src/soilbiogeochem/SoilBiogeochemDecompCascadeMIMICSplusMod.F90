@@ -1807,10 +1807,8 @@ end subroutine calc_myc_mortality
      endif
      if (myc_type == 1) then 
       if (cpool_myc > 0.0_r8) then
-      roi = ((fn_smin2myc + fn_mining_somc + fn_mining_somp) / (params_inst%mimicsplus_k_myc_som / secsphr ) * &
+      roi = ((fn_smin2myc + fn_mining_somc + fn_mining_somp) * (params_inst%mimicsplus_k_myc_som / secsphr ) * &
              params_inst%mimicsplus_mge_ecm / cpool_myc) 
-      !roi = (fn_smin2myc + fn_mining_somc + fn_mining_somp/(params_inst%mimicsplus_mge_am / cpool_myc))*& !ECW 
-        !    (params_inst%mimicsplus_k_myc_som / secsphr )*eps
              if (roi <= 0.0_r8) then
                roi = 1.0_r8/big_roi
              end if 
@@ -1819,9 +1817,8 @@ end subroutine calc_myc_mortality
       endif
      else
       if (cpool_myc > 0.0_r8) then
-         roi = (fn_smin2myc/ (params_inst%mimicsplus_k_myc_som / secsphr ) * &
+         roi = (fn_smin2myc * (params_inst%mimicsplus_k_myc_som / secsphr ) * &
                 params_inst%mimicsplus_mge_am / cpool_myc)
-        ! roi = (fn_smin2myc/(params_inst%mimicsplus_mge_am / cpool_myc))*(params_inst%mimicsplus_k_myc_som / secsphr )*eps
          if (roi <= 0.0_r8) then
             roi = 1.0_r8/big_roi
          end if 
@@ -1881,7 +1878,7 @@ end subroutine calc_myc_mortality
    else
       c_use_eff = params_inst%mimicsplus_mge_am
    endif
-   f_growth = c_use_eff ! in original mimics+ code this is used for some reasom, so here it is for consistency
+   f_growth = c_use_eff !MVD check | in original mimics+ code this is used for some reasom, so here it is for consistency
    ! Change this back to 0.5 coming from parameter file at some point
    fn_smin2myc = (params_inst%mimicsplus_vmax_myc / secphr) * sminn / dz * &
                  (cpool_myc / (cpool_myc + params_inst%mimicsplus_k_m_emyc)) 

@@ -950,7 +950,7 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
                  frac_ideal_C_use = max(min(1.0_r8,frac_ideal_C_use),0.5_r8) 
              else
                  frac_ideal_C_use= 1.0_r8
-          end if
+             end if
            
           excess_carbon                 = npp_to_spend * (1.0_r8-frac_ideal_c_use)
           if(excess_carbon*(1.0_r8+grperc(ivt(p))).gt.npp_to_spend)then !prevent negative dnpp
@@ -1272,7 +1272,7 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
               write(iulog,*)  'soilchange, burned off c', soilc_change(p), burned_off_carbon/dt
               write(iulog,*), 'Excess carbon, npp_Nretrans,freeretrans',excess_carbon_acc/dt,npp_Nretrans(p),free_retransn_to_npool(p)
              endif
-             !-----------------------Diagnostic Fluxes------------------------------!
+             !-----------------------nostic Fluxes------------------------------!
              if(availc(p).gt.0.0_r8)then !what happens in the night? 
                 nuptake_npp_fraction_patch(p) = npp_Nuptake(p)/availc(p)
              else
