@@ -761,9 +761,14 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
 
       if (availc(p) > 0._r8) then
          do j = 1, nlevdecomp
-            rootc_dens(p,j)     =  crootfr(p,j) * rootC(p)
+             rootc_dens(p,j) = crootfr(p,j) * rootC(p)
          end do
-      end if
+     else
+         do j = 1, nlevdecomp
+             rootc_dens(p,j) = 0.0_r8
+         end do
+     end if
+     
 
       plant_ndemand_pool(p)     =  plant_ndemand(p) *  dt
       plant_ndemand_pool(p)     =  max(plant_ndemand_pool(p),0._r8)
