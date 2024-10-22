@@ -94,12 +94,10 @@ module CNFUNMIMICSplusMod
   real(r8), pointer :: npp_retrans_acc(:)                                    ! NPP used for the extraction (gC/m2)
   real(r8), pointer :: nt_uptake(:)                                          ! N uptake from retrans, active, and fix(gN/m2)
   real(r8), pointer :: npp_uptake(:)                                         ! NPP used by the uptakes (gC/m2)
-  real(r8), pointer :: sminfrc(:,:)                                          ! fraction of N to handle NO3 / NH4 input 
   real(r8), pointer :: sminn_to_plant(:,:)                                   ! Nitrogen to plant (to handle NO3 / NH4 input)
 
   !----------NITRIF_DENITRIF-------------!
   !REPLACE NO# with N
-  real(r8)            :: sminn_diff                                          ! A temporary limit for N uptake                  (gN/m2)
   real(r8),  pointer  :: costs_paths(:,:,:)                                  ! Costs for all paths (gC/gN) [patch,nlev,ipath]
   real(r8),  pointer  :: npp_frac_paths(:,:,:)                               ! NPP fraction for all paths () [patch,nlev,ipath]
   real(r8),  pointer  :: npp_to_paths(:,:,:)                                 ! NPP spent all paths (gC/m2) [patch,nlev,ipath]
@@ -108,8 +106,6 @@ module CNFUNMIMICSplusMod
   real(r8),  pointer  :: npp_paths_acc (:,:)                                 ! accumulated NPP spent all paths (gC/m2) [patch,nlev,ipath]
   real(r8),  pointer  :: sminn_layer(:,:)                                      ! Available N in each soil layer (gN/m2)
   real(r8),  pointer  :: sminn_layer_step(:,:)                               ! A temporary variable for soil N (gN/m2) 
-  real(r8),  pointer  :: n_active_vr(:,:)                                    ! Layer mycorrhizal N uptake (gN/m2)
-  real(r8),  pointer  :: n_nonmyc_vr(:,:)                                    ! Layer non-myc     N uptake (gN/m2)
   
   ! Uptake fluxes for COST_METHOD=2
   ! Update Fluxes
@@ -203,12 +199,6 @@ end type params_type
 
      allocate(this%sminn_layer_step(bounds%begp:bounds%endp,1:nlevdecomp));  this%sminn_layer_step(:,:) = spval
 
-     allocate(this%n_active_vr(bounds%begp:bounds%endp, 1:nlevdecomp));      this%n_active_vr(:,:) = spval
-
-     allocate(this%n_nonmyc_vr(bounds%begp:bounds%endp, 1:nlevdecomp));      this%n_nonmyc_vr(:,:) = spval
-
-     allocate(this%sminfrc(bounds%begc:bounds%endc,1:nlevdecomp));           this%sminfrc(:,:) = spval
-
      allocate(this%sminn_to_plant(bounds%begc:bounds%endc,1:nlevdecomp));    this%sminn_to_plant(:,:) = spval
 
     ! Uptake fluxes for COST_METHOD=2
@@ -249,7 +239,6 @@ end type params_type
               nf   =>  soilbiogeochem_nitrogenflux_inst )
  
      this%rootc_dens_step                                               = 0._r8
-     this%sminn_diff                                                    = 0._r8
      this%rootc_dens(begp:endp,1:nlevdecomp)                            = 0._r8
      this%rootC(begp:endp)                                              = 0._r8
      this%n_uptake_myc_frac(begp:endp)                                  = 0._r8
@@ -271,9 +260,6 @@ end type params_type
      this%npp_uptake(bounds%begp:bounds%endp)                           = 0._r8
      this%sminn_layer(bounds%begc:bounds%endc,1:nlevdecomp)             = 0._r8
      this%sminn_layer_step(bounds%begc:bounds%endc,1:nlevdecomp)        = 0._r8
-     this%n_active_vr(bounds%begp:bounds%endp, 1:nlevdecomp)            = 0._r8
-     this%n_nonmyc_vr(bounds%begp:bounds%endp, 1:nlevdecomp)            = 0._r8
-     this%sminfrc(bounds%begc:bounds%endc,1:nlevdecomp)                 = 0._r8
      this%sminn_to_plant(bounds%begc:bounds%endc,1:nlevdecomp)          = 0._r8
 
      cf%c_am_resp_vr_col(begc:endc,1:nlevdecomp)                        = 0._r8
@@ -637,8 +623,6 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
       free_nretrans_acc      => cnfunmimicsplus_inst%free_nretrans_acc                        , &
       litterfall_c_step      => cnfunmimicsplus_inst%litterfall_c_step                        , &
       litterfall_n_step      => cnfunmimicsplus_inst%litterfall_n_step                        , &
-      n_active_vr            => cnfunmimicsplus_inst%n_active_vr                              , &
-      n_nonmyc_vr            => cnfunmimicsplus_inst%n_nonmyc_vr                              , &
       n_retrans_acc          => cnfunmimicsplus_inst%n_retrans_acc                            , &
       n_uptake_myc_frac      => cnfunmimicsplus_inst%n_uptake_myc_frac                        , &
       npp_remaining          => cnfunmimicsplus_inst%npp_remaining                            , &
@@ -650,7 +634,6 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
       rootC                  => cnfunmimicsplus_inst%rootC                                    , &
       rootc_dens             => cnfunmimicsplus_inst%rootc_dens                               , &
       rootc_dens_step        => cnfunmimicsplus_inst%rootc_dens_step                          , &
-      sminfrc                => cnfunmimicsplus_inst%sminfrc                                  , &
       sminn_layer_step       => cnfunmimicsplus_inst%sminn_layer_step                         , &
       sminn_to_plant         => cnfunmimicsplus_inst%sminn_to_plant                           , &
       
@@ -752,8 +735,8 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
       p = filter_soilp(fp)
       c = patch%column(p)
      
-      sminn_to_plant_fun_nh4_vr(p,:) = 0._r8
-      sminn_to_plant_fun_no3_vr(p,:) = 0._r8   
+      sminn_to_plant_fun_nh4_vr(p,:) = 0.0_r8
+      sminn_to_plant_fun_no3_vr(p,:) = 0.0_r8   
       burned_off_carbon              = 0.0_r8
       excess_carbon_acc              = 0.0_r8
      
