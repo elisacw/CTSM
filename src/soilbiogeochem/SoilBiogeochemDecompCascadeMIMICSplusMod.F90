@@ -1947,7 +1947,7 @@ end subroutine calc_myc_mortality
    ! During this process carbon is release from the chemmically and physically protected SOM pools which enters the avaliable SOM pool.
 
    ! USES:
-
+   use clm_time_manager, only: get_step_size_real
    ! ARGUMENTS:
    real(r8), intent(in) :: cpool_som          ! SOM pool [gC/m3]
    real(r8), intent(in) :: cpool_myc          ! Carbon pool of mycorrhiza [gC/m3]
@@ -1957,9 +1957,12 @@ end subroutine calc_myc_mortality
    real(r8), intent(inout) :: fn_mining_som   ! nitrogen mining flux [gN/m3/s]
 
    ! LOCAL VARIABLES:
-   real(r8) :: secphr = 60.0_r8 * 60.0_r8
+   real(r8)            :: secphr = 60.0_r8 * 60.0_r8
    real(r8), parameter :: small_value = 1.e-10_r8
+   real(r8)            :: dt
    
+   dt = get_step_size_real()
+
    ! SOM carbon flux
    fc_som2soma = (params_inst%mimicsplus_k_mo / secphr) * dz * cpool_myc * cpool_som
    ! Nitrogen mining flux
@@ -1971,6 +1974,16 @@ end subroutine calc_myc_mortality
         fc_som2soma = 0.0_r8
      endif
    else 
+     fn_mining_som = 0.0_r8
+     fc_som2soma = 0.0_r8
+   endif
+   ! we need to check that we do not take too much.
+   if (cpool_som < fc_som2soma * dt) then
+     fn_mining_som = 0.0_r8
+     fc_som2soma = 0.0_r8
+   endif
+   ! same for nitrogen
+   if (npool_som < fn_mining_som * dt) then
      fn_mining_som = 0.0_r8
      fc_som2soma = 0.0_r8
    endif
