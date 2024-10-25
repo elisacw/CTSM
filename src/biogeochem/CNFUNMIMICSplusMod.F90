@@ -506,6 +506,24 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
    real(r8) :: c_somc2soma_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)        ! carbon release from mining from somc pool
    real(r8) :: c_somp2soma_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)        ! carbon release from mining from somp pool
    
+   ! Update mycorrhizal variables
+   real(r8) :: n_ecm_growth_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
+   real(r8) :: c_ecm_growth_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
+   real(r8) :: c_ecm_resp_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
+   real(r8) :: c_ecm_enz_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
+   real(r8) :: n_am_growth_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
+   real(r8) :: c_am_growth_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
+   real(r8) :: c_am_resp_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
+   real(r8) :: sminno3_to_ecm_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
+   real(r8) :: sminno3_to_am_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
+   real(r8) :: sminnh4_to_ecm_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
+   real(r8) :: sminnh4_to_am_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
+   real(r8) :: n_somc2ecm_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
+   real(r8) :: n_somp2ecm_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
+   real(r8) :: c_somc2soma_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)        ! carbon release from mining from somc pool
+   real(r8) :: c_somp2soma_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)        ! carbon release from mining from somp pool
+
+
    real(r8) :: n_active_no3_vr(bounds%begp:bounds%endp, 1:nlevdecomp)             ! Layer mycorrhizal no3 uptake (gN/m2)
    real(r8) :: n_nonmyc_no3_vr(bounds%begp:bounds%endp, 1:nlevdecomp)             ! Layer non-myc no3 uptake (gN/m2)
    real(r8) :: n_active_nh4_vr(bounds%begp:bounds%endp, 1:nlevdecomp)             ! Layer mycorrhizal nh4 uptake (gN/m2)
@@ -689,6 +707,22 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
           sminno3_to_am_vr_patch(p,j)  =0.0_r8      ! No3 flux from soil to AM
           sminnh4_to_ecm_vr_patch(p,j) =0.0_r8     ! NH4 flux from soil to ECM
           sminnh4_to_am_vr_patch(p,j)  =0.0_r8     ! NH4 flux from soil to AM
+
+          n_ecm_growth_vr_patch_tmp(p,j)=0.0_r8
+          c_ecm_growth_vr_patch_tmp(p,j)=0.0_r8
+          c_ecm_resp_vr_patch_tmp(p,j)  =0.0_r8
+          c_ecm_enz_vr_patch_tmp(p,j)   =0.0_r8
+          n_am_growth_vr_patch_tmp(p,j) =0.0_r8
+          c_am_growth_vr_patch_tmp(p,j) =0.0_r8
+          c_am_resp_vr_patch_tmp(p,j)   =0.0_r8
+          sminno3_to_ecm_vr_patch_tmp(p,j) =0.0_r8
+          sminno3_to_am_vr_patch_tmp(p,j)  =0.0_r8
+          sminnh4_to_ecm_vr_patch_tmp(p,j) =0.0_r8
+          sminnh4_to_am_vr_patch_tmp(p,j)  =0.0_r8
+          n_somc2ecm_vr_patch_tmp(p,j)     =0.0_r8
+          n_somp2ecm_vr_patch_tmp(p,j)     =0.0_r8
+          c_somc2soma_vr_patch_tmp(p,j)    =0.0_r8
+          c_somp2soma_vr_patch_tmp(p,j)    =0.0_r8
 
 
          call calc_myc_roi(decomp_cpools_vr(c,j,i_ecm_myc),decomp_npools_vr(c,j,i_ecm_myc) , &
@@ -1017,30 +1051,51 @@ stp:  do imyc = ecm_step, am_step        ! TWO STEPS
             C_before_corr(1:npaths) = npp_to_paths(p,j,1:npaths)
             if ((sminn_layer_step(p,j,imyc)) > 0.0_r8 .or. imyc == ecm_step) then
               if (imyc == ecm_step) then
-                sminno3_to_ecm_vr_patch(p,j) = 0.0_r8
-                sminnh4_to_ecm_vr_patch(p,j) = 0.0_r8
+                sminno3_to_ecm_vr_patch_tmp(p,j) = 0.0_r8
+                sminnh4_to_ecm_vr_patch_tmp(p,j) = 0.0_r8
                 call fun_fluxes_myc_update1 (decomp_cpools_vr(c,j,i_ecm_myc),decomp_npools_vr(c,j,i_ecm_myc), &
                 decomp_cpools_vr(c,j,i_phys_som),decomp_cpools_vr(c,j,i_avl_som),decomp_cpools_vr(c,j,i_chem_som), &
                 decomp_npools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_chem_som), &
                 sminn_layer_step(p,j,imyc), sminfrc(c,j), ecm_step, dzsoi_decomp(j), &
                 npp_to_paths(p,j,ipano3), npp_to_paths(p,j,ipanh4), &
                 n_from_paths(p,j,ipnmno3), n_from_paths(p,j,ipnmnh4),n_from_paths(p,j,ipano3), n_from_paths(p,j,ipanh4), &
-                sminno3_to_ecm_vr_patch(p,j), sminnh4_to_ecm_vr_patch(p,j), &
-                c_ecm_resp_vr_patch(p,j), c_ecm_growth_vr_patch(p,j), n_ecm_growth_vr_patch(p,j), c_ecm_enz_vr_patch(p,j), &
-                c_somp2soma_vr_patch(p,j), c_somc2soma_vr_patch(p,j), n_somp2ecm_vr_patch(p,j), n_somc2ecm_vr_patch(p,j))
+                sminno3_to_ecm_vr_patch_tmp(p,j), sminnh4_to_ecm_vr_patch_tmp(p,j), &
+                c_ecm_resp_vr_patch_tmp(p,j), c_ecm_growth_vr_patch_tmp(p,j), n_ecm_growth_vr_patch_tmp(p,j), c_ecm_enz_vr_patch_tmp(p,j), &
+                c_somp2soma_vr_patch_tmp(p,j), c_somc2soma_vr_patch_tmp(p,j), n_somp2ecm_vr_patch_tmp(p,j), n_somc2ecm_vr_patch_tmp(p,j))
                 ! update npp_to_nonmyc with cost
               else
-                sminno3_to_am_vr_patch(p,j) = 0.0_r8
-                sminnh4_to_am_vr_patch(p,j) = 0.0_r8
+                sminno3_to_am_vr_patch_tmp(p,j) = 0.0_r8
+                sminnh4_to_am_vr_patch_tmp(p,j) = 0.0_r8
                 call fun_fluxes_myc_update1 (decomp_cpools_vr(c,j,i_am_myc),decomp_npools_vr(c,j,i_am_myc), &
                 decomp_cpools_vr(c,j,i_phys_som),decomp_cpools_vr(c,j,i_avl_som),decomp_cpools_vr(c,j,i_chem_som), &
                 decomp_npools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_chem_som), &
                 sminn_layer_step(p,j,imyc), sminfrc(c,j), ecm_step, dzsoi_decomp(j), &
                 npp_to_paths(p,j,ipano3), npp_to_paths(p,j,ipanh4), &
                 n_from_paths(p,j,ipnmno3), n_from_paths(p,j,ipnmnh4),n_from_paths(p,j,ipano3), n_from_paths(p,j,ipanh4), &
-                sminno3_to_am_vr_patch(p,j), sminnh4_to_am_vr_patch(p,j), &
-                c_am_resp_vr_patch(p,j), c_am_growth_vr_patch(p,j), n_am_growth_vr_patch(p,j))
+                sminno3_to_am_vr_patch_tmp(p,j), sminnh4_to_am_vr_patch_tmp(p,j), &
+                c_am_resp_vr_patch_tmp(p,j), c_am_growth_vr_patch_tmp(p,j), n_am_growth_vr_patch_tmp(p,j))
               endif
+
+              n_ecm_growth_vr_patch(p,j) = n_ecm_growth_vr_patch(p,j) + n_ecm_growth_vr_patch_tmp(p,j)
+              c_ecm_growth_vr_patch(p,j) = c_ecm_growth_vr_patch(p,j) + c_ecm_growth_vr_patch_tmp(p,j)
+              c_ecm_resp_vr_patch(p,j)   = c_ecm_resp_vr_patch(p,j)   + c_ecm_resp_vr_patch_tmp(p,j)
+              c_ecm_enz_vr_patch(p,j)    = c_ecm_enz_vr_patch(p,j)    + c_ecm_enz_vr_patch_tmp(p,j)
+
+              n_am_growth_vr_patch(p,j) = n_am_growth_vr_patch(p,j) + n_am_growth_vr_patch_tmp(p,j)
+              c_am_growth_vr_patch(p,j) = c_am_growth_vr_patch(p,j) + c_am_growth_vr_patch_tmp(p,j)
+              c_am_resp_vr_patch(p,j)   = c_am_resp_vr_patch(p,j)   + c_am_resp_vr_patch_tmp(p,j)
+
+              sminno3_to_ecm_vr_patch(p,j) = sminno3_to_ecm_vr_patch(p,j) + sminno3_to_ecm_vr_patch_tmp(p,j)
+              sminno3_to_am_vr_patch(p,j) = sminno3_to_am_vr_patch(p,j) + sminno3_to_am_vr_patch_tmp(p,j)
+              sminnh4_to_ecm_vr_patch(p,j) = sminnh4_to_ecm_vr_patch(p,j) + sminnh4_to_ecm_vr_patch_tmp(p,j)
+              sminnh4_to_am_vr_patch(p,j) = sminnh4_to_am_vr_patch(p,j) + sminnh4_to_am_vr_patch_tmp(p,j)
+              n_somc2ecm_vr_patch(p,j) = n_somc2ecm_vr_patch(p,j) + n_somc2ecm_vr_patch_tmp(p,j)
+              n_somp2ecm_vr_patch(p,j) = n_somp2ecm_vr_patch(p,j) + n_somp2ecm_vr_patch_tmp(p,j)
+              c_somc2soma_vr_patch(p,j) = c_somc2soma_vr_patch(p,j) + c_somc2soma_vr_patch_tmp(p,j)
+              c_somp2soma_vr_patch(p,j) = c_somp2soma_vr_patch(p,j) + c_somp2soma_vr_patch_tmp(p,j)
+
+
+
               sminno3_to_am_vr_patch(p,j)  = sminno3_to_am_vr_patch(p,j)/(dzsoi_decomp(j)*dt)
               sminno3_to_ecm_vr_patch(p,j) = sminno3_to_ecm_vr_patch(p,j)/(dzsoi_decomp(j)*dt)
               sminnh4_to_am_vr_patch(p,j)  = sminnh4_to_am_vr_patch(p,j)/(dzsoi_decomp(j)*dt)
