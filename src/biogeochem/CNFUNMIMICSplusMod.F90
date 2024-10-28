@@ -223,8 +223,8 @@ end type params_type
      this%rootc_dens(begp:endp,1:nlevdecomp)                            = 0._r8
      this%rootC(begp:endp)                                              = 0._r8
      this%plant_ndemand_pool(begp:endp)                                 = 0._r8
-     this%litterfall_n(begp:endp)                                  = 0._r8
-     this%litterfall_c(begp:endp)                                  = 0._r8
+     this%litterfall_n(begp:endp)                                       = 0._r8
+     this%litterfall_c(begp:endp)                                       = 0._r8
      this%npp_remaining(begp:endp)                                      = 0._r8
      this%costs_paths(begp:endp,1:nlevdecomp,1:npaths)                  = big_cost
      this%npp_to_paths(begp:endp,1:nlevdecomp,1:npaths)                 = 0._r8
@@ -439,7 +439,7 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
    !  WITHOUT GROWTH RESP
    real(r8) ::                    npp_to_spend         ! how much carbon do we need to get rid of?
    real(r8) ::                    npp_to_spend_init    ! npp that is available for nuptake
-   real(r8) ::                    npp_to_spend_fix     ! temporary variable to check if npp from fixation is sammaler than all pathways
+   real(r8) ::                    npp_to_spend_prev    ! npp used for previous iteration
    real(r8) ::                    npp_spent            ! temporary
    real(r8) ::                    soil_n_extraction    ! calculates total N pulled from soil
    real(r8) ::                    total_N_conductance  ! inverse of C to of N for whole soil-leaf pathway
@@ -448,8 +448,6 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
    real(r8) ::                    free_n_retrans
    real(r8) ::                    total_c_spent_retrans
    real(r8) ::                    total_c_accounted_retrans
-
-   real(r8) :: frac_alloc_ecm                     ! fraction from ROI allocated to EcM
 
    ! soil mineral nitrogen availible
    real(r8) :: sminno3_to_paths(bounds%begp:bounds%endp, 1:nlevdecomp)   ! miniral no3 available
@@ -471,25 +469,7 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
    real(r8) :: c_somc2soma_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)        ! carbon release from mining from somc pool
    real(r8) :: c_somp2soma_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)        ! carbon release from mining from somp pool
 
-   real(r8) :: n_ecm_growth_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
-   real(r8) :: c_ecm_growth_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
-   real(r8) :: c_ecm_resp_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
-   real(r8) :: c_ecm_enz_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
-   real(r8) :: n_am_growth_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
-   real(r8) :: c_am_growth_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
-   real(r8) :: c_am_resp_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
-   real(r8) :: sminno3_to_ecm_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
-   real(r8) :: sminno3_to_am_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
-   real(r8) :: sminnh4_to_ecm_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
-   real(r8) :: sminnh4_to_am_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
-   real(r8) :: n_somc2ecm_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
-   real(r8) :: n_somp2ecm_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)
-   real(r8) :: c_somc2soma_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)        ! carbon release from mining from somc pool
-   real(r8) :: c_somp2soma_vr_patch_tmp(bounds%begp:bounds%endp, 1:nlevdecomp)        ! carbon release from mining from somp pool
-
-   real(r8) :: n_ecm(bounds%begp:bounds%endp, 1:nlevdecomp)             ! Layer mycorrhizal no3 uptake (gN/m2)
    real(r8) :: n_nonmyc_no3_vr(bounds%begp:bounds%endp, 1:nlevdecomp)             ! Layer non-myc no3 uptake (gN/m2)
-   real(r8) :: n_am(bounds%begp:bounds%endp, 1:nlevdecomp)             ! Layer mycorrhizal nh4 uptake (gN/m2)
    real(r8) :: n_nonmyc_nh4_vr(bounds%begp:bounds%endp, 1:nlevdecomp)             ! Layer non-myc nh4 uptake (gN/m2)
    real(r8) :: sminno3_to_ecm_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)     ! No3 flux from soil to ECM
    real(r8) :: sminno3_to_am_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp)      ! No3 flux from soil to AM
@@ -604,23 +584,20 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
       plant_ndemand_pool     => cnfunmimicsplus_inst%plant_ndemand_pool                       , &
       rootC                  => cnfunmimicsplus_inst%rootC                                    , &
       rootc_dens             => cnfunmimicsplus_inst%rootc_dens                               , &
-      rootc_dens_step        => cnfunmimicsplus_inst%rootc_dens_step                          , &
-      
       ! C and N soil pools:
       decomp_cpools_vr      => soilbiogeochem_carbonstate_inst%decomp_cpools_vr_col           , &
       decomp_npools_vr      => soilbiogeochem_nitrogenstate_inst%decomp_npools_vr_col          )
       
-      dt           = get_step_size_real()
-      stepspday    = secspday / dt
+   dt           = get_step_size_real()
+   stepspday    = secspday / dt
 
 
-     ! Time step of FUNMIMICSplus: once per day                
-     call cnfunmimicsplus_inst%SetZeros(bounds,soilbiogeochem_carbonflux_inst,soilbiogeochem_nitrogenflux_inst) ! set everything to zero
+   ! Time step of FUNMIMICSplus: once per day                
+   call cnfunmimicsplus_inst%SetZeros(bounds,soilbiogeochem_carbonflux_inst,soilbiogeochem_nitrogenflux_inst) ! set everything to zero
 
-     do fp = 1,num_soilp          ! PFT Starts
-     p = filter_soilp(fp)
-   
-     ! Calculate plant N based on; N lost with litterfall, root C, ...
+   do fp = 1,num_soilp          ! PFT Starts
+      p = filter_soilp(fp)
+      ! Calculate plant N based on; N lost with litterfall, root C, ...
       rootC(p)        =  frootc(p)
 
      ! Calculate patch plant C:N ratio
@@ -629,9 +606,8 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
       else
           plantCN(p)  = 0._r8 
       end if
-     end do                       ! PFT ends
+   end do                       ! PFT ends
 
-      ! Calculates fraction of N uptake per mycorrhizal type per PFT
    do fp = 1,num_soilp
       p = filter_soilp(fp)
       c = patch%column(p)
@@ -648,25 +624,6 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
          n_somp2ecm_vr_patch(p,j)      =0.0_r8    ! nitrogen mining from ECM mycorrhiza
          c_somc2soma_vr_patch(p,j)     =0.0_r8    ! carbon release from mining from somc pool
          c_somp2soma_vr_patch(p,j)     =0.0_r8    ! carbon release from mining from somp pool
-
-         n_ecm_growth_vr_patch_tmp(p,j)=0.0_r8
-         c_ecm_growth_vr_patch_tmp(p,j)=0.0_r8
-         c_ecm_resp_vr_patch_tmp(p,j)  =0.0_r8
-         c_ecm_enz_vr_patch_tmp(p,j)   =0.0_r8
-         n_am_growth_vr_patch_tmp(p,j) =0.0_r8
-         c_am_growth_vr_patch_tmp(p,j) =0.0_r8
-         c_am_resp_vr_patch_tmp(p,j)   =0.0_r8
-         sminno3_to_ecm_vr_patch_tmp(p,j) =0.0_r8
-         sminno3_to_am_vr_patch_tmp(p,j)  =0.0_r8
-         sminnh4_to_ecm_vr_patch_tmp(p,j) =0.0_r8
-         sminnh4_to_am_vr_patch_tmp(p,j)  =0.0_r8
-         n_somc2ecm_vr_patch_tmp(p,j)     =0.0_r8
-         n_somp2ecm_vr_patch_tmp(p,j)     =0.0_r8
-         c_somc2soma_vr_patch_tmp(p,j)    =0.0_r8
-         c_somp2soma_vr_patch_tmp(p,j)    =0.0_r8
-       
-          n_ecm(p,j)                   =0.0_r8    ! Layer mycorrhizal no3 uptake (gN/m2)
-          n_am(p,j)                    =0.0_r8    ! Layer mycorrhizal nh4 uptake (gN/m2)
           n_nonmyc_no3_vr(p,j)         =0.0_r8    ! Layer non-myc     no3 uptake (gN/m2)
           n_nonmyc_nh4_vr(p,j)         =0.0_r8    ! Layer non-myc     nh4 uptake (gN/m2)
           sminno3_to_ecm_vr_patch(p,j) =0.0_r8    ! No3 flux from soil to ECM
@@ -679,42 +636,40 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
 
       end do
 
-     if(leafc(p)>0.0_r8)then                       ! N available in leaf which fell off in this timestep. Same fraction loss as C.    
+      if(leafc(p)>0.0_r8)then                       ! N available in leaf which fell off in this timestep. Same fraction loss as C.    
           litterfall_c(p)         =   dt * leafc_to_litter_fun(p) 
           litterfall_n(p)         =   dt * leafn(p) * leafc_to_litter_fun(p)/leafc(p)
-     endif 
+      endif 
    end do
      
      
-    do j = 1, nlevdecomp
-       do fp = 1,num_soilp        ! PFT Starts
-          p = filter_soilp(fp)
-          c = patch%column(p)
-          sminno3_to_paths(p,j) = max(smin_no3_to_plant_vr(c,j) * dzsoi_decomp(j) * dt,0.0_r8) ! gN/m2
-          sminnh4_to_paths(p,j) = max(smin_nh4_to_plant_vr(c,j) * dzsoi_decomp(j) * dt,0.0_r8) ! gN/m2
-       end do
-    end do
+   do j = 1, nlevdecomp
+      do fp = 1,num_soilp        ! PFT Starts
+         p = filter_soilp(fp)
+         c = patch%column(p)
+         sminno3_to_paths(p,j) = max(smin_no3_to_plant_vr(c,j) * dzsoi_decomp(j) * dt,0.0_r8) ! gN/m2
+         sminnh4_to_paths(p,j) = max(smin_nh4_to_plant_vr(c,j) * dzsoi_decomp(j) * dt,0.0_r8) ! gN/m2
+      end do
+   end do
 
    ! PFT loop
    ! Calculating leaf C / N storage demand for retranslocation
-pft:  do fp = 1,num_soilp        ! PFT Starts
+   pft_loop: do fp = 1,num_soilp        ! PFT Starts
       p = filter_soilp(fp)
-      c = patch%column(p)
-      sminn_to_plant_fun_nh4_vr(p,:) = 0._r8
-      sminn_to_plant_fun_no3_vr(p,:) = 0._r8   
+      c = patch%column(p) 
       burned_off_carbon              = 0.0_r8
       excess_carbon_acc              = 0.0_r8
       sum_path_mult = 0.0_r8
-      path_mult(p,iecm)    = perecm(ivt(p))
-      path_mult(p,iam)     = 1.0_r8 - perecm(ivt(p))
+      path_mult(p,ipecm)    = perecm(ivt(p))
+      path_mult(p,ipam)     = 1.0_r8 - perecm(ivt(p))
       path_mult(p,ipnmno3) = 1.0_r8
       path_mult(p,ipnmnh4) = 1.0_r8
       if (FUN_fracfixers(ivt(p)) < 1.0_r8) then
          path_mult(p,ipfix)   = FUN_fracfixers(ivt(p)) 
       else
          path_mult(p,ipfix)   = 1.0_r8
-         path_mult(p,iecm)    = 0.0_r8
-         path_mult(p,iam)     = 0.0_r8 
+         path_mult(p,ipecm)   = 0.0_r8
+         path_mult(p,ipam)    = 0.0_r8 
          path_mult(p,ipnmno3) = 0.0_r8
          path_mult(p,ipnmnh4) = 0.0_r8
       endif
@@ -727,9 +682,6 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
         write(iulog,*) 'ERROR: all pathways for nitrogen uptake have 0 fraction'
         call endrun(msg= errMsg(sourcefile,  __LINE__))
       endif
-
-      ! I have turned off this retranslocation functionality for now. To be rolled back in to a new version later on once the rest of the mode is working OK. RF
-
       if (season_decid(ivt(p)) == 1._r8.or.stress_decid(ivt(p)) == 1._r8) then
          if (onset_flag(p) == 1._r8) then
             leafn_storage_xfer_acc(p) = leafn_storage_xfer_acc(p) + leafn_storage_to_xfer(p) * dt
@@ -754,41 +706,47 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
       else
          rootc_dens(p,:) = 0.0_r8
       end if
-
+      if (use_flexibleCN) then   
+         if (leafn(p) == 0.0_r8) then   ! to avoid division by zero
+            delta_CN = fun_cn_flex_c(ivt(p))   ! Max CN ratio over standard
+         else
+            delta_CN = (leafc(p)+leafc_storage(p))/(leafn(p)+leafn_storage(p)) - leafcn(ivt(p)) ! leaf CN ratio                                                              
+         end if
+      else
+           delta_CN = 0.0_r8
+      endif
       plant_ndemand_pool(p)     =  plant_ndemand(p) *  dt
       plant_ndemand_pool(p)     =  max(plant_ndemand_pool(p),0._r8)
       plant_ndemand_retrans(p)  =  storage_ndemand(p) 
-
-      ! Nitrogen demand of plant & remaining carbon (NPP) per timestep
-      unmetDemand              = .TRUE.
       npp_remaining(p)             = availc(p) * dt ! gC/m2 !og availc(p) *dt
-         
       ! COST FIXATION PATHWAY
       ! checks which photosyntetic pathway plant has (C3 / C4) and if they can do nitrogen fixation   
       do j = 1, nlevdecomp
-         if(pftcon%c3psn(patch%itype(p)).eq.1)then
-           fixer=1
+         if (pftcon%c3psn(patch%itype(p)).eq.1) then
+            fixer=1
          else
-           fixer=0
+            fixer=0
          endif
-         costs_paths(p,j,ipfix)     = fun_cost_fix(fixer,a_fix(ivt(p)),b_fix(ivt(p))&
-         ,c_fix(ivt(p)) ,big_cost,crootfr(p,j),s_fix(ivt(p)),t_soisno(c,j))
+            costs_paths(p,j,ipfix) = fun_cost_fix(fixer,a_fix(ivt(p)),b_fix(ivt(p)), &
+                                     c_fix(ivt(p)) ,big_cost,crootfr(p,j),s_fix(ivt(p)),t_soisno(c,j))
       end do
 
       ! ACTIVE UPTAKE
       ! Mycorrhizal Uptake Cost
       do j = 1,nlevdecomp
-         rootc_dens_step             = rootc_dens(p,j)
          costs_paths(p,j,ipecm:ipam)=big_cost
-         if (rootc_dens_step > 0.0_r8) then
-         call calc_myc_roi(decomp_cpools_vr(c,j,i_ecm_myc),decomp_npools_vr(c,j,i_ecm_myc) , &
-         decomp_cpools_vr(c,j,i_phys_som),decomp_cpools_vr(c,j,i_avl_som),decomp_cpools_vr(c,j,i_chem_som), &
-         decomp_npools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_chem_som), &
-         (smin_no3_to_plant_vr(c,j) + smin_nh4_to_plant_vr(c,j)) * dt , ecm_step , dzsoi_decomp(j),big_cost, costs_paths(p,j,ipecm))
-         call calc_myc_roi(decomp_cpools_vr(c,j,i_am_myc),decomp_npools_vr(c,j,i_am_myc) , &
-         decomp_cpools_vr(c,j,i_phys_som),decomp_cpools_vr(c,j,i_avl_som),decomp_cpools_vr(c,j,i_chem_som), &
-         decomp_npools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_chem_som), &
-         (smin_no3_to_plant_vr(c,j) + smin_nh4_to_plant_vr(c,j)) * dt, am_step , dzsoi_decomp(j),big_cost, costs_paths(p,j,ipam))
+         if (rootc_dens(p,j) > 0.0_r8) then
+            ! these return gN/gC
+            call calc_myc_roi(decomp_cpools_vr(c,j,i_ecm_myc), &
+                              decomp_cpools_vr(c,j,i_phys_som), decomp_cpools_vr(c,j,i_avl_som), decomp_cpools_vr(c,j,i_chem_som), &
+                              decomp_npools_vr(c,j,i_phys_som), decomp_npools_vr(c,j,i_chem_som), &
+                              (sminno3_to_paths(p,j) + sminnh4_to_paths(p,j)), ecm_step , & ! sminn is in gN/m2 here
+                              dzsoi_decomp(j), big_cost, costs_paths(p,j,ipecm))
+            call calc_myc_roi(decomp_cpools_vr(c,j,i_am_myc), &
+                              decomp_cpools_vr(c,j,i_phys_som), decomp_cpools_vr(c,j,i_avl_som), decomp_cpools_vr(c,j,i_chem_som), &
+                              decomp_npools_vr(c,j,i_phys_som), decomp_npools_vr(c,j,i_chem_som), &
+                              (sminno3_to_paths(p,j) + sminnh4_to_paths(p,j)), am_step , &
+                              dzsoi_decomp(j), big_cost, costs_paths(p,j,ipam))
          end if
          costs_paths(p,j,ipecm)=1./costs_paths(p,j,ipecm)
          costs_paths(p,j,ipam)=1./costs_paths(p,j,ipam) ! convert to C/N
@@ -796,272 +754,283 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
       
       ! Non-mycorrhizal Uptake Cost
       do j = 1,nlevdecomp
-         rootc_dens_step               = rootc_dens(p,j)
          costs_paths(p,j,ipnmno3)      = fun_cost_nonmyc(sminno3_to_paths(p,j) &
-         ,big_cost,kc_nonmyc(ivt(p)),kn_nonmyc(ivt(p)) ,rootc_dens_step,crootfr(p,j),smallValue)
+         ,big_cost,kc_nonmyc(ivt(p)),kn_nonmyc(ivt(p)) ,rootc_dens(p,j),crootfr(p,j),smallValue)
          costs_paths(p,j,ipnmnh4)      = fun_cost_nonmyc(sminnh4_to_paths(p,j) &
-         ,big_cost,kc_nonmyc(ivt(p)),kn_nonmyc(ivt(p)) ,rootc_dens_step,crootfr(p,j),smallValue)
+         ,big_cost,kc_nonmyc(ivt(p)),kn_nonmyc(ivt(p)) ,rootc_dens(p,j),crootfr(p,j),smallValue)
       end do
       total_N_conductance = 1.0_r8/ big_cost
 
 
-         ! has to be zeroed since depend on accumula
-          n_from_paths(p,:,:) = 0.0_r8 !act and nonmyc boths nh4 and no3
-          npp_frac_paths(p,:,:) = 0.0_r8
-          npp_to_paths(p,:,:) = 0.0_r8
-          !           Calculate Integrated Resistance OF WHOLE SOIL COLUMN
+      ! has to be zeroed since depend on accumula
+      n_from_paths(p,:,:) = 0.0_r8 !act and nonmyc boths nh4 and no3
+      npp_frac_paths(p,:,:) = 0.0_r8
+      npp_to_paths(p,:,:) = 0.0_r8
+      !           Calculate Integrated Resistance OF WHOLE SOIL COLUMN
           
-          sum_n_acquired      = 0.0_r8
-          total_N_conductance = 0.0_r8
-          do j = 1, nlevdecomp
-             ! Method changed from FUN-resistors method to a method which allocates fluxs based on conductance. rosief
-             ! Sum the conductances             
-             total_N_conductance  = total_N_conductance + 1._r8/ costs_paths(p,j,ipecm) + 1._r8/ costs_paths(p,j,ipam) &
-                                 + 1._r8/ costs_paths(p,j,ipnmno3) + 1._r8/ costs_paths(p,j,ipnmnh4) !N/C
-             total_N_conductance  = total_N_conductance  + 1._r8/ costs_paths(p,j,ipfix) 
-          end do 
-          if (total_N_conductance <= 0.0_r8) then
-             write(iulog,*) "Total N Conductance is out of bounds: " total_N_conductance
-             call endrun(msg= errMsg(sourcefile,  __LINE__))
-          endif
+      sum_n_acquired      = 0.0_r8
+      do j = 1, nlevdecomp
+         ! Method changed from FUN-resistors method to a method which allocates fluxs based on conductance. rosief
+         ! Sum the conductances             
+         total_N_conductance  = total_N_conductance + 1._r8/ costs_paths(p,j,ipecm) + 1._r8/ costs_paths(p,j,ipam) &
+                                + 1._r8/ costs_paths(p,j,ipnmno3) + 1._r8/ costs_paths(p,j,ipnmnh4) !N/C
+         total_N_conductance  = total_N_conductance  + 1._r8/ costs_paths(p,j,ipfix) 
+      end do 
+      if (total_N_conductance <= 0.0_r8) then
+         write(iulog,*) "Total N Conductance is out of bounds: ", total_N_conductance
+         call endrun(msg= errMsg(sourcefile,  __LINE__))
+      endif
 
-          do j = 1, nlevdecomp
+      do j = 1, nlevdecomp
             
-             ! MVD Proposed variable to get rid of ecm and fixer loops
-             ! Calculate npp allocation to pathways proportional to their exchange rate (N/C) 
-             rootc_dens_step             = rootc_dens(p,j) 
-             if (rootc_dens_step > 0.0_r8) then
-                npp_frac_paths(p,j,ipecm) = (1.0_r8/costs_paths(p,j,ipecm)) / total_N_conductance * path_mult(p,ipecm)
-                npp_frac_paths(p,j,ipam) = (1.0_r8/costs_paths(p,j,ipam)) / total_N_conductance * path_mult(p,ipam)
-                npp_frac_paths(p,j,ipnmno3) = (1.0_r8/costs_paths(p,j,ipnmno3)) / total_N_conductance * path_mult(p,ipnmno3)
-                npp_frac_paths(p,j,ipnmnh4) = (1.0_r8/costs_paths(p,j,ipnmnh4)) / total_N_conductance * path_mult(p,ipnmnh4)
-                npp_frac_paths(p,j,ipecm) = (1.0_r8/costs_paths(p,j,ipfix)) / total_N_conductance * path_mult(p,ipfix)
-                sum_path_mult = 0.0_r8
-                do ipath = 1,npath
-                  sum_path_mult = sum_path_mult + npp_frac_paths(p,j,ipath)
-                enddo
-                if (sum_path_mult > 0.0_r8) then
-                   ! renormalize fractions and conductance
-                   do ipath = 1,npaths
-                      npp_frac_paths(p,j,ipath) = npp_frac_paths(p,j,ipath) /sum_path_mult
-                      sum_n_acquired  = sum_n_acquired + npp_frac_paths / costs_paths (p,j,ipath) ! N/C
-                         
-                   enddo
-                else
-                   write(iulog,*) "Sum of npp fractions is out of bounds: " sum_path_mult
-                   call endrun(msg= errMsg(sourcefile,  __LINE__))
-                endif
-             else 
-               npp_frac_paths(p,j,ipecm:ipfix) = 0.0_r8
-             endif
-          end do
+         ! MVD Proposed variable to get rid of ecm and fixer loops
+         ! Calculate npp allocation to pathways proportional to their exchange rate (N/C) 
+         if (rootc_dens(p,j) > 0.0_r8) then
+            npp_frac_paths(p,j,ipecm) = (1.0_r8/costs_paths(p,j,ipecm)) / total_N_conductance * path_mult(p,ipecm)
+            npp_frac_paths(p,j,ipam) = (1.0_r8/costs_paths(p,j,ipam)) / total_N_conductance * path_mult(p,ipam)
+            npp_frac_paths(p,j,ipnmno3) = (1.0_r8/costs_paths(p,j,ipnmno3)) / total_N_conductance * path_mult(p,ipnmno3)
+            npp_frac_paths(p,j,ipnmnh4) = (1.0_r8/costs_paths(p,j,ipnmnh4)) / total_N_conductance * path_mult(p,ipnmnh4)
+            npp_frac_paths(p,j,ipecm) = (1.0_r8/costs_paths(p,j,ipfix)) / total_N_conductance * path_mult(p,ipfix)
+            sum_path_mult = 0.0_r8
+            do ipath = 1,npaths
+               sum_path_mult = sum_path_mult + npp_frac_paths(p,j,ipath)
+            enddo
+            if (sum_path_mult > 0.0_r8) then
+               ! renormalize fractions and conductance
+               do ipath = 1,npaths
+                  npp_frac_paths(p,j,ipath) = npp_frac_paths(p,j,ipath) /sum_path_mult
+                  sum_n_acquired  = sum_n_acquired + npp_frac_paths(p,j,ipath) / costs_paths (p,j,ipath) ! N/C
+               enddo
+            else
+              write(iulog,*) "Sum of npp fractions is out of bounds: ", sum_path_mult
+              call endrun(msg= errMsg(sourcefile,  __LINE__))
+            endif
+         else 
+            npp_frac_paths(p,j,ipecm:ipfix) = 0.0_r8
+         endif
+      end do
 
-          npp_to_spend = = availc(p) * dt ! gC/m2 !og availc(p) *dt
-          npp_to_spend_init = npp_to_spend
-          cn_resolved = .false.
-          cn_iter = 0
+      npp_to_spend = availc(p) * dt ! gC/m2 !og availc(p) *dt
+      npp_to_spend_init = npp_to_spend
+      cn_resolved = .false.
+      cn_iter = 0
 
-          cn_not_resolved do while (.not. cn_resolved)
+      cn_loop: do while (.not. cn_resolved)
 
-             cn_iter = cn_iter + 1
-             if (cn_iter > max_cn_iter) then !  exit before executing next itiration
-                cn_resolved = .true.
-             endif
-             if (plant_ndemand_pool(p) <= 0._r8) then    ! unmet demand
-                cn_resolved = .true.
-                n_from_paths(p,:,:) = 0.0_r8
-                npp_to_paths(p,:,:) = 0.0_r8
-                sminno3_to_ecm_vr_patch(p,:) = 0.0_r8
-                c_somp2soma_vr_patch(p,:)    = 0.0_r8
-                n_somp2ecm_vr_patch(p,:)     = 0.0_r8
-                c_somc2soma_vr_patch(p,:)    = 0.0_r8
-                n_somc2ecm_vr_patch(p,:)     = 0.0_r8
-                sminnh4_to_ecm_vr_patch(p,:) = 0.0_r8
-                sminnh4_to_am_vr_patch(p,:) = 0.0_r8
-                sminno3_to_am_vr_patch(p,:) = 0.0_r8
-                ! set all other vars to 0.0 here
-             else
-                layer_loop: do j = 1,nlevdecomp
-                   N_before_corr(1:npaths) = n_from_paths(p,j,1:npaths)
-                   C_before_corr(1:npaths) = npp_to_paths(p,j,1:npaths)
-                   sminnh4_extracted = 0.0_r8
-                   sminno3_extracted = 0.0_r8
-                   npp_to_paths(p,j,1:npaths) = npp_frac_paths(p,j,1:npaths) * npp_to_spend
-                   n_from_paths(p,j,1:npaths) = npp_to_paths(p,j,1:npaths) / costs_paths(p,j,1:npaths)
-                   if (npp_to_paths(p,j,ipecm) > 0.0_r8) then
-                      ! ecm no3 and mining
-                      call myc_n_extraction(dzsoi_decomp(j),(smin_no3_to_plant_vr(c,j)) * dt, &
-                         decomp_cpools_vr(c,j,i_ecm_myc),decomp_cpools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_phys_som), &
-                         decomp_cpools_vr(c,j,i_chem_som),decomp_npools_vr(c,j,i_chem_som), sminno3_to_ecm_vr_patch(p,j), & 
-                         c_somp2soma_vr_patch(p,j),n_somp2ecm_vr_patch(p,j), &
-                         c_somc2soma_vr_patch(p,j),n_somc2ecm_vr_patch(p,j))
-                      ! ecm nh4
-                      call myc_n_extraction(dzsoi_decomp(j),(smin_nh4_to_plant_vr(c,j)) * dt, &
-                         decomp_cpools_vr(c,j,i_ecm_myc),decomp_cpools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_phys_som), &
-                         decomp_cpools_vr(c,j,i_chem_som),decomp_npools_vr(c,j,i_chem_som), sminnh4_to_ecm_vr_patch_tmp(p,j))
-                   else
-                      sminno3_to_ecm_vr_patch(p,j) = 0.0_r8
-                      c_somp2soma_vr_patch(p,j)    = 0.0_r8
-                      n_somp2ecm_vr_patch(p,j)     = 0.0_r8
-                      c_somc2soma_vr_patch(p,j)    = 0.0_r8
-                      n_somc2ecm_vr_patch(p,j)     = 0.0_r8
-                      sminnh4_to_ecm_vr_patch(p,j) = 0.0_r8
-                   end if
-                   if (npp_to_paths(p,j,ipam) > 0.0_r8) then
-                      ! am no3
-                      call myc_n_extraction(dzsoi_decomp(j),(smin_no3_to_plant_vr(c,j)) * dt, &
-                         decomp_cpools_vr(c,j,i_am_myc),decomp_cpools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_phys_som), &
-                         decomp_cpools_vr(c,j,i_chem_som),decomp_npools_vr(c,j,i_chem_som), sminno3_to_am_vr_patch(p,j))
-                      ! am nh4
-                      call myc_n_extraction(dzsoi_decomp(j),(smin_nh4_to_plant_vr(c,j)) * dt, &
-                         decomp_cpools_vr(c,j,i_am_myc),decomp_cpools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_phys_som), &
-                         decomp_cpools_vr(c,j,i_chem_som),decomp_npools_vr(c,j,i_chem_som), sminnh4_to_am_vr_patch(p,j))
-                   else
-                      sminnh4_to_am_vr_patch(p,j) = 0.0_r8
-                      sminno3_to_am_vr_patch(p,j) = 0.0_r8
-                   end if
-                   ! LIMIT SMIN extraction:
-                   ! nonmyc gives to plant all the mineral nitrogen it extracts.
-                   sminnh4_extracted = sminnh4_to_ecm_vr_patch(p,j) + sminnh4_to_am_vr_patch(p,j) + n_from_paths(p,j,ipnmnh4)
-                   sminno3_extracted = sminno3_to_ecm_vr_patch(p,j) + sminno3_to_am_vr_patch(p,j) + n_from_paths(p,j,ipnmno3)
-                   ! If we have any thing to extract:
-                   if (sminnh4_to_paths(p,j) > 0.0_r8 .and. sminnh4_extracted > 0.0_r8) then
-                      ! extracted more than  there is possibly available
-                      if (sminnh4_to_paths(p,j) < sminnh4_extracted) then
-                         sminnh4_overlimit = sminnh4_extracted - sminnh4_to_paths(p,j)
-                         sminnh4_to_ecm_vr_patch(p,j) = sminnh4_to_ecm_vr_patch(p,j) * (1.0_r8 - sminnh4_overlimit / sminnh4_extracted)
-                         sminnh4_to_am_vr_patch(p,j)  = sminnh4_to_am_vr_patch(p,j) * (1.0_r8 - sminnh4_overlimit / sminnh4_extracted)
-                         n_from_paths(p,j,ipnmnh4)    = n_from_paths(p,j,ipnmnh4) * (1.0_r8 - sminnh4_overlimit / sminnh4_extracted)
-                      endif
-                   else
-                      sminnh4_overlimit = 0.0_r8
-                      sminnh4_to_ecm_vr_patch(p,j) = 0.0_r8
-                      sminnh4_to_am_vr_patch(p,j)  = 0.0_r8
-                      n_from_paths(p,j,ipnmnh4)    = 0.0_r8
-                   endif
-                   ! Limiting no3 extraction.
-                   if (sminno3_to_paths(p,j) > 0.0 .and. sminno3_extracted > 0.0) then
-                   ! extracted more than  there is possibly available
-                      if (sminno3_to_paths(p,j) < sminno3_extracted) then
-                         sminno3_overlimit = sminno3_extracted - sminno3_to_paths(p,j)
-                         sminno3_to_ecm_vr_patch(p,j) = sminno3_to_ecm_vr_patch(p,j) * (1.0_r8 - sminno3_overlimit / sminno3_extracted)
-                         sminno3_to_am_vr_patch(p,j)  = sminno3_to_am_vr_patch(p,j) * (1.0_r8 - sminno3_overlimit / sminno3_extracted)
-                         n_from_paths(p,j,ipnmno3)    = n_from_paths(p,j,ipnmno3) * (1.0_r8 - sminno3_overlimit / sminno3_extracted)
-                      endif
-                   else
-                      sminno3_overlimit            = 0.0_r8
-                      sminno3_to_ecm_vr_patch_tmp(p,j) = 0.0_r8
-                      sminno3_to_am_vr_patch_tmp(p,j)  = 0.0_r8
-                      n_from_paths(p,j,ipnmno3)    = 0.0_r8
-                   endif
+         cn_iter = cn_iter + 1
+         npp_to_spend_prev = npp_to_spend
+         if (plant_ndemand_pool(p) <= 0._r8) then    ! no plant demand, everything goes to 0
+            cn_resolved = .true.
+            n_from_paths(p,:,:)          = 0.0_r8
+            npp_to_paths(p,:,:)          = 0.0_r8
+            sminnh4_to_ecm_vr_patch(p,:) = 0.0_r8
+            sminno3_to_ecm_vr_patch(p,:) = 0.0_r8
+            c_somp2soma_vr_patch(p,:)    = 0.0_r8
+            n_somp2ecm_vr_patch(p,:)     = 0.0_r8
+            c_somc2soma_vr_patch(p,:)    = 0.0_r8
+            n_somc2ecm_vr_patch(p,:)     = 0.0_r8
+            sminnh4_to_am_vr_patch(p,:)  = 0.0_r8
+            sminno3_to_am_vr_patch(p,:)  = 0.0_r8
+            c_ecm_enz_vr_patch(p,:)      = 0.0
+            c_ecm_growth_vr_patch(p,:)   = 0.0_r8
+            c_ecm_resp_vr_patch(p,:)     = 0.0_r8
+            n_ecm_growth_vr_patch(p,:)   = 0.0_r8
+            c_am_growth_vr_patch(p,:)    = 0.0_r8
+            c_am_resp_vr_patch(p,:)      = 0.0_r8
+            n_am_growth_vr_patch(p,:)    = 0.0_r8
+            n_paths_acc(p,:)             = 0.0_r8
+            npp_paths_acc(p,:)           = 0.0_r8
+         else
+            do j = 1,nlevdecomp !layer loop
+               sminnh4_extracted = 0.0_r8
+               sminno3_extracted = 0.0_r8
+               npp_to_paths(p,j,1:npaths) = npp_frac_paths(p,j,1:npaths) * npp_to_spend / dt /dzsoi_decomp(j) ! gC/m3/s
+               n_from_paths(p,j,1:npaths) = npp_to_paths(p,j,1:npaths) / costs_paths(p,j,1:npaths)            ! gN/m3/s
+               if (npp_to_paths(p,j,ipecm) > 0.0_r8) then
+                  ! ecm no3 and mining fluxes are returned in g/m3/s
+                  call myc_n_extraction(dzsoi_decomp(j),sminno3_to_paths(p,j), &
+                       decomp_cpools_vr(c,j,i_ecm_myc),decomp_cpools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_phys_som), &
+                       decomp_cpools_vr(c,j,i_chem_som),decomp_npools_vr(c,j,i_chem_som), sminno3_to_ecm_vr_patch(p,j), & 
+                       c_somp2soma_vr_patch(p,j),n_somp2ecm_vr_patch(p,j), &
+                       c_somc2soma_vr_patch(p,j),n_somc2ecm_vr_patch(p,j))
+                  ! ecm nh4 fluxes are returned in g/m3/s
+                  call myc_n_extraction(dzsoi_decomp(j),sminnh4_to_paths(p,j), &
+                       decomp_cpools_vr(c,j,i_ecm_myc),decomp_cpools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_phys_som), &
+                       decomp_cpools_vr(c,j,i_chem_som),decomp_npools_vr(c,j,i_chem_som), sminnh4_to_ecm_vr_patch(p,j))
+               else
+                  sminno3_to_ecm_vr_patch(p,j) = 0.0_r8
+                  c_somp2soma_vr_patch(p,j)    = 0.0_r8
+                  n_somp2ecm_vr_patch(p,j)     = 0.0_r8
+                  c_somc2soma_vr_patch(p,j)    = 0.0_r8
+                  n_somc2ecm_vr_patch(p,j)     = 0.0_r8
+                  sminnh4_to_ecm_vr_patch(p,j) = 0.0_r8
+               end if
+               if (npp_to_paths(p,j,ipam) > 0.0_r8) then
+                  ! am no3
+                  call myc_n_extraction(dzsoi_decomp(j),sminno3_to_paths(p,j), &
+                       decomp_cpools_vr(c,j,i_am_myc),decomp_cpools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_phys_som), &
+                       decomp_cpools_vr(c,j,i_chem_som),decomp_npools_vr(c,j,i_chem_som), sminno3_to_am_vr_patch(p,j))
+                  ! am nh4
+                  call myc_n_extraction(dzsoi_decomp(j),sminnh4_to_paths(p,j), &
+                       decomp_cpools_vr(c,j,i_am_myc),decomp_cpools_vr(c,j,i_phys_som),decomp_npools_vr(c,j,i_phys_som), &
+                       decomp_cpools_vr(c,j,i_chem_som),decomp_npools_vr(c,j,i_chem_som), sminnh4_to_am_vr_patch(p,j))
+               else
+                  sminnh4_to_am_vr_patch(p,j) = 0.0_r8
+                  sminno3_to_am_vr_patch(p,j) = 0.0_r8
+               end if
+               ! LIMIT SMIN extraction:
+               ! nonmyc gives to plant all the mineral nitrogen it extracts.
+               sminnh4_extracted = sminnh4_to_ecm_vr_patch(p,j) + sminnh4_to_am_vr_patch(p,j) + n_from_paths(p,j,ipnmnh4)
+               sminno3_extracted = sminno3_to_ecm_vr_patch(p,j) + sminno3_to_am_vr_patch(p,j) + n_from_paths(p,j,ipnmno3)
+               ! If we have any thing to extract:
+               if (sminnh4_to_paths(p,j) / dzsoi_decomp(j) / dt  > 0.0_r8 .and. sminnh4_extracted > 0.0_r8) then
+                  ! extracted more than  there is possibly available
+                  if (sminnh4_to_paths(p,j) / dzsoi_decomp(j) / dt < sminnh4_extracted) then
+                     sminnh4_overlimit = sminnh4_extracted - sminnh4_to_paths(p,j) / dzsoi_decomp(j) / dt
+                     sminnh4_to_ecm_vr_patch(p,j) = sminnh4_to_ecm_vr_patch(p,j) * (1.0_r8 - sminnh4_overlimit / sminnh4_extracted)
+                     sminnh4_to_am_vr_patch(p,j)  = sminnh4_to_am_vr_patch(p,j) * (1.0_r8 - sminnh4_overlimit / sminnh4_extracted)
+                     n_from_paths(p,j,ipnmnh4)    = n_from_paths(p,j,ipnmnh4) * (1.0_r8 - sminnh4_overlimit / sminnh4_extracted)
+                  endif
+               else
+                  sminnh4_overlimit = 0.0_r8
+                  sminnh4_to_ecm_vr_patch(p,j) = 0.0_r8
+                  sminnh4_to_am_vr_patch(p,j)  = 0.0_r8
+                  n_from_paths(p,j,ipnmnh4)    = 0.0_r8
+               endif
+               ! Limiting no3 extraction.
+               if (sminno3_to_paths(p,j) / dzsoi_decomp(j) / dt > 0.0 .and. sminno3_extracted > 0.0) then
+                  ! extracted more than  there is possibly available
+                  if (sminno3_to_paths(p,j) / dzsoi_decomp(j) / dt < sminno3_extracted) then
+                     sminno3_overlimit = sminno3_extracted - sminno3_to_paths(p,j) / dzsoi_decomp(j) / dt
+                     sminno3_to_ecm_vr_patch(p,j) = sminno3_to_ecm_vr_patch(p,j) * (1.0_r8 - sminno3_overlimit / sminno3_extracted)
+                     sminno3_to_am_vr_patch(p,j)  = sminno3_to_am_vr_patch(p,j) * (1.0_r8 - sminno3_overlimit / sminno3_extracted)
+                     n_from_paths(p,j,ipnmno3)    = n_from_paths(p,j,ipnmno3) * (1.0_r8 - sminno3_overlimit / sminno3_extracted)
+                  endif
+               else
+                  sminno3_overlimit            = 0.0_r8
+                  sminno3_to_ecm_vr_patch(p,j) = 0.0_r8
+                  sminno3_to_am_vr_patch(p,j)  = 0.0_r8
+                  n_from_paths(p,j,ipnmno3)    = 0.0_r8
+               endif
 
-                   ! Calculate actual myc fluxes now:
-                   call myc_cn_fluxes(dzsoi_decomp(j), npp_to_paths(p,j,ipecm), sminno3_to_ecm_vr_patch(p,j) + & 
-                      n_somc2ecm_vr_patch(p,j) + n_somp2ecm_vr_patch(p,j), &
-                      n_from_paths(p,j,ipecm), n_ecm_growth_vr_patch(p,j), &
-                      c_ecm_growth_vr_patch(p,j), c_ecm_resp_vr_patch(p,j), c_ecm_enz_vr_patch(p,j))
+               ! Calculate actual myc fluxes now:
+               call myc_cn_fluxes(dzsoi_decomp(j), npp_to_paths(p,j,ipecm), sminno3_to_ecm_vr_patch(p,j) + & 
+                    n_somc2ecm_vr_patch(p,j) + n_somp2ecm_vr_patch(p,j), &
+                    n_from_paths(p,j,ipecm), n_ecm_growth_vr_patch(p,j), &
+                    c_ecm_growth_vr_patch(p,j), c_ecm_resp_vr_patch(p,j), c_ecm_enz_vr_patch(p,j))
 
-                   call myc_cn_fluxes(dzsoi_decomp(j), npp_to_paths(p,j,ipam), sminno3_to_am_vr_patch(p,j), &
-                      n_from_paths(p,j,ipam), n_am_growth_vr_patch(p,j), &
-                      c_am_growth_vr_patch(p,j), c_am_resp_vr_patch(p,j))
-                   !-------------------- N flux accumulation------------!
-                   do ipath = 1,npaths
-                      n_paths_acc(p,ipath) = n_paths_acc(p,ipath) + n_from_paths(p,j,ipath)
-                   end do
-                   ! only mycorrhiza is greedy all other paths get as much carbon as they give out nitrogen
-                   npp_to_paths(p,j,ipnmno3) = npp_to_paths(p,j,ipnmno3) * costs_paths(p,j,ipnmno3)
-                   npp_to_paths(p,j,ipnmnh4) = npp_to_paths(p,j,ipnmnh4) * costs_paths(p,j,ipnmnh4)
-                   npp_to_paths(p,j,ipfix)   = npp_to_paths(p,j,ipfix)   * costs_paths(p,j,ipfix)
-                   !-------------------- C flux accumulation------------!
-                   do ipath = 1,npaths
-                      npp_paths_acc(p,ipath) = npp_paths_acc(p,ipath) + npp_to_paths(p,j,ipath)
-                   end do
-                end do layer_loop
-                npp_spent  = sum(npp_paths_acc(p,1:npaths))
-                n_acquired = sum(n_paths_acc(p,1:npaths))
-                ! MVD we switch off retranslocation for now. Ask rosie about total_c_accounted and total_c_spent
-                !if (n_acquired > 0.0_r8 ) then
-                !   total_N_resistance = npp_spent / n_acquired
-                !else
-                !   total_N_resistance = big_cost
-                !endif
-                !total_c_accounted_retrans = 0.0_r8
-                !total_c_spent_retrans     = 0.0_r8
-                !total_c_accounted_retrans = 0.0_r8
-                !paid_for_n_retrans        = 0.0_r8
-                !free_n_retrans            = 0.0_r8
-                !free_n_retrans = 0.0_r8
-                !!  Calculate appropriate degree of retranslocation
-                !if(leafc(p).gt.0.0_r8.and.litterfall_n(p)>0.0_r8.and.ivt(p) <npcropmin)then
-                !   call fun_retranslocation(p,dt,npp_to_spend,&
-                !                            litterfall_c(p),&
-                !                            litterfall_n(p),&
-                !                            total_n_resistance, total_c_spent_retrans,total_c_accounted_retrans, &
-                !                            free_n_retrans,paid_for_n_retrans, leafcn(ivt(p)), & 
-                !                            grperc(ivt(p)), plantCN(p))
-                !            
-                !else
-                !   total_c_accounted_retrans = 0.0_r8
-                !   total_c_spent_retrans     = 0.0_r8
-                !   total_c_accounted_retrans = 0.0_r8
-                !   paid_for_n_retrans        = 0.0_r8
-                !  free_n_retrans            = 0.0_r8
-                !endif
+               call myc_cn_fluxes(dzsoi_decomp(j), npp_to_paths(p,j,ipam), sminno3_to_am_vr_patch(p,j), &
+                    n_from_paths(p,j,ipam), n_am_growth_vr_patch(p,j), &
+                    c_am_growth_vr_patch(p,j), c_am_resp_vr_patch(p,j))
+               !-------------------- N flux accumulation------------!
+               do ipath = 1,npaths
+                  n_paths_acc(p,ipath) = n_paths_acc(p,ipath) + n_from_paths(p,j,ipath) * dzsoi_decomp(j) * dt 
+               end do
+               ! only mycorrhiza is greedy all other paths get as much carbon as they give out nitrogen
+               npp_to_paths(p,j,ipnmno3) = npp_to_paths(p,j,ipnmno3) * costs_paths(p,j,ipnmno3)
+               npp_to_paths(p,j,ipnmnh4) = npp_to_paths(p,j,ipnmnh4) * costs_paths(p,j,ipnmnh4)
+               npp_to_paths(p,j,ipfix)   = npp_to_paths(p,j,ipfix)   * costs_paths(p,j,ipfix)
+               !-------------------- C flux accumulation------------!
+               do ipath = 1,npaths
+                  npp_paths_acc(p,ipath) = npp_paths_acc(p,ipath) + npp_to_paths(p,j,ipath) * dzsoi_decomp(j) * dt ! gC/m2
+               end do
+            end do ! layer loop
+            npp_spent  = sum(npp_paths_acc(p,1:npaths))
+            n_acquired = sum(n_paths_acc(p,1:npaths))
+            ! MVD we switch off retranslocation for now. Ask rosie about total_c_accounted and total_c_spent
+            if (n_acquired > 0.0_r8 ) then
+               total_N_resistance = npp_spent / n_acquired
+            else
+               total_N_resistance = big_cost
+            endif
+            total_c_accounted_retrans = 0.0_r8
+            total_c_spent_retrans     = 0.0_r8
+            total_c_accounted_retrans = 0.0_r8
+            paid_for_n_retrans        = 0.0_r8
+            free_n_retrans            = 0.0_r8
+            free_n_retrans = 0.0_r8
+            !  Calculate appropriate degree of retranslocation
+            if (leafc(p).gt.0.0_r8.and.litterfall_n(p)>0.0_r8.and.ivt(p) <npcropmin)then
+               call fun_retranslocation(p,dt,npp_to_spend,&
+                                        litterfall_c(p),&
+                                        litterfall_n(p),&
+                                        total_n_resistance, total_c_spent_retrans,total_c_accounted_retrans, &
+                                        free_n_retrans,paid_for_n_retrans, leafcn(ivt(p)), & 
+                                        grperc(ivt(p)), plantCN(p))
+            else
+               total_c_spent_retrans     = 0.0_r8
+               total_c_accounted_retrans = 0.0_r8
+               paid_for_n_retrans        = 0.0_r8
+               free_n_retrans            = 0.0_r8
+            endif
+            npp_spent = npp_spent + total_c_spent_retrans + total_c_accounted_retrans
+            n_acquired = n_acquired + free_n_retrans + paid_for_n_retrans
+            free_nretrans_acc(p) = free_n_retrans
+            n_retrans_acc(p)    = paid_for_n_retrans
+            ! double check if we have spent too much then initially (should not be possible):
+            if (npp_spent - npp_to_spend_init > 0.0_r8) then
+               write(iulog,*) 'ERROR: TO MUCH CARBON HAS BEEN SPENT ON N UPTAKE: ', cn_iter
+               write(iulog,*) 'npp spent, npp avail', npp_spent, npp_to_spend_init
+               write(iulog,*) 'npp retrans:', total_c_spent_retrans, total_c_accounted_retrans
+               do ipath = ipecm,ipfix
+                  write(iulog,*) 'npp to path:', ipath, npp_paths_acc(p,ipath)
+               end do
+                  call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
+                              msg= errMsg(sourcefile,  __LINE__))
+            end if
 
-                ! double check if we have spent too much then initially (should not be possible):
-                if (npp_spent - npp_to_spend_init > 0.0_r8) then
-                   write(iulog,*) 'ERROR: TO MUCH CARBON HAS BEEN SPENT ON N UPTAKE'
-                   write(iulog,*) 'npp_to_spend_fix, npp before', npp_spent, npp_to_spend_init
-                   write(iulog,*) 'npp retrans:', total_c_spent_retrans, total_c_accounted_retrans
-                   do ipath = ipecm,ipfix
-                      write(iulog,*) 'npp to path:', ipath, npp_paths_acc(p,ipath)
-                   end do
-                   call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
-                               msg= errMsg(sourcefile,  __LINE__))
-                end if
+            ! main block for deciding to stop cn_resolution or not:
 
-                ! main block for deciding to stop cn_resolution or not:
-                if (local_use_flexiblecn) then   
-                   if (leafn(p) == 0.0_r8) then   ! to avoid division by zero
-                      delta_CN = fun_cn_flex_c(ivt(p))   ! Max CN ratio over standard
-                   else
-                      delta_CN = (leafc(p)+leafc_storage(p))/(leafn(p)+leafn_storage(p)) - leafcn(ivt(p)) ! leaf CN ratio                                                              
-                   end if
-                endif
+            n_discrep = n_acquired - plant_ndemand_pool(p)
+            c_discrep = npp_spent - npp_to_spend_init
+            if (n_acquired > 0.0_r8) then
+               if (npp_spent == 0.0_r8) then
+                  ! no carbon spent, but we aquired nitrogen, that should not be possible
+                  write(iulog,*) "ERROR: Nitrogen aquired but no carbon have been spent on it"
+                  call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
+                              msg= errMsg(sourcefile,  __LINE__))
+               endif
+               ! we have acquiered too much nitrogen:
+               if (n_discrep >= 0.0_r8) then
+                   npp_to_spend = npp_to_spend - n_discrep * plantCN(p)
+               else ! underflow of nitrogen small
+                  if ( use_flexibleCN ) then
+                     if (npp_to_spend < npp_to_spend_init) then
+                           npp_to_spend = npp_to_spend + (npp_to_spend_init - npp_to_spend) *  min(1.0_r8,((0.0_r8 - delta_CN)/fun_cn_flex_c(ivt(p))))
+                           npp_to_spend = min(npp_to_spend_init,npp_to_spend)
+                     else ! can not give more C
+                        cn_resolved = .true.
+                     endif
+                  else 
+                      npp_to_spend = min(npp_to_spend + n_discrep * plantCN(p), npp_to_spend_init)
+                  endif
+               endif
+               if (npp_spent == npp_to_spend_prev .and. cn_iter > 1) then
+                     ! npp did not change
+                      cn_resolved = .true.
+               endif
 
-                dnpp = 0.0_r8
-                n_discrep = n_acquired - plant_ndemand_pool(p)
-                c_discrep = npp_spent - npp_to_spend_init
-                frac_ideal_C_use = 1.0_r8
-                if (n_acquired > 0.0_r8) then
-                   if (npp_spent == 0.0_r8) then
-                      ! no carbon spent, but we aquired nitrogen, that should not be possible
-                      write(iulog,*) "ERROR: Nitrogen aquired but no carbon have been spent on it"
-                      call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
-                                  msg= errMsg(sourcefile,  __LINE__))
-                   endif
-                   ! we have acquiered too much nitrogen:
-                   if (abs(n_discrep) <= smallValue ) then
-                      ! if the ammount is small, check for CN ratios and put extra nitrogen into soil and exit:
-                      npp_to_spend = npp_to_spend * (n_acquired - plant_ndemand_pool(p)) * plantCN
 
-                   elseif(n_discrep >= 0.0_r8 .and. n_discrep >=smallValue) then
-                      ! check CN and reduce the ammount of carbon to spend on nuptake
-                   elseif(n_discrep <= 0.0_r8 .and. n_discrep <= smallValue) ! underflow of nitrogen small
-                      if (.not. local_use_flexiblecn ) then
-                          if (n_acquired / npp_spent == plantCN) then
-                            ! CN is good, check if there is carbon to spent
-                          else 
-                            ! try to fix carbon flux to preserve cn
-                          endif
-                      else
-                            ! check if CN is within bounds
-                      endif
-                    endif
-                else
-                  ! no nitrogen available, zero everything out and exit
-                endif
-            enddo cn_not_resolved
+            elseif (n_acquired == 0.0_r8) then
+               if (npp_spent == 0.0_r8) then
+                  ! no carbon to spend, no nitrogen to get
+                  cn_resolved = .true.
+               else
+                  npp_to_spend = 0.0_r8
+               endif
+
+            else
+               write(iulog,*) "ERROR: Negative acquired Nitrogen: ", n_acquired
+               call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
+                            msg= errMsg(sourcefile,  __LINE__))
+            endif
+
+            if (cn_iter > max_cn_iter) then !  exit before executing next itiration
+               cn_resolved = .true.
+            endif
+         endif
+      enddo cn_loop
+
              ! Turn step level quantities back into fluxes per second. 
              Nfix(p)                   = (n_paths_acc(p,ipfix)) / dt                   
              retransn_to_npool(p)      = (n_retrans_acc(p)) / dt 
@@ -1073,21 +1042,9 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
              ! this is the N that comes off leaves. 
              Nretrans(p)               = retransn_to_npool(p) + free_retransn_to_npool(p)
     
-             
-             !Extract active uptake N from soil pools. 
-             do j = 1, nlevdecomp
-             !RF change. The N fixed doesn't actually come out of the soil mineral pools, it is 'new'... 
-             ! we have  these variable instead of smin*_to_plant_fun_vr, just need give them proper units
-             n_ecm(p,j)  =  n_ecm(p,j)/(dzsoi_decomp(j)*dt)
-             n_am(p,j)  =  n_am(p,j)/(dzsoi_decomp(j)*dt)
-             n_nonmyc_no3_vr(p,j)  =  n_nonmyc_no3_vr(p,j)/(dzsoi_decomp(j)*dt)
-             n_nonmyc_nh4_vr(p,j)  =  n_nonmyc_nh4_vr(p,j)/(dzsoi_decomp(j)*dt)
-             end do
-    
-             !SPLIT TO NO3 and NH4 like in original fun
              !---------------------------N fluxes--------------------! ! total means sum(var(p,1:nmyc,ipath)),ecm/am var(p,ecm_step,ipath)
-             Nactive_no3(p) = 0.0_r8
-             Nactive_nh4(p) = 0.0_r8
+             Nactive_no3(p) = 0.0_r8 ! will not be used
+             Nactive_nh4(p) = 0.0_r8 ! will not be used
              Nnonmyc_no3(p) = (n_paths_acc(p,ipnmno3)) / dt
              Nnonmyc_nh4(p) = (n_paths_acc(p,ipnmnh4)) / dt
              Necm(p) = (n_paths_acc(p,ipecm)) / dt
@@ -1114,12 +1071,13 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
                              msg= errMsg(sourcefile,  __LINE__))
              endif                                          
              ! free N goes straight to the npool, not throught Nuptake...
+             ! This goes to NutrientCompetitionFlexibleCN
              sminn_to_plant_fun(p)     = Necm(p) + Nam(p) + Nnonmyc_no3(p) + Nnonmyc_nh4(p) + Nfix(p) 
     
              !---------------------------C fluxes--------------------!
 
-             npp_Nactive_no3(p) = 0.0_r8
-             npp_Nactive_nh4(p) = 0.0_r8
+             npp_Nactive_no3(p) = 0.0_r8 ! won't be used
+             npp_Nactive_nh4(p) = 0.0_r8 ! won't be used
              npp_Necm(p) = (npp_paths_acc(p,ipecm)) / dt
              npp_Nam(p) = (npp_paths_acc(p,ipam)) / dt
              npp_Nnonmyc_no3(p) = (npp_paths_acc(p,ipnmno3)) / dt
@@ -1185,16 +1143,9 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
                 cost_nretrans(p) = Nretrans(p)/npp_Nretrans(p)
              else
                 cost_nretrans(p) = spval
-             endif 
-            
-end do pft 
-! go through all variables avove and see if they are used in a nothe rmodule from 1231
-! patch variables have to be p2c into col variables
-! compilable 
-! is everything in CN fun,  0red, allocated
-end associate
-call t_startf( 'updateCNFUNMIMICSplus' )
-call updateCNFUNMIMICSplus (bounds, num_soilc, filter_soilc, cnveg_carbonflux_inst, cnveg_nitrogenflux_inst, &
+             endif
+   end do pft_loop
+   call updateCNFUNMIMICSplus (bounds, num_soilc, filter_soilc, cnveg_carbonflux_inst, cnveg_nitrogenflux_inst, &
                            soilbiogeochem_nitrogenflux_inst, soilbiogeochem_carbonflux_inst, cnfunmimicsplus_inst, &
                            c_am_resp_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp), c_ecm_resp_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp), &
                            c_am_growth_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp), c_ecm_growth_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp), &
@@ -1204,11 +1155,9 @@ call updateCNFUNMIMICSplus (bounds, num_soilc, filter_soilc, cnveg_carbonflux_in
                            c_somc2soma_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp), c_somp2soma_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp),&
                            sminno3_to_ecm_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp), sminno3_to_am_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp), &
                            sminnh4_to_ecm_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp), sminnh4_to_am_vr_patch(bounds%begp:bounds%endp, 1:nlevdecomp), &
-                           n_ecm(bounds%begp:bounds%endp, 1:nlevdecomp), n_nonmyc_no3_vr(bounds%begp:bounds%endp, 1:nlevdecomp), &
-                           n_am(bounds%begp:bounds%endp, 1:nlevdecomp), n_nonmyc_nh4_vr(bounds%begp:bounds%endp, 1:nlevdecomp) &
+                           n_nonmyc_no3_vr(bounds%begp:bounds%endp, 1:nlevdecomp), n_nonmyc_nh4_vr(bounds%begp:bounds%endp, 1:nlevdecomp) &
                            )
-
-call t_stopf( 'updateCNFUNMIMICSplus' )
+  end associate
 end subroutine CNFUNMIMICSplus
 
 
@@ -1218,8 +1167,9 @@ subroutine updateCNFUNMIMICSplus (bounds, num_soilc, filter_soilc, &
                                  c_am_resp_vr_patch, c_ecm_resp_vr_patch, c_am_growth_vr_patch, c_ecm_growth_vr_patch, &
                                  n_am_growth_vr_patch, n_ecm_growth_vr_patch, c_ecm_enz_vr_patch, &
                                  n_somc2ecm_vr_patch, n_somp2ecm_vr_patch, c_somc2soma_vr_patch, c_somp2soma_vr_patch,&
-                                 sminno3_to_ecm_vr_patch, sminno3_to_am_vr_patch, sminnh4_to_ecm_vr_patch, sminnh4_to_am_vr_patch, &
-                                 n_ecm, n_nonmyc_no3_vr, n_am, n_nonmyc_nh4_vr &
+                                 sminno3_to_ecm_vr_patch, sminno3_to_am_vr_patch, &
+                                 sminnh4_to_ecm_vr_patch, sminnh4_to_am_vr_patch, &
+                                 n_nonmyc_no3_vr, n_nonmyc_nh4_vr &
                                  )
     !
     ! !DESCRIPTION:
@@ -1253,9 +1203,7 @@ subroutine updateCNFUNMIMICSplus (bounds, num_soilc, filter_soilc, &
    real(r8), intent(in) :: sminno3_to_am_vr_patch(:,:)      ! No3 flux from soil to AM
    real(r8), intent(in) :: sminnh4_to_ecm_vr_patch(:,:)     ! NH4 flux from soil to ECM
    real(r8), intent(in) :: sminnh4_to_am_vr_patch(:,:)      ! NH4 flux from soil to AM
-   real(r8), intent(in) :: n_ecm(:,:)                       ! Layer EcM mycorrhizal N uptake (gN/m2)
    real(r8), intent(in) :: n_nonmyc_no3_vr(:,:)             ! Layer non-myc no3 uptake (gN/m2)
-   real(r8), intent(in) :: n_am(:,:)                        ! Layer AM mycorrhizal N uptake (gN/m2)
    real(r8), intent(in) :: n_nonmyc_nh4_vr(:,:)             ! Layer non-myc nh4 uptake (gN/m2)
 
    associate( cnfun => cnfunmimicsplus_inst              , &
