@@ -2103,6 +2103,7 @@ end subroutine calc_myc_mortality
    ! During this process carbon is release from the chemmically and physically protected SOM pools which enters the avaliable SOM pool.
 
    ! USES:
+   use clm_time_manager, only: get_step_size_real
 
    ! ARGUMENTS:
    real(r8), intent(in) :: cpool_som          ! SOM pool [gC/m3]
@@ -2113,9 +2114,12 @@ end subroutine calc_myc_mortality
    real(r8), intent(inout) :: fn_mining_som   ! nitrogen mining flux [gN/m3/s]
 
    ! LOCAL VARIABLES:
-   real(r8) :: secphr = 60.0_r8 * 60.0_r8
+   real(r8)            :: secphr = 60.0_r8 * 60.0_r8
    real(r8), parameter :: small_value = 1.e-10_r8
+   real(r8)            :: dt
    
+   dt = get_step_size_real()
+
    ! SOM carbon flux
    fc_som2soma = (params_inst%mimicsplus_k_mo / secphr) * dz * cpool_myc * cpool_som
    ! Nitrogen mining flux
@@ -2130,6 +2134,16 @@ end subroutine calc_myc_mortality
      fn_mining_som = 0.0_r8
      fc_som2soma = 0.0_r8
    endif
+   ! we need to check that we do not take too much.
+   if (cpool_som < fc_som2soma * dt) then
+      fn_mining_som = 0.0_r8
+      fc_som2soma = 0.0_r8
+    endif
+    ! same for nitrogen
+    if (npool_som < fn_mining_som * dt) then
+      fn_mining_som = 0.0_r8
+      fc_som2soma = 0.0_r8
+    endif
 
   end subroutine calc_myc_mining_rates
 
@@ -2307,87 +2321,114 @@ end subroutine calc_myc_mortality
    endif
 
    fc_veg2myc=(fc_veg2myc_no3 + fc_veg2myc_nh4)/dz/dt
-   if (myc_type == 1) then                                                ! EcM
-      call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_somp,l_fc_somp2soma,l_fn_mining_somp)
-      call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_somc,l_fc_somc2soma,l_fn_mining_somc)
-   if ( cpool_somc < 0.0_r8 .or. cpool_myc < 0.0_r8  .or. & 
-        npool_myc < 0.0_r8 .or.  cpool_somp < 0.0_r8) then 
-     write(iulog,*) 'ERROR: cpool_som,cpool_myc,npool_my',cpool_somp,cpool_somc,cpool_myc, npool_myc,l_fc_somp2soma,l_fn_mining_somp
-     call endrun(                             msg= errMsg(sourcefile,  __LINE__))
-   end if
-      N_demand_myc = c_use_eff * (1.0_r8 - f_enz) * fc_veg2myc / params_inst%mimicsplus_cn_myc 
-      N_uptake_myc = fn_smin2myc + l_fn_mining_somp + l_fn_mining_somc 
-      if (N_uptake_myc > N_demand_myc) then
-         fn_myc2veg = N_uptake_myc - N_demand_myc                        ! N flux myc -> veg
-         n_myc_growth = N_demand_myc                                     ! How much N the need to grow
-         l_c_ecm_enz  = fc_veg2myc * f_enz * c_use_eff
-         ! we add the enzymes here into the EcM pool because we first took them away, but now add them again
-         c_myc_growth = n_myc_growth * params_inst%mimicsplus_cn_myc
-         ! enzyme flux will go to soma pool in the next update 
-         c_myc_resp  = fc_veg2myc - (c_myc_growth + l_c_ecm_enz)                          ! C that they don't need to grow
-      else ! less N in soil, so we limit N flux to vegetaion and mycorrhiza N demand so their sum is equal to N uptake
-         fn_myc2veg = (1-f_growth) * N_uptake_myc
-         c_use_eff = f_growth * N_uptake_myc * params_inst%mimicsplus_cn_myc / (1.0_r8 - f_enz) / fc_veg2myc
-         n_myc_growth = f_growth * N_uptake_myc
-         l_c_ecm_enz  = fc_veg2myc * f_enz * c_use_eff
-         c_myc_growth = c_use_eff * fc_veg2myc
-         c_myc_resp  = fc_veg2myc - (c_myc_growth + l_c_ecm_enz)                          ! C that they don't need to grow
+   if (fc_veg2myc > 0) then
+      if (myc_type == 1) then                                                ! EcM
+         call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_somp,l_fc_somp2soma,l_fn_mining_somp)
+         call calc_myc_mining_rates(dz, cpool_somc,cpool_myc, npool_somc,l_fc_somc2soma,l_fn_mining_somc)
+      if ( cpool_somc < 0.0_r8 .or. cpool_myc < 0.0_r8  .or. & 
+           npool_myc < 0.0_r8 .or.  cpool_somp < 0.0_r8) then 
+        write(iulog,*) 'ERROR: cpool_som,cpool_myc,npool_my',cpool_somp,cpool_somc,cpool_myc, npool_myc,l_fc_somp2soma,l_fn_mining_somp
+        call endrun(                             msg= errMsg(sourcefile,  __LINE__))
       end if
-
-      ! update inout optional arguments
-      if (present(c_ecm_enz)) then
-         c_ecm_enz = l_c_ecm_enz
+         N_demand_myc = c_use_eff * (1.0_r8 - f_enz) * fc_veg2myc / params_inst%mimicsplus_cn_myc 
+         N_uptake_myc = fn_smin2myc + l_fn_mining_somp + l_fn_mining_somc 
+         if (N_uptake_myc > N_demand_myc) then
+            fn_myc2veg = N_uptake_myc - N_demand_myc                        ! N flux myc -> veg
+            n_myc_growth = N_demand_myc                                     ! How much N the need to grow
+            l_c_ecm_enz  = fc_veg2myc * f_enz * c_use_eff
+            ! we add the enzymes here into the EcM pool because we first took them away, but now add them again
+            c_myc_growth = n_myc_growth * params_inst%mimicsplus_cn_myc
+            ! enzyme flux will go to soma pool in the next update 
+            c_myc_resp  = fc_veg2myc - (c_myc_growth + l_c_ecm_enz)                          ! C that they don't need to grow
+         else ! less N in soil, so we limit N flux to vegetaion and mycorrhiza N demand so their sum is equal to N uptake
+            fn_myc2veg = (1-f_growth) * N_uptake_myc
+            c_use_eff = f_growth * N_uptake_myc * params_inst%mimicsplus_cn_myc / (1.0_r8 - f_enz) / fc_veg2myc
+            n_myc_growth = f_growth * N_uptake_myc
+            l_c_ecm_enz  = fc_veg2myc * f_enz * c_use_eff
+            c_myc_growth = c_use_eff * fc_veg2myc
+            c_myc_resp  = fc_veg2myc - (c_myc_growth + l_c_ecm_enz)                          ! C that they don't need to grow
+         end if
+   
+         ! update inout optional arguments
+         if (present(c_ecm_enz)) then
+            c_ecm_enz = l_c_ecm_enz
+         endif
+         if (present(fc_somp2soma)) then
+            fc_somp2soma = l_fc_somp2soma
+         end if
+         if (present(fc_somc2soma)) then
+            fc_somc2soma = l_fc_somc2soma
+         end if
+         if (present(fn_mining_somp)) then
+            fn_mining_somp = l_fn_mining_somp
+         end if
+         if (present(fn_mining_somc)) then
+            fn_mining_somc = l_fn_mining_somc
+         end if
+   
+      else                                                                   ! AM 
+         N_demand_myc = c_use_eff * (fc_veg2myc) / params_inst%mimicsplus_cn_myc
+         N_uptake_myc = fn_smin2myc
+         if (N_uptake_myc > N_demand_myc) then
+            fn_myc2veg = N_uptake_myc - N_demand_myc                        ! N flux myc -> veg
+            n_myc_growth = N_demand_myc                                     ! How much N the need to grow
+            c_myc_growth = n_myc_growth * params_inst%mimicsplus_cn_myc     ! How much C they need to grow
+            c_myc_resp  = fc_veg2myc - c_myc_growth                         ! C that they don't need to grow
+   
+         else
+            fn_myc2veg = (1-f_growth) * N_uptake_myc
+            n_myc_growth = f_growth * N_uptake_myc 
+            c_myc_growth = n_myc_growth * params_inst%mimicsplus_cn_myc / fc_veg2myc
+            c_myc_resp = fc_veg2myc - c_myc_growth
+         end if
       endif
-      if (present(fc_somp2soma)) then
-         fc_somp2soma = l_fc_somp2soma
-      end if
-      if (present(fc_somc2soma)) then
-         fc_somc2soma = l_fc_somc2soma
-      end if
-      if (present(fn_mining_somp)) then
-         fn_mining_somp = l_fn_mining_somp
-      end if
-      if (present(fn_mining_somc)) then
-         fn_mining_somc = l_fn_mining_somc
-      end if
+   
+      fno3_myc2veg = fn_myc2veg * l_no3_frac ! Amount of NO3 / NH4 mycorrhiza could give to plant 
+      fnh4_myc2veg = fn_myc2veg * (1 - l_no3_frac)
+      no3_unpaid = fno3_myc2veg * dz * dt - no3_from_myc ! plants did not actually get all the promised nitrogen (NO3 / NH4)
+      nh4_unpaid = fnh4_myc2veg * dz * dt - nh4_from_myc
 
-   else                                                                   ! AM 
-      N_demand_myc = c_use_eff * (fc_veg2myc) / params_inst%mimicsplus_cn_myc
-      N_uptake_myc = fn_smin2myc
-      if (N_uptake_myc > N_demand_myc) then
-         fn_myc2veg = N_uptake_myc - N_demand_myc                        ! N flux myc -> veg
-         n_myc_growth = N_demand_myc                                     ! How much N the need to grow
-         c_myc_growth = n_myc_growth * params_inst%mimicsplus_cn_myc     ! How much C they need to grow
-         c_myc_resp  = fc_veg2myc - c_myc_growth                         ! C that they don't need to grow
-
-      else
-         fn_myc2veg = (1-f_growth) * N_uptake_myc
-         n_myc_growth = f_growth * N_uptake_myc 
-         c_myc_growth = n_myc_growth * params_inst%mimicsplus_cn_myc / fc_veg2myc
-         c_myc_resp = fc_veg2myc - c_myc_growth
-      end if
-   endif
-
-   fno3_myc2veg = fn_myc2veg * l_no3_frac ! Amount of NO3 / NH4 mycorrhiza could give to plant 
-   fnh4_myc2veg = fn_myc2veg * (1 - l_no3_frac)
-   no3_unpaid = fno3_myc2veg * dz * dt - no3_from_myc ! plants did not actually get all the promised nitrogen (NO3 / NH4)
-   nh4_unpaid = fnh4_myc2veg * dz * dt - nh4_from_myc
-
-   !if (no3_unpaid + nh4_unpaid < 0) then
+      !if (no3_unpaid + nh4_unpaid < 0) then
    !   message = "N flux from AM mycorrhiza to plant is greater than mycorrhiza can actually give to the plant"
    !   call endrun(msg=message)
    !else 
    ! Bringing nitrogen fluxes to vegetation back to gN/m2
       no3_from_myc = fno3_myc2veg * dz * dt   ! if we can give more nitrogen than we promised just give it
       nh4_from_myc = fnh4_myc2veg * dz * dt 
-   !endif
-   if ( no3_from_myc < 0.0_r8 .or. nh4_from_myc < 0.0_r8  & 
-        ) then 
-     write(iulog,*) 'ERROR: type,no3_from_myc, nh4_from_myc',myc_type, no3_from_myc, nh4_from_myc, fc_veg2myc_no3,fc_veg2myc_nh4, l_no3_frac, l_fn_mining_somp,l_fn_mining_somc
-     call endrun(                             msg= errMsg(sourcefile,  __LINE__))
+      !endif
+      if ( no3_from_myc < 0.0_r8 .or. nh4_from_myc < 0.0_r8  & 
+           ) then 
+        write(iulog,*) 'ERROR: type,no3_from_myc, nh4_from_myc',myc_type, no3_from_myc, nh4_from_myc, fc_veg2myc_no3,fc_veg2myc_nh4, l_no3_frac, l_fn_mining_somp,l_fn_mining_somc
+        call endrun(                             msg= errMsg(sourcefile,  __LINE__))
+      end if
+      
+   else
+   !fc_veg2myc_no3           = 0.0_r8
+   !fc_veg2myc_nh4           = 0.0_r8
+   !no3_from_nonmyc          = 0.0_r8
+   !nh4_from_nonmyc          = 0.0_r8
+   !no3_from_myc             = 0.0_r8
+   !nh4_from_myc             = 0.0_r8
+
+   !fn_smin_no3_2myc         = 0.0_r8
+   !fn_smin_nh4_2myc         = 0.0_r8
+
+     ! Mycorrhiza internal fluxes
+   !c_myc_resp               = 0.0_r8
+   !c_myc_growth             = 0.0_r8
+   !n_myc_growth             = 0.0_r8
+   !c_ecm_enz      = 0.0_r8
+
+   ! Mining fluxes
+   fc_somp2soma    = 0.0_r8
+   fc_somc2soma    = 0.0_r8
+   fn_mining_somp  = 0.0_r8
+   fn_mining_somc  = 0.0_r8
+
    end if
+
+
   end subroutine fun_fluxes_myc_update1
-  
 
           
   !Moisture function, based on testbed code: https://github.com/wwieder/biogeochem_testbed/blob/957a5c634b9f2d0b4cdba0faa06b5a91216ace33/SOURCE_CODE/mimics_cycle.f90#L401-L419
