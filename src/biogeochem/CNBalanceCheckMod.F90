@@ -76,7 +76,7 @@ contains
     this%cwarning = 1.e-8_r8
     this%nwarning = 1.e-7_r8
     this%nerror   = 1.e-3_r8
-    this%cerror   = 1.e-7_r8
+    this%cerror   = 1.e-9_r8 ! original 1.e-7_r8 
   end subroutine Init
 
   !-----------------------------------------------------------------------
@@ -497,6 +497,7 @@ contains
     use clm_varctl, only : use_crop
     use subgridAveMod, only: c2g
     use atm2lndType, only: atm2lnd_type
+    use SoilBiogeochemDecompCascadeConType, only: decomp_method, mimicsplus_decomp
     !
     ! !ARGUMENTS:
     class(cn_balance_type)                  , intent(inout) :: this
@@ -595,7 +596,7 @@ contains
             col_ninputs(c) = col_ninputs(c)  + fates_litter_flux(c)
          end if
          
-         if(use_fun)then
+         if(use_fun .or. decomp_method == mimicsplus_decomp) then
             col_ninputs(c) = col_ninputs(c) + ffix_to_sminn(c) ! for FUN, free living fixation is a seprate flux. RF. 
          endif
      

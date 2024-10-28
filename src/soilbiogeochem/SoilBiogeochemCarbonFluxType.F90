@@ -54,6 +54,7 @@ module SoilBiogeochemCarbonFluxType
 
      real(r8), pointer :: hr_col                                    (:)     ! (gC/m2/s) total heterotrophic respiration
      real(r8), pointer :: michr_col                                 (:)     ! (gC/m2/s) microbial heterotrophic respiration: donor-pool based definition, so expect it to be zero with MIMICS; microbial decomposition is responsible for heterotrophic respiration of donor pools (litter and soil), but in the accounting we assign it to the donor pool for consistency with CENTURY
+     real(r8), pointer :: mychr_col                                 (:)     ! (gC/m2/s) mycorrhiza heterotrophic respiration (mimicsplus): since the pathways is not part of decomp_cascade it's treated differently than other hr
      real(r8), pointer :: cwdhr_col                                 (:)     ! (gC/m2/s) coarse woody debris heterotrophic respiration: donor-pool based definition
      real(r8), pointer :: lithr_col                                 (:)     ! (gC/m2/s) litter heterotrophic respiration: donor-pool based definition
      real(r8), pointer :: somhr_col                                 (:)     ! (gC/m2/s) soil organic matter heterotrophic res: donor-pool based definition
@@ -61,6 +62,14 @@ module SoilBiogeochemCarbonFluxType
      real(r8), pointer :: fates_litter_flux                         (:)     ! (gC/m2/s) A summary of the total litter
                                                                             ! flux passed in from FATES.
                                                                             ! This is a diagnostic for balance checks only
+  real(r8),  pointer ::  c_am_resp_vr_col(:,:)            ! carbon respiration flux for AM mycorrhiza
+  real(r8),  pointer ::  c_ecm_resp_vr_col(:,:)           ! carbon respiration flux for ECM mycorrhiza
+  real(r8),  pointer ::  c_am_growth_vr_col(:,:)          ! carbon growth flux for AM mycorrhiza
+  real(r8),  pointer ::  c_ecm_growth_vr_col(:,:)         ! carbon growth flux for ECM mycorrhiza
+
+  real(r8),  pointer ::  c_ecm_enz_vr_col(:,:)            ! carbon enzyme production flux for ECM mycorrhiza
+  real(r8),  pointer ::  c_somc2soma_vr_col(:,:)        ! carbon release from mining from somc pool
+  real(r8),  pointer ::  c_somp2soma_vr_col(:,:)        ! carbon release from mining from somp pool
 
      
    contains
@@ -156,6 +165,7 @@ contains
 
      allocate(this%hr_col                  (begc:endc)) ; this%hr_col                  (:) = nan
      allocate(this%michr_col               (begc:endc)) ; this%michr_col               (:) = nan
+     allocate(this%mychr_col               (begc:endc)) ; this%mychr_col               (:) = nan
      allocate(this%cwdhr_col               (begc:endc)) ; this%cwdhr_col               (:) = nan
      allocate(this%lithr_col               (begc:endc)) ; this%lithr_col               (:) = nan
      allocate(this%somhr_col               (begc:endc)) ; this%somhr_col               (:) = nan
@@ -172,6 +182,15 @@ contains
 
      allocate(this%litr_lig_c_to_n_col(begc:endc))
      this%litr_lig_c_to_n_col(:)= 0._r8
+
+     allocate(this%c_am_resp_vr_col(begc:endc,1:nlevdecomp_full))    ; this%c_am_resp_vr_col    = spval
+     allocate(this%c_ecm_resp_vr_col(begc:endc,1:nlevdecomp_full))   ; this%c_ecm_resp_vr_col   = spval
+     allocate(this%c_am_growth_vr_col(begc:endc,1:nlevdecomp_full))  ; this%c_am_growth_vr_col  = spval
+     allocate(this%c_ecm_growth_vr_col(begc:endc,1:nlevdecomp_full)) ; this%c_ecm_growth_vr_col = spval
+
+     allocate(this%c_ecm_enz_vr_col(begc:endc,1:nlevdecomp_full))    ; this%c_ecm_enz_vr_col    = spval
+     allocate(this%c_somc2soma_vr_col(begc:endc,1:nlevdecomp_full))  ; this%c_somc2soma_vr_col  = spval
+     allocate(this%c_somp2soma_vr_col(begc:endc,1:nlevdecomp_full))  ; this%c_somp2soma_vr_col  = spval
      
    end subroutine InitAllocate 
 
@@ -231,6 +250,12 @@ contains
            call hist_addfld1d (fname='MICC_HR', units='gC/m^2/s', &
              avgflag='A', long_name='microbial C heterotrophic respiration: donor-pool based, so expect zero with MIMICS', &
              ptr_col=this%michr_col, default='inactive')
+        end if
+        if (decomp_method == mimicsplus_decomp) then
+           this%mychr_col(begc:endc) = spval
+           call hist_addfld1d (fname='MYCC_HR', units='gC/m^2/s', &
+             avgflag='A', long_name='mycorrhizal C heterotrophic respiration: donor-pool based, so expect zero with MIMICSplus', &
+             ptr_col=this%mychr_col, default='inactive')
         end if
 
         this%cwdhr_col(begc:endc) = spval
@@ -453,6 +478,12 @@ contains
              avgflag='A', long_name='C13 microbial heterotrophic respiration', &
              ptr_col=this%michr_col, default='inactive')
         end if
+        if (decomp_method == mimicsplus_decomp) then
+           this%mychr_col(begc:endc) = spval
+           call hist_addfld1d (fname='C13_MYCC_HR', units='gC/m^2/s', &
+             avgflag='A', long_name='C13 mycorrhizal heterotrophic respiration', &
+             ptr_col=this%mychr_col, default='inactive')
+        end if
 
         this%cwdhr_col(begc:endc) = spval
         call hist_addfld1d (fname='C13_CWDC_HR', units='gC/m^2/s', &
@@ -528,13 +559,18 @@ contains
              avgflag='A', long_name='C14 total heterotrophic respiration', &
              ptr_col=this%hr_col)
 
-             if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
+        if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
                this%michr_col(begc:endc) = spval
                call hist_addfld1d (fname='C14_MICC_HR', units='gC13/m^2/s', &
                  avgflag='A', long_name='C14 microbial heterotrophic respiration', &
                  ptr_col=this%michr_col, default='inactive')
         end if
-
+        if (decomp_method == mimicsplus_decomp) then
+           this%mychr_col(begc:endc) = spval
+           call hist_addfld1d (fname='C14_MYCC_HR', units='gC/m^2/s', &
+             avgflag='A', long_name='C14 mycorrhizal heterotrophic respiration', &
+             ptr_col=this%mychr_col, default='inactive')
+        end if
         this%cwdhr_col(begc:endc) = spval
         call hist_addfld1d (fname='C14_CWDC_HR', units='gC/m^2/s', &
              avgflag='A', long_name='C14 cwd C heterotrophic respiration', &
@@ -729,6 +765,14 @@ contains
        do fi = 1,num_column
           i = filter_column(fi)
           this%hr_vr_col(i,j) = value_column
+
+          this%c_am_resp_vr_col(i,j)    = value_column
+          this%c_ecm_resp_vr_col(i,j)   = value_column
+          this%c_am_growth_vr_col(i,j)  = value_column
+          this%c_ecm_growth_vr_col(i,j) = value_column
+          this%c_ecm_enz_vr_col(i,j)    = value_column
+          this%c_somc2soma_vr_col(i,j)  = value_column
+          this%c_somp2soma_vr_col(i,j)  = value_column
        end do
     end do
 
@@ -741,6 +785,7 @@ contains
        this%lithr_col(i)         = value_column
        this%cwdhr_col(i)         = value_column
        this%michr_col(i)         = value_column
+       this%mychr_col(i)         = value_column
        this%soilc_change_col(i)  = value_column
     end do
 
@@ -751,7 +796,7 @@ contains
                      num_bgc_soilc, filter_bgc_soilc, num_soilp, filter_soilp, &
                      soilbiogeochem_decomp_cascade_ctransfer_col, &
                      soilbiogeochem_cwdc_col, soilbiogeochem_cwdn_col, &
-                     leafc_to_litter_patch, frootc_to_litter_patch)
+                     leafc_to_litter_patch, frootc_to_litter_patch, c_myc_resp)
     !
     ! !DESCRIPTION:
     ! On the radiation time step, carbon summary calculations
@@ -773,6 +818,7 @@ contains
 
     real(r8), intent(in), optional :: leafc_to_litter_patch(:)
     real(r8), intent(in), optional :: frootc_to_litter_patch(:)
+    real(r8), intent(in), optional :: c_myc_resp(bounds%begc:,1:)
     !
     ! !LOCAL VARIABLES:
     integer  :: c,j,k,l,p
@@ -892,8 +938,20 @@ contains
          end if
       end do
     end associate
-
-    
+    ! mycorrhiza hr is treated differently because it is not part of the decomp cascade
+    if (decomp_method == mimicsplus_decomp) then
+       do j = 1, nlevdecomp
+          do fc = 1,num_bgc_soilc
+             c = filter_bgc_soilc(fc)
+             this%mychr_col(c) = this%michr_col(c) + (this%c_am_resp_vr_col(c,j) + this%c_ecm_resp_vr_col(c,j)) * dzsoi_decomp(j)
+          end do
+       end do
+    else
+       do fc = 1,num_bgc_soilc
+          c = filter_bgc_soilc(fc)
+          this%mychr_col(c) = 0.0_r8
+       end do
+    endif
     ! total heterotrophic respiration (HR)
     do fc = 1,num_bgc_soilc
        c = filter_bgc_soilc(fc)
@@ -902,8 +960,8 @@ contains
             this%michr_col(c) + &
             this%cwdhr_col(c) + &
             this%lithr_col(c) + &
-            this%somhr_col(c)
-       
+            this%somhr_col(c) + &
+            this%mychr_col(c)
     end do
 
     ! Calculate ligninNratio

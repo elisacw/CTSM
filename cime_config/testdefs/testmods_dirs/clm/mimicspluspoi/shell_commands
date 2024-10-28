@@ -1,0 +1,5 @@
+#!/bin/bash
+./xmlchange CLM_FORCE_COLDSTART="on"
+./xmlchange NTASKS=1
+./xmlchange PTS_LON=170.0
+./xmlchange PTS_LAT=-42.0
