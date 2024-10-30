@@ -413,6 +413,16 @@ contains
          cs_veg%cpool_patch(p)             = cs_veg%cpool_patch(p)          - cf_veg%cpool_to_leafc_storage_patch(p)*dt
          cs_veg%cpool_patch(p)             = cs_veg%cpool_patch(p)          - cf_veg%cpool_to_frootc_patch(p)*dt
          cs_veg%cpool_patch(p)             = cs_veg%cpool_patch(p)          - cf_veg%cpool_to_frootc_storage_patch(p)*dt 
+
+          if (cs_veg%cpool_patch(p) < -1.0e-09_r8 .or. cs_veg%cpool_patch(p) > 1.0e6_r8) then
+                 write(iulog,*) 'ERROR: cpool_patch=',cs_veg%cpool_patch(p),cf_veg%availc_patch(p),cpool_delta,cf_veg%soilc_change_patch(p)*dt
+                 write(iulog,*) 'ERROR: cpool_to_leafc_patch=',cf_veg%cpool_to_leafc_patch(p)*dt
+                 write(iulog,*) 'ERROR: cpool_to_leafc_storage_patch=',cf_veg%cpool_to_leafc_storage_patch(p)*dt
+                 write(iulog,*) 'ERROR: cpool_to_frootc_patch=',cf_veg%cpool_to_frootc_patch(p)*dt
+                 write(iulog,*) 'ERROR: cpool_to_frootc_storage_patch=',cf_veg%cpool_to_frootc_storage_patch(p)*dt
+                 call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
+                             msg= errMsg(sourcefile,  __LINE__))
+          end if
          !
          ! State update without the matrix solution
          !

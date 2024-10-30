@@ -1800,26 +1800,22 @@ end subroutine calc_myc_mortality
         call myc_n_extraction(dz, sminn, cpool_myc,cpool_somp, npool_somp, cpool_somc, npool_somc,fn_smin2myc)
      endif
      
- 
+     roi = 1.0_r8/big_roi
      ! Calculate ROI
      if (params_inst%mimicsplus_k_myc_som < small_flux) then
          call endrun(msg='k_myc_som in the parameter file is too small')
      endif
-     if (myc_type == 1) then 
-      if (cpool_myc > 0.0_r8) then
-      roi = ((fn_smin2myc + fn_mining_somc + fn_mining_somp) / & ! gN/m3/s
+     if (cpool_myc > 0.0_r8) then
+         roi = ((fn_smin2myc + fn_mining_somc + fn_mining_somp) / & ! gN/m3/s
              (params_inst%mimicsplus_k_myc_som / secsphr ) * &  ! s 
              params_inst%mimicsplus_mge_ecm / cpool_myc)  !  m3/gC
              if (roi <= 0.0_r8) then
                roi = 1.0_r8/big_roi
              end if 
-      else
+     else
          roi = 1.0_r8/big_roi
-      endif
-
-
      endif
- 
+     roi = 1.0/roi
    end subroutine calc_myc_roi
 
   subroutine calc_myc_mining_rates(dz, cpool_som,cpool_myc, npool_som, fc_som2soma,fn_mining_som)
@@ -1906,9 +1902,9 @@ end subroutine calc_myc_mortality
 
    dt           = get_step_size_real()
    
-   fn_smin_myc = (params_inst%mimicsplus_vmax_myc / secphr) * sminn * &  ! 1/s * gN/m2
-                 (cpool_myc / (cpool_myc + params_inst%mimicsplus_k_m_emyc / dz)) * dt ! gC/m3 / gC/m3
-   fn_smin_myc = max(0.0_r8, fn_smin_myc) / dz / dt ! gN/m3/s
+   fn_smin_myc = (params_inst%mimicsplus_vmax_myc / secphr) * sminn * dt * &  ! 1/s * gN/m2 * s
+                 (cpool_myc / (cpool_myc + params_inst%mimicsplus_k_m_emyc / dz)) ! gC/m3 / gC/m3
+   fn_smin_myc = max(0.0_r8, fn_smin_myc) / dz / dt ! gN/m3/s 
 
     if (present(fc_somp)) then
       call calc_myc_mining_rates(dz, cpool_somp,cpool_myc, npool_somp,fc_somp,fn_mining_somp)

@@ -440,6 +440,7 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
    real(r8) ::                    npp_to_spend         ! how much carbon do we need to get rid of?
    real(r8) ::                    npp_to_spend_init    ! npp that is available for nuptake
    real(r8) ::                    npp_to_spend_prev    ! npp used for previous iteration
+   real(r8) ::                    n_acquired_prev      ! n acquired on previous iteration
    real(r8) ::                    npp_spent            ! temporary
    real(r8) ::                    soil_n_extraction    ! calculates total N pulled from soil
    real(r8) ::                    total_N_conductance  ! inverse of C to of N for whole soil-leaf pathway
@@ -647,8 +648,18 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
       do fp = 1,num_soilp        ! PFT Starts
          p = filter_soilp(fp)
          c = patch%column(p)
-         sminno3_to_paths(p,j) = max(smin_no3_to_plant_vr(c,j) * dzsoi_decomp(j) * dt,0.0_r8) ! gN/m2
-         sminnh4_to_paths(p,j) = max(smin_nh4_to_plant_vr(c,j) * dzsoi_decomp(j) * dt,0.0_r8) ! gN/m2
+         if (availc(p) > 0._r8) then
+            rootc_dens(p,j) = crootfr(p,j) * rootC(p)
+         else
+           rootc_dens(p,j) = 0.0_r8
+         end if
+         if (rootc_dens(p,j)>0.0_r8) then
+            sminno3_to_paths(p,j) = max(smin_no3_to_plant_vr(c,j) * dzsoi_decomp(j) * dt,0.0_r8) ! gN/m2
+            sminnh4_to_paths(p,j) = max(smin_nh4_to_plant_vr(c,j) * dzsoi_decomp(j) * dt,0.0_r8) ! gN/m2
+         else
+            sminno3_to_paths(p,j) = 0.0_r8
+            sminnh4_to_paths(p,j) = 0.0_r8
+         endif
       end do
    end do
 
@@ -695,17 +706,6 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
       else
           storage_ndemand(p)          = 0._r8 
       end if   ! end for deciduous
-
-      ! Avaliable carbon for growth or Nitrogen uptake
-      !availc(p)            =  availc(p)        *  dt !!
-
-      if (availc(p) > 0._r8) then
-         do j = 1, nlevdecomp
-            rootc_dens(p,j)     =  crootfr(p,j) * rootC(p)
-         end do
-      else
-         rootc_dens(p,:) = 0.0_r8
-      end if
       if (use_flexibleCN) then   
          if (leafn(p) == 0.0_r8) then   ! to avoid division by zero
             delta_CN = fun_cn_flex_c(ivt(p))   ! Max CN ratio over standard
@@ -718,7 +718,6 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
       plant_ndemand_pool(p)     =  plant_ndemand(p) *  dt
       plant_ndemand_pool(p)     =  max(plant_ndemand_pool(p),0._r8)
       plant_ndemand_retrans(p)  =  storage_ndemand(p) 
-      npp_remaining(p)             = availc(p) * dt ! gC/m2 !og availc(p) *dt
       ! COST FIXATION PATHWAY
       ! checks which photosyntetic pathway plant has (C3 / C4) and if they can do nitrogen fixation   
       do j = 1, nlevdecomp
@@ -748,8 +747,6 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
                               (sminno3_to_paths(p,j) + sminnh4_to_paths(p,j)), am_step , &
                               dzsoi_decomp(j), big_cost, costs_paths(p,j,ipam))
          end if
-         costs_paths(p,j,ipecm)=1./costs_paths(p,j,ipecm)
-         costs_paths(p,j,ipam)=1./costs_paths(p,j,ipam) ! convert to C/N
       end do
       
       ! Non-mycorrhizal Uptake Cost
@@ -781,44 +778,44 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
          call endrun(msg= errMsg(sourcefile,  __LINE__))
       endif
 
+      sum_path_mult = 0.0_r8
       do j = 1, nlevdecomp
-            
-         ! MVD Proposed variable to get rid of ecm and fixer loops
-         ! Calculate npp allocation to pathways proportional to their exchange rate (N/C) 
          if (rootc_dens(p,j) > 0.0_r8) then
             npp_frac_paths(p,j,ipecm) = (1.0_r8/costs_paths(p,j,ipecm)) / total_N_conductance * path_mult(p,ipecm)
             npp_frac_paths(p,j,ipam) = (1.0_r8/costs_paths(p,j,ipam)) / total_N_conductance * path_mult(p,ipam)
             npp_frac_paths(p,j,ipnmno3) = (1.0_r8/costs_paths(p,j,ipnmno3)) / total_N_conductance * path_mult(p,ipnmno3)
             npp_frac_paths(p,j,ipnmnh4) = (1.0_r8/costs_paths(p,j,ipnmnh4)) / total_N_conductance * path_mult(p,ipnmnh4)
             npp_frac_paths(p,j,ipecm) = (1.0_r8/costs_paths(p,j,ipfix)) / total_N_conductance * path_mult(p,ipfix)
-            sum_path_mult = 0.0_r8
             do ipath = 1,npaths
                sum_path_mult = sum_path_mult + npp_frac_paths(p,j,ipath)
             enddo
-            if (sum_path_mult > 0.0_r8) then
-               ! renormalize fractions and conductance
-               do ipath = 1,npaths
-                  npp_frac_paths(p,j,ipath) = npp_frac_paths(p,j,ipath) /sum_path_mult
-                  sum_n_acquired  = sum_n_acquired + npp_frac_paths(p,j,ipath) / costs_paths (p,j,ipath) ! N/C
-               enddo
-            else
-              write(iulog,*) "Sum of npp fractions is out of bounds: ", sum_path_mult
-              call endrun(msg= errMsg(sourcefile,  __LINE__))
-            endif
          else 
             npp_frac_paths(p,j,ipecm:ipfix) = 0.0_r8
          endif
       end do
-
-      npp_to_spend = availc(p) * dt ! gC/m2 !og availc(p) *dt
-      npp_to_spend_init = npp_to_spend
+      if (sum_path_mult > 0.0) then
+         do j = 1,nlevdecomp
+            do ipath = 1,npaths
+               ! renormalize fractions and conductance
+               npp_frac_paths(p,j,ipath) = npp_frac_paths(p,j,ipath) /sum_path_mult
+            enddo
+         enddo
+      else
+         npp_frac_paths(p,:,:) = 0.0_r8
+      endif
+      ! we start in the middle
+      npp_to_spend = 0.5_r8 * availc(p) * dt / (1.0_r8 + grperc(ivt(p))) ! gC/m2 !og availc(p) *dt
+      npp_to_spend_init = availc(p) * dt / (1.0_r8 + grperc(ivt(p)))
       cn_resolved = .false.
       cn_iter = 0
-
+      n_acquired = 0.0_r8
       cn_loop: do while (.not. cn_resolved)
 
          cn_iter = cn_iter + 1
          npp_to_spend_prev = npp_to_spend
+         n_acquired_prev = n_acquired
+         n_paths_acc(p,:) = 0.0_r8
+         npp_paths_acc(p,:) = 0.0_r8
          if (plant_ndemand_pool(p) <= 0._r8) then    ! no plant demand, everything goes to 0
             cn_resolved = .true.
             n_from_paths(p,:,:)          = 0.0_r8
@@ -914,12 +911,14 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
                endif
 
                ! Calculate actual myc fluxes now:
-               call myc_cn_fluxes(dzsoi_decomp(j), npp_to_paths(p,j,ipecm), sminno3_to_ecm_vr_patch(p,j) + & 
-                    n_somc2ecm_vr_patch(p,j) + n_somp2ecm_vr_patch(p,j), &
+               call myc_cn_fluxes(dzsoi_decomp(j), npp_to_paths(p,j,ipecm), &
+                    (sminno3_to_ecm_vr_patch(p,j) + sminnh4_to_ecm_vr_patch(p,j) + & 
+                    n_somc2ecm_vr_patch(p,j) + n_somp2ecm_vr_patch(p,j)), &
                     n_from_paths(p,j,ipecm), n_ecm_growth_vr_patch(p,j), &
                     c_ecm_growth_vr_patch(p,j), c_ecm_resp_vr_patch(p,j), c_ecm_enz_vr_patch(p,j))
 
-               call myc_cn_fluxes(dzsoi_decomp(j), npp_to_paths(p,j,ipam), sminno3_to_am_vr_patch(p,j), &
+               call myc_cn_fluxes(dzsoi_decomp(j), npp_to_paths(p,j,ipam), &
+                    sminno3_to_am_vr_patch(p,j) + sminnh4_to_am_vr_patch(p,j), &
                     n_from_paths(p,j,ipam), n_am_growth_vr_patch(p,j), &
                     c_am_growth_vr_patch(p,j), c_am_resp_vr_patch(p,j))
                !-------------------- N flux accumulation------------!
@@ -927,9 +926,9 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
                   n_paths_acc(p,ipath) = n_paths_acc(p,ipath) + n_from_paths(p,j,ipath) * dzsoi_decomp(j) * dt 
                end do
                ! only mycorrhiza is greedy all other paths get as much carbon as they give out nitrogen
-               npp_to_paths(p,j,ipnmno3) = npp_to_paths(p,j,ipnmno3) * costs_paths(p,j,ipnmno3)
-               npp_to_paths(p,j,ipnmnh4) = npp_to_paths(p,j,ipnmnh4) * costs_paths(p,j,ipnmnh4)
-               npp_to_paths(p,j,ipfix)   = npp_to_paths(p,j,ipfix)   * costs_paths(p,j,ipfix)
+               ! npp_to_paths(p,j,ipnmno3) = n_from_paths(p,j,ipnmno3) * costs_paths(p,j,ipnmno3)
+               ! npp_to_paths(p,j,ipnmnh4) = n_from_paths(p,j,ipnmnh4) * costs_paths(p,j,ipnmnh4)
+               ! npp_to_paths(p,j,ipfix)   = n_from_paths(p,j,ipfix)   * costs_paths(p,j,ipfix)
                !-------------------- C flux accumulation------------!
                do ipath = 1,npaths
                   npp_paths_acc(p,ipath) = npp_paths_acc(p,ipath) + npp_to_paths(p,j,ipath) * dzsoi_decomp(j) * dt ! gC/m2
@@ -963,47 +962,59 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
                paid_for_n_retrans        = 0.0_r8
                free_n_retrans            = 0.0_r8
             endif
-            npp_spent = npp_spent + total_c_spent_retrans + total_c_accounted_retrans
-            n_acquired = n_acquired + free_n_retrans + paid_for_n_retrans
+            !npp_spent = npp_spent + total_c_spent_retrans + total_c_accounted_retrans
+            total_c_accounted_retrans = 0.0_r8
+            total_c_spent_retrans     = 0.0_r8
+            total_c_accounted_retrans = 0.0_r8
+            paid_for_n_retrans        = 0.0_r8
+            n_acquired = n_acquired + free_n_retrans 
             free_nretrans_acc(p) = free_n_retrans
             n_retrans_acc(p)    = paid_for_n_retrans
             ! double check if we have spent too much then initially (should not be possible):
-            if (npp_spent - npp_to_spend_init > 0.0_r8) then
+            if (npp_spent - npp_to_spend_init > smallValue) then
                write(iulog,*) 'ERROR: TO MUCH CARBON HAS BEEN SPENT ON N UPTAKE: ', cn_iter
                write(iulog,*) 'npp spent, npp avail', npp_spent, npp_to_spend_init
                write(iulog,*) 'npp retrans:', total_c_spent_retrans, total_c_accounted_retrans
                do ipath = ipecm,ipfix
                   write(iulog,*) 'npp to path:', ipath, npp_paths_acc(p,ipath)
                end do
-                  call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
+               do j = 1,nlevdecomp
+                  write(iulog,*), 'npp to layers: ', j, npp_to_paths(p,j,1:npaths)
+               enddo
+               call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
                               msg= errMsg(sourcefile,  __LINE__))
             end if
 
             ! main block for deciding to stop cn_resolution or not:
-
+            if (n_acquired - free_n_retrans > 0.0_r8) then
+               total_N_resistance = npp_spent / n_acquired
+            else
+               total_N_resistance = big_cost
+            endif
             n_discrep = n_acquired - plant_ndemand_pool(p)
             c_discrep = npp_spent - npp_to_spend_init
+            if (.not. use_flexibleCN) then
+               dnpp = 0.5_r8 * abs(n_discrep) * plantCN(p)
+            else
+                 dnpp = max(0.5_r8,min(1.0_r8, delta_CN/fun_cn_flex_c(ivt(p)))) * abs(n_discrep) * plantCN(p)
+            endif
             if (n_acquired > 0.0_r8) then
-               if (npp_spent == 0.0_r8) then
+               if (npp_spent == 0.0_r8 ) then
+                  if (free_nretrans_acc(p) < 0.0_r8) then
                   ! no carbon spent, but we aquired nitrogen, that should not be possible
                   write(iulog,*) "ERROR: Nitrogen aquired but no carbon have been spent on it"
                   call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
                               msg= errMsg(sourcefile,  __LINE__))
+                  endif
                endif
                ! we have acquiered too much nitrogen:
                if (n_discrep >= 0.0_r8) then
-                   npp_to_spend = npp_to_spend - n_discrep * plantCN(p)
+                   npp_to_spend = max(0.0_r8,npp_to_spend - dnpp)
                else ! underflow of nitrogen small
-                  if ( use_flexibleCN ) then
-                     if (npp_to_spend < npp_to_spend_init) then
-                           npp_to_spend = npp_to_spend + (npp_to_spend_init - npp_to_spend) *  min(1.0_r8,((0.0_r8 - delta_CN)/fun_cn_flex_c(ivt(p))))
-                           npp_to_spend = min(npp_to_spend_init,npp_to_spend)
-                     else ! can not give more C
-                        cn_resolved = .true.
-                     endif
-                  else 
-                      npp_to_spend = min(npp_to_spend + n_discrep * plantCN(p), npp_to_spend_init)
-                  endif
+                   npp_to_spend = min(npp_to_spend_init,npp_to_spend + dnpp)
+                   if (npp_to_spend == npp_to_spend_init .and. npp_to_spend_prev == npp_to_spend_init) then
+                       cn_resolved = .true.
+                   endif
                endif
                if (npp_spent == npp_to_spend_prev .and. cn_iter > 1) then
                      ! npp did not change
@@ -1032,8 +1043,7 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
       enddo cn_loop
 
              ! Turn step level quantities back into fluxes per second. 
-             Nfix(p)                   = (n_paths_acc(p,ipfix)) / dt                   
-             retransn_to_npool(p)      = (n_retrans_acc(p)) / dt 
+
              ! Without matrix solution
              if(.not. use_matrixcn)then
                 free_retransn_to_npool(p) = (free_nretrans_acc(p)) / dt
@@ -1049,6 +1059,8 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
              Nnonmyc_nh4(p) = (n_paths_acc(p,ipnmnh4)) / dt
              Necm(p) = (n_paths_acc(p,ipecm)) / dt
              Nam(p) = (n_paths_acc(p,ipam)) / dt
+             Nfix(p)                   = (n_paths_acc(p,ipfix)) / dt                   
+             retransn_to_npool(p)      = (n_retrans_acc(p)) / dt 
              Nnonmyc(p) = Nnonmyc_no3(p) + Nnonmyc_nh4(p)
             
              plant_ndemand_retrans(p)  = plant_ndemand_retrans(p)/dt
@@ -1059,13 +1071,12 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
             ! Nactive(p) = Nactive_no3(p)  + Nactive_nh4(p) + Nnonmyc_no3(p) + Nnonmyc_nh4(p)
              !Nactive(p) = Necm(p)  +   Nam(p) + Nnonmyc_no3(p) + Nnonmyc_nh4(p)
              if (Nuptake(p) > 10000._r8) then
-              !write(iulog,*) 'ERROR: Nactive_no3 negative: ', Nactive_no3(p)
-              !write(iulog,*) 'ERROR: Nactive_nh4 negative: ', Nactive_nh4(p)
-              write(iulog,*) 'ERROR: Nnonmyc_no3 negative: ', Nnonmyc_no3(p)
-              write(iulog,*) 'ERROR: Nnonmyc_nh4 negative: ', Nnonmyc_nh4(p)
-              write(iulog,*) 'ERROR: Nfix negative: ', Nfix(p)
-              write(iulog,*) 'ERROR: retransn_to_npool negative: ', retransn_to_npool(p)
-              write(iulog,*) 'ERROR: free_retransn_to_npool negative: ', free_retransn_to_npool(p)
+              write(iulog,*) 'ERROR: Nuptake: ', Nuptake(p)
+              write(iulog,*) 'ERROR: Nnonmyc_no3: ', Nnonmyc_no3(p)
+              write(iulog,*) 'ERROR: Nnonmyc_nh4: ', Nnonmyc_nh4(p)
+              write(iulog,*) 'ERROR: Nfix: ', Nfix(p)
+              write(iulog,*) 'ERROR: retransn_to_npool: ', retransn_to_npool(p)
+              write(iulog,*) 'ERROR: free_retransn_to_npool: ', free_retransn_to_npool(p)
 
                  call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
                              msg= errMsg(sourcefile,  __LINE__))
@@ -1088,15 +1099,16 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
              npp_Nactive(p) = npp_Necm(p) + npp_Nam(p) + npp_Nnonmyc_no3(p) + npp_Nnonmyc_nh4(p)
 
              !---------------------------Extra Respiration Fluxes--------------------!      
-             soilc_change(p)           = npp_Nactive(p) + npp_Nfix(p) + npp_Nretrans(p)
-            ! soilc_change(p)           = npp_Nactive(p) + npp_Nfix(p) + npp_Nnonmyc(p) + npp_Nretrans(p)
              soilc_change(p)           = npp_Necm(p) + npp_Nam(p) + npp_Nnonmyc_no3(p) + npp_Nnonmyc_nh4(p) + npp_Nfix(p) + npp_Nretrans(p)
-             soilc_change(p)           = soilc_change(p) + burned_off_carbon / dt                 
+             !soilc_change(p)           = soilc_change(p) 
              npp_burnedoff(p)          = burned_off_carbon/dt          
              npp_Nuptake(p)            = soilc_change(p)
+             npp_Nuptake(p)            = npp_Nuptake(p) * (1.0_r8 - grperc(ivt(p)))
+             soilc_change(p)           = soilc_change(p) * grperc(ivt(p))
+             
              ! how much carbon goes to growth of tissues?  
              !npp_growth(p)             = (Nuptake(p)- free_retransn_to_npool(p))*plantCN(p)+(excess_carbon_acc/dt) !does not include gresp, since this is calculated from growth 
-             npp_growth(p)             = npp_Nuptake(p)+(excess_carbon_acc/dt) !does not include gresp, since this is calculated from growth 
+             npp_growth(p)             = npp_Nuptake(p) !does not include gresp, since this is calculated from growth 
              if (availc(p) <= 0.0_r8 .and. soilc_change(p) > 0.0_r8) then
               write(iulog,*) 'ERROR: availc(p): ', availc(p)
               write(iulog,*) 'ERROR: soilc_change(p): ', soilc_change(p)
@@ -1107,13 +1119,13 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
              endif
 
              if (npp_growth(p) < -1.0e-7_r8 .or. npp_growth(p) > 10000._r8) then
-              write(iulog,*) 'ERROR: Nuptake(p) is negative: ', Nuptake(p)
-              write(iulog,*) 'ERROR: npp_Nuptake(p) is negative: ', npp_Nuptake(p)
-              write(iulog,*) 'ERROR: free_retransn_to_npool(p) is negative: ', free_retransn_to_npool(p)
-              write(iulog,*) 'ERROR: plantCN(p) is negative: ', plantCN(p)
-              write(iulog,*) 'ERROR: excess_carbon_acc is negative: ', excess_carbon_acc
-              write(iulog,*) 'ERROR: npp_Nactive(p) is negative: ', npp_Nactive(p)
-              write(iulog,*) 'ERROR: npp_Nnonmyc(p) is npp_Nnonmyc: ', npp_Nnonmyc(p)
+              write(iulog,*) 'ERROR: Nuptake(p): ', Nuptake(p)
+              write(iulog,*) 'ERROR: npp_Nuptake(p): ', npp_Nuptake(p)
+              write(iulog,*) 'ERROR: free_retransn_to_npool(p): ', free_retransn_to_npool(p)
+              write(iulog,*) 'ERROR: plantCN(p): ', plantCN(p)
+              write(iulog,*) 'ERROR: excess_carbon_acc: ', excess_carbon_acc
+              write(iulog,*) 'ERROR: npp_Nactive(p): ', npp_Nactive(p)
+              write(iulog,*) 'ERROR: npp_Nnonmyc(p): ', npp_Nnonmyc(p)
                  call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
                              msg= errMsg(sourcefile,  __LINE__))
              endif
@@ -1122,6 +1134,8 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
               write(iulog,*) 'Acailc, npp_Nuptake/growth:',availc(p), npp_Nuptake(p),npp_growth(p)
               write(iulog,*)  'soilchange, burned off c', soilc_change(p), burned_off_carbon/dt
               write(iulog,*), 'Excess carbon, npp_Nretrans,freeretrans',excess_carbon_acc/dt,npp_Nretrans(p),free_retransn_to_npool(p)
+                 call endrun(subgrid_index=p, subgrid_level=subgrid_level_patch, &
+                             msg= errMsg(sourcefile,  __LINE__))
              endif
              !-----------------------nostic Fluxes------------------------------!
              if(availc(p).gt.0.0_r8)then !what happens in the night? 
