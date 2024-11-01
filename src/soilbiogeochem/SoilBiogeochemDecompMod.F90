@@ -326,11 +326,9 @@ contains
                 end do ! transitions
                 ! fluxes that are not part of the cascade.
                 decomp_cpools_vr(c,j,i_ecm_myc) = decomp_cpools_vr(c,j,i_ecm_myc) + c_ecm_growth_vr(c,j) * dt
-                decomp_npools_vr(c,j,i_ecm_myc) = decomp_npools_vr(c,j,i_ecm_myc) + (n_ecm_growth_vr(c,j) + &
-                                                  sminno3_to_ecm_vr(c,j) + sminnh4_to_ecm_vr(c,j)) * dt
+                decomp_npools_vr(c,j,i_ecm_myc) = decomp_npools_vr(c,j,i_ecm_myc) + n_ecm_growth_vr(c,j) * dt
                 decomp_cpools_vr(c,j,i_am_myc) = decomp_cpools_vr(c,j,i_am_myc) + c_am_growth_vr(c,j) * dt
-                decomp_npools_vr(c,j,i_am_myc) = decomp_npools_vr(c,j,i_am_myc) + (n_ecm_growth_vr(c,j) + &
-                                                   sminno3_to_am_vr(c,j) + sminnh4_to_am_vr(c,j)) * dt
+                decomp_npools_vr(c,j,i_am_myc) = decomp_npools_vr(c,j,i_am_myc) + n_ecm_growth_vr(c,j) * dt
                 decomp_cpools_vr(c,j,i_avl_som) = decomp_cpools_vr(c,j,i_avl_som) + c_ecm_enz_vr(c,j) * dt
             end do ! layer
          enddo !column

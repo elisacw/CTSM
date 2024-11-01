@@ -1100,12 +1100,11 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
              Nuptake(p) = Necm(p) + Nam(p) + Nnonmyc_no3(p) + Nnonmyc_nh4(p) + Nfix(p) + Nretrans(p)
 
              !---------------------------Extra Respiration Fluxes--------------------!      
-             soilc_change(p)           = npp_Necm(p) + npp_Nam(p) + npp_Nnonmyc_no3(p) + npp_Nnonmyc_nh4(p) + npp_Nfix(p) + npp_Nretrans(p)
-             !soilc_change(p)           = soilc_change(p) 
+             soilc_change(p)           = npp_Nnonmyc_no3(p) + npp_Nnonmyc_nh4(p) + npp_Nfix(p) + npp_Nretrans(p) ! mycorrhiza fluxes are used separately
+             soilc_change(p)           = soilc_change(p)
              npp_burnedoff(p)          = burned_off_carbon/dt          
              npp_Nuptake(p)            = soilc_change(p)
-             npp_Nuptake(p)            = npp_Nuptake(p) * (1.0_r8 - grperc(ivt(p)))
-             soilc_change(p)           = soilc_change(p) * grperc(ivt(p))
+             npp_Nuptake(p)            = npp_Necm(p) + npp_Nam(p) + npp_Nnonmyc_no3(p) + npp_Nnonmyc_nh4(p) + npp_Nfix(p) + npp_Nretrans(p)
              
              ! how much carbon goes to growth of tissues?  
              !npp_growth(p)             = (Nuptake(p)- free_retransn_to_npool(p))*plantCN(p)+(excess_carbon_acc/dt) !does not include gresp, since this is calculated from growth 
