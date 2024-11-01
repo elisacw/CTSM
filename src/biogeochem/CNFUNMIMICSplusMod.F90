@@ -1194,7 +1194,7 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
                                   retransn_to_npool(p)+free_retransn_to_npool(p) 
 
             ! Nactive(p) = Nactive_no3(p)  + Nactive_nh4(p) + Nnonmyc_no3(p) + Nnonmyc_nh4(p)
-             !Nactive(p) = Necm(p)  +   Nam(p) + Nnonmyc_no3(p) + Nnonmyc_nh4(p)
+             Nactive(p) = Necm(p)  +   Nam(p) + Nnonmyc_no3(p) + Nnonmyc_nh4(p)
              if (Nuptake(p) > 10000._r8) then
               !write(iulog,*) 'ERROR: Nactive_no3 negative: ', Nactive_no3(p)
               !write(iulog,*) 'ERROR: Nactive_nh4 negative: ', Nactive_nh4(p)
@@ -1222,6 +1222,7 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
              npp_Nfix(p) = (npp_paths_acc(p,ipfix)) /dt
              npp_Nretrans(p) = (npp_retrans_acc(p))/dt
              npp_Nactive(p) = npp_Necm(p) + npp_Nam(p) + npp_Nnonmyc_no3(p) + npp_Nnonmyc_nh4(p)
+             Nuptake(p) = Necm(p) + Nam(p) + Nnonmyc_no3(p) + Nnonmyc_nh4(p) + Nfix(p) + Nretrans(p)
 
              !---------------------------Extra Respiration Fluxes--------------------!      
              soilc_change(p)           = npp_Nactive(p) + npp_Nfix(p) + npp_Nretrans(p)
@@ -1273,6 +1274,13 @@ pft:  do fp = 1,num_soilp        ! PFT Starts
              endif 
              if(npp_Nactive(p).gt.0.0_r8)then
                 cost_nactive(p) = (Nactive(p)+Nnonmyc(p))/(npp_Nactive(p)+npp_Nnonmyc(p))
+                if (cost_nactive(p) >= spval) then
+                  write(iulog,*) 'cost_nactive: ', cost_nactive(p), Nactive(p), npp_Nactive(p)
+                  write(iulog,*) 'myc n npp: ', Necm(p),npp_Necm(p),Nam(p),npp_Nam(p)
+                  write(iulog,*) 'nonmyc n npp: ',Nnonmyc_no3(p),npp_Nnonmyc_no3(p),Nnonmyc_nh4(p),npp_Nnonmyc_nh4(p)
+                  write(iulog,*) 'fix n npp: ',Nfix(p),npp_Nfix(p)
+                  write(iulog,*) 'uptake n npp',Nuptake(p),npp_Nuptake
+              endif
              else
                 cost_nactive(p) = spval
              endif 
