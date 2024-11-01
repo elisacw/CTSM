@@ -828,7 +828,9 @@ contains
                       soilbiogeochem_nitrogenflux_inst%sminno3_to_am_vr_col(c,j) - &
                       smin_no3_to_plant_vr(c,j)).gt.0.0000000000001_r8) then
                       write(iulog,*) 'problem with limitations on no3 uptake', &
-                              soilbiogeochem_nitrogenflux_inst%sminno3_nonmyc_to_plant_col(c,j) + cnfunmimicsplus_inst%no3_myc_to_plant_col(c,j), &
+                              soilbiogeochem_nitrogenflux_inst%sminno3_nonmyc_to_plant_col(c,j), &
+                              soilbiogeochem_nitrogenflux_inst%sminno3_to_ecm_vr_col(c,j), &
+                              soilbiogeochem_nitrogenflux_inst%sminno3_to_am_vr_col(c,j), &
                               smin_no3_to_plant_vr(c,j)
                       call endrun("too much NO3 uptake predicted by CNFUNMIMICSplus")
                   end if
@@ -837,7 +839,9 @@ contains
                        soilbiogeochem_nitrogenflux_inst%sminnh4_to_am_vr_col(c,j) - &
                        smin_nh4_to_plant_vr(c,j)).gt.0.0000000000001_r8) then
                       write(iulog,*) 'problem with limitations on nh4 uptake', &
-                              soilbiogeochem_nitrogenflux_inst%sminnh4_nonmyc_to_plant_col(c,j) + cnfunmimicsplus_inst%nh4_myc_to_plant_col(c,j), &
+                              soilbiogeochem_nitrogenflux_inst%sminnh4_nonmyc_to_plant_col(c,j), &
+                              soilbiogeochem_nitrogenflux_inst%sminnh4_to_ecm_vr_col(c,j), &
+                              soilbiogeochem_nitrogenflux_inst%sminnh4_to_am_vr_col(c,j) , &
                               smin_nh4_to_plant_vr(c,j)
                       call endrun("too much NH4 uptake predicted by CNFUNMIMICSplus")
                   end if
