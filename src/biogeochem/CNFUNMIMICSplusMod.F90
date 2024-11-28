@@ -1103,12 +1103,12 @@ subroutine CNFUNMIMICSplus (bounds, num_soilc, filter_soilc, num_soilp ,filter_s
              soilc_change(p)           = npp_Nnonmyc_no3(p) + npp_Nnonmyc_nh4(p) + npp_Nfix(p) + npp_Nretrans(p) ! mycorrhiza fluxes are used separately
              soilc_change(p)           = soilc_change(p)
              npp_burnedoff(p)          = burned_off_carbon/dt          
-             npp_Nuptake(p)            = soilc_change(p)
+             !npp_Nuptake(p)            = soilc_change(p)
              npp_Nuptake(p)            = npp_Necm(p) + npp_Nam(p) + npp_Nnonmyc_no3(p) + npp_Nnonmyc_nh4(p) + npp_Nfix(p) + npp_Nretrans(p)
              
              ! how much carbon goes to growth of tissues?  
              !npp_growth(p)             = (Nuptake(p)- free_retransn_to_npool(p))*plantCN(p)+(excess_carbon_acc/dt) !does not include gresp, since this is calculated from growth 
-             npp_growth(p)             = npp_Nuptake(p) !does not include gresp, since this is calculated from growth 
+             npp_growth(p)             = (Nuptake(p) - free_retransn_to_npool(p)) * plantCN(p) !does not include gresp, since this is calculated from growth 
              if (availc(p) <= 0.0_r8 .and. soilc_change(p) > 0.0_r8) then
               write(iulog,*) 'ERROR: availc(p): ', availc(p)
               write(iulog,*) 'ERROR: soilc_change(p): ', soilc_change(p)

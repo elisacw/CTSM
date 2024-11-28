@@ -939,17 +939,16 @@ contains
       end do
     end associate
     ! mycorrhiza hr is treated differently because it is not part of the decomp cascade
+    do fc = 1,num_bgc_soilc
+       c = filter_bgc_soilc(fc)
+       this%mychr_col(c) = 0.0_r8
+    end do
     if (decomp_method == mimicsplus_decomp) then
        do j = 1, nlevdecomp
           do fc = 1,num_bgc_soilc
              c = filter_bgc_soilc(fc)
-             this%mychr_col(c) = this%michr_col(c) + (this%c_am_resp_vr_col(c,j) + this%c_ecm_resp_vr_col(c,j)) * dzsoi_decomp(j)
+             !this%mychr_col(c) = this%mychr_col(c) + (this%c_am_resp_vr_col(c,j) + this%c_ecm_resp_vr_col(c,j)) * dzsoi_decomp(j)
           end do
-       end do
-    else
-       do fc = 1,num_bgc_soilc
-          c = filter_bgc_soilc(fc)
-          this%mychr_col(c) = 0.0_r8
        end do
     endif
     ! total heterotrophic respiration (HR)
