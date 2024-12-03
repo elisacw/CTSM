@@ -1655,21 +1655,21 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
 
               
               ! Fraction of mycorrizal necromass to SOM pools
-              tau_myc1 = min(1._r8, max(0._r8, mimicsplus_tau_ecm))
+              tau_myc1 = min(1._r8, max(0._r8, mimicsplus_tau_ecm))                      !fractions of mycorrhiza into SOM pools
               fchem_myc1 = min(1._r8, max(0._r8, mimicsplus_fchem_ecm))
               fphys_myc1 = min(1._r8, max(0._r8, mimicsplus_fphys_ecm))
               tau_myc2 = min(1._r8, max(0._r8, mimicsplus_tau_am))
               fchem_myc2 = min(1._r8, max(0._r8, mimicsplus_fchem_am))
               fphys_myc2 = min(1._r8, max(0._r8, mimicsplus_fphys_am))
               
-              decomp_k(c,j,i_ecm_myc) = tau_myc * &                              !ECW I think these lines don't do anything
-                    myc1_conc**((mimicsplus_densdep - 1.0_r8) * moist_mod) 
+              decomp_k(c,j,i_ecm_myc) = tau_myc * &                                       !calculates turnover of EcM
+                    myc1_conc**(mimicsplus_densdep - 1.0_r8) * moist_mod
               pathfrac_decomp_cascade(c,j,i_myc1s1) = tau_myc1 
               pathfrac_decomp_cascade(c,j,i_myc1s2) = fchem_myc1
               pathfrac_decomp_cascade(c,j,i_myc1s3) = fphys_myc1
 
-              decomp_k(c,j,i_am_myc) = tau_myc * &
-                    myc2_conc**((mimicsplus_densdep - 1.0_r8) * moist_mod)
+              decomp_k(c,j,i_am_myc) = tau_myc * &                                        !calculates turnover of AM
+                    myc2_conc**(mimicsplus_densdep - 1.0_r8) * moist_mod
               pathfrac_decomp_cascade(c,j,i_myc2s1) = tau_myc2
               pathfrac_decomp_cascade(c,j,i_myc2s2) = fchem_myc2
               pathfrac_decomp_cascade(c,j,i_myc2s3) = fphys_myc2
@@ -1959,14 +1959,16 @@ end subroutine calc_myc_mortality
             fc_myc_enz  = fc_to_myc * f_enz * c_use_eff
             fc_myc_growth = fn_myc_growth * params_inst%mimicsplus_cn_myc
             ! enzyme flux will go to soma pool in the next update 
-            fc_myc_resp  = fc_to_myc - (fc_myc_growth + fc_myc_enz)                          ! C that they don't need to grow
+            !fc_myc_resp  = fc_to_myc - (fc_myc_growth + fc_myc_enz)                          ! C that they don't need to grow
+            fc_myc_resp  = fc_to_myc * (c_use_eff)
         else ! less N in soil, so we limit N flux to vegetaion and mycorrhiza N demand so their sum is equal to N uptake
             fn_to_veg = (1-f_growth) * N_uptake_myc
             c_use_eff = f_growth * N_uptake_myc * params_inst%mimicsplus_cn_myc / (1.0_r8 - f_enz) / fc_to_myc
             fn_myc_growth = f_growth * N_uptake_myc
             fc_myc_enz  = fc_to_myc * f_enz * c_use_eff
             fc_myc_growth = c_use_eff * fc_to_myc
-            fc_myc_resp  = fc_to_myc - (fc_myc_growth + fc_myc_enz)                          ! C that they don't need to grow
+            !fc_myc_resp  = fc_to_myc - (fc_myc_growth + fc_myc_enz)                          ! C that they don't need to grow
+            fc_myc_resp  = fc_to_myc * (c_use_eff)
           end if
      else
         fn_to_veg     = 0.0_r8
@@ -1982,14 +1984,16 @@ end subroutine calc_myc_mortality
            fn_myc_growth = N_demand_myc                                     ! How much N the need to grow
            fc_myc_growth = fn_myc_growth * params_inst%mimicsplus_cn_myc
            ! enzyme flux will go to soma pool in the next update 
-           fc_myc_resp  = fc_to_myc - fc_myc_growth                          ! C that they don't need to grow
+           !fc_myc_resp  = fc_to_myc - fc_myc_growth 
+           fc_myc_resp  = fc_to_myc * (c_use_eff)                         ! C that they don't need to grow
         else ! less N in soil, so we limit N flux to vegetaion and mycorrhiza N demand so their sum is equal to N uptake
            fn_to_veg = (1-f_growth) * N_uptake_myc
-           c_use_eff = f_growth * N_uptake_myc
+           c_use_eff = f_growth * N_uptake_myc * params_inst%mimicsplus_cn_myc / fc_to_myc !ECW 02.12.24
            fn_myc_growth = f_growth * N_uptake_myc
            !fc_myc_growth = c_use_eff * fc_to_myc !ECW double check this or nex line
            fc_myc_growth = fn_myc_growth * params_inst%mimicsplus_cn_myc / fc_to_myc
-           fc_myc_resp  = fc_to_myc - fc_myc_growth                         ! C that they don't need to grow
+          ! fc_myc_resp  = fc_to_myc - fc_myc_growth                         ! C that they don't need to grow
+           fc_myc_resp  = fc_to_myc * (c_use_eff)
         end if
      else
         fn_to_veg     = 0.0_r8
