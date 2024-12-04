@@ -149,7 +149,8 @@ contains
     ! On the radiation time step, update all the prognostic carbon state
     ! variables (except for gap-phase mortality and fire fluxes)
     !
-    use clm_varctl    , only : carbon_resp_opt
+    use clm_varctl                        , only : carbon_resp_opt
+    use SoilBiogeochemDecompCascadeConType, only: decomp_method, mimicsplus_decomp
     ! !ARGUMENTS:
     integer                              , intent(in)    :: num_soilc       ! number of soil columns filter
     integer                              , intent(in)    :: filter_soilc(:) ! filter for soil columns
@@ -384,7 +385,11 @@ contains
          cs_veg%cpool_patch(p) = cs_veg%cpool_patch(p) -  cf_veg%cpool_to_resp_patch(p)*dt
 
          !RF Add in the carbon spent on uptake respiration. 
-         cs_veg%cpool_patch(p)= cs_veg%cpool_patch(p) - cf_veg%soilc_change_patch(p)*dt
+         if (decomp_method == mimicsplus_decomp) then
+            cs_veg%cpool_patch(p)= cs_veg%cpool_patch(p) - cf_veg%npp_Nuptake_patch(p)*dt !ECW substract fluxes that go into myc pools  
+         else
+            cs_veg%cpool_patch(p)= cs_veg%cpool_patch(p) - cf_veg%soilc_change_patch(p)*dt !ECW substract fluxes that go into myc pools
+         endif
           if (cs_veg%cpool_patch(p) < -1.0e-09_r8 .or. cs_veg%cpool_patch(p) > 1.0e6_r8) then
                  write(iulog,*) 'ERROR: cpool_patch=',cs_veg%cpool_patch(p),cf_veg%cpool_to_resp_patch(p)*dt,cf_veg%soilc_change_patch(p)*dt,cf_veg%availc_patch(p)
 

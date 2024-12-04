@@ -947,7 +947,7 @@ contains
        do j = 1, nlevdecomp
           do fc = 1,num_bgc_soilc
              c = filter_bgc_soilc(fc)
-             !this%mychr_col(c) = this%mychr_col(c) + (this%c_am_resp_vr_col(c,j) + this%c_ecm_resp_vr_col(c,j)) * dzsoi_decomp(j)
+             this%mychr_col(c) = this%mychr_col(c) + (this%c_am_resp_vr_col(c,j) + this%c_ecm_resp_vr_col(c,j)) * dzsoi_decomp(j)
           end do
        end do
     endif

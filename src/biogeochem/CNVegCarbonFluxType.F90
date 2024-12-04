@@ -4510,6 +4510,7 @@ contains
        end if
        
        if (use_fun .or. decomp_method == mimicsplus_decomp) then
+         ! if mimicsplus is on, this does not include fluxes to the mycorrhiza
           this%ar_patch(p) = this%ar_patch(p) + this%soilc_change_patch(p)
        end if
       

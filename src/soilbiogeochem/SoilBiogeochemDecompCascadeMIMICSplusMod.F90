@@ -1662,14 +1662,12 @@ module SoilBiogeochemDecompCascadeMIMICSplusMod
               fchem_myc2 = min(1._r8, max(0._r8, mimicsplus_fchem_am))
               fphys_myc2 = min(1._r8, max(0._r8, mimicsplus_fphys_am))
               
-              decomp_k(c,j,i_ecm_myc) = tau_myc * &                                       !calculates turnover of EcM
-                    myc1_conc**(mimicsplus_densdep - 1.0_r8) * moist_mod
+              decomp_k(c,j,i_ecm_myc) = tau_myc                                      !calculates turnover of EcM
               pathfrac_decomp_cascade(c,j,i_myc1s1) = tau_myc1 
               pathfrac_decomp_cascade(c,j,i_myc1s2) = fchem_myc1
               pathfrac_decomp_cascade(c,j,i_myc1s3) = fphys_myc1
 
-              decomp_k(c,j,i_am_myc) = tau_myc * &                                        !calculates turnover of AM
-                    myc2_conc**(mimicsplus_densdep - 1.0_r8) * moist_mod
+              decomp_k(c,j,i_am_myc) = tau_myc                                       !calculates turnover of AM
               pathfrac_decomp_cascade(c,j,i_myc2s1) = tau_myc2
               pathfrac_decomp_cascade(c,j,i_myc2s2) = fchem_myc2
               pathfrac_decomp_cascade(c,j,i_myc2s3) = fphys_myc2
