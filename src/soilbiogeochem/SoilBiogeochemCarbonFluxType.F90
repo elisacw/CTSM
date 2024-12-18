@@ -10,7 +10,7 @@ module SoilBiogeochemCarbonFluxType
   use pftconMod                          , only : pftcon
   use landunit_varcon                    , only : istsoil, istcrop, istdlak 
   use ch4varcon                          , only : allowlakeprod
-  use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, century_decomp, mimics_decomp, decomp_method, use_soil_matrixcn
+  use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, century_decomp, mimics_decomp, mimicsplus_decomp, decomp_method, use_soil_matrixcn
   use PatchType                          , only : patch
   use ColumnType                         , only : col                
   use LandunitType                       , only : lun
@@ -263,7 +263,7 @@ contains
              avgflag='A', long_name='total heterotrophic respiration', &
              ptr_col=this%hr_col)
 
-        if (decomp_method == mimics_decomp) then
+        if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
            this%michr_col(begc:endc) = spval
            call hist_addfld1d (fname='MICC_HR', units='gC/m^2/s', &
              avgflag='A', long_name='microbial C heterotrophic respiration: donor-pool based, so expect zero with MIMICS', &
@@ -484,7 +484,7 @@ contains
              avgflag='A', long_name='C13 total heterotrophic respiration', &
              ptr_col=this%hr_col)
 
-        if (decomp_method == mimics_decomp) then
+        if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
            this%michr_col(begc:endc) = spval
            call hist_addfld1d (fname='C13_MICC_HR', units='gC13/m^2/s', &
              avgflag='A', long_name='C13 microbial heterotrophic respiration', &
@@ -565,7 +565,7 @@ contains
              avgflag='A', long_name='C14 total heterotrophic respiration', &
              ptr_col=this%hr_col)
 
-        if (decomp_method == mimics_decomp) then
+        if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
            this%michr_col(begc:endc) = spval
            call hist_addfld1d (fname='C14_MICC_HR', units='gC13/m^2/s', &
              avgflag='A', long_name='C14 microbial heterotrophic respiration', &
@@ -960,7 +960,7 @@ contains
 
     ! Calculate ligninNratio
     ! FATES does its own calculation
-    if_mimics: if (decomp_method == mimics_decomp ) then
+    if_mimics: if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
 
        if(num_soilp>0)then
           do fp = 1,num_soilp

@@ -15,7 +15,7 @@ module SoilBiogeochemNitrogenStateType
   use clm_varctl                         , only : iulog, override_bgc_restart_mismatch_dump, spinup_state
   use landunit_varcon                    , only : istcrop, istsoil 
   use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, use_soil_matrixcn
-  use SoilBiogeochemDecompCascadeConType , only : mimics_decomp, century_decomp, decomp_method
+  use SoilBiogeochemDecompCascadeConType , only : mimics_decomp, mimicsplus_decomp, century_decomp, decomp_method
   use LandunitType                       , only : lun                
   use ColumnType                         , only : col                
   use GridcellType                       , only : grc
@@ -358,7 +358,7 @@ contains
          avgflag='A', long_name='total litter N', &
          ptr_col=this%totlitn_col)
 
-    if (decomp_method == mimics_decomp ) then
+    if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
        this%totmicn_col(begc:endc) = spval
        call hist_addfld1d (fname='TOTMICN', units='gN/m^2', &
          avgflag='A', long_name='total microbial N', &
@@ -779,7 +779,7 @@ contains
 
     if (decomp_method == century_decomp ) then
        decomp_cascade_state = 1
-    else if (decomp_method == mimics_decomp ) then
+    else if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
        decomp_cascade_state = 2
     else
        decomp_cascade_state = 0

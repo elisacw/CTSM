@@ -104,7 +104,7 @@ module CLMFatesInterfaceMod
                                   get_proc_clumps,   &
                                   get_proc_global,   &
                                   get_clump_bounds
-   use SoilBiogeochemDecompCascadeConType , only : mimics_decomp, decomp_method
+   use SoilBiogeochemDecompCascadeConType , only : mimics_decomp, mimicsplus_decomp, decomp_method
    use SoilBiogeochemDecompCascadeConType , only : no_soil_decomp, century_decomp
    use SoilWaterRetentionCurveMod, only : soil_water_retention_curve_type
    use GridCellType      , only : grc
@@ -428,8 +428,10 @@ module CLMFatesInterfaceMod
         ! which has fewer boundary conditions (simpler)
         call set_fates_ctrlparms('nu_com',cval='RD')
 
-        if (decomp_method == mimics_decomp) then
+        if (decomp_method == mimics_decomp ) then
            call set_fates_ctrlparms('decomp_method',cval='MIMICS')
+        elseif(decomp_method == mimicsplus_decomp ) then
+           call set_fates_ctrlparms('decomp_method',cval='MIMICSPLUS')
         elseif(decomp_method == century_decomp ) then
            call set_fates_ctrlparms('decomp_method',cval='CENTURY')
         elseif(decomp_method == no_soil_decomp ) then
@@ -1332,7 +1334,7 @@ module CLMFatesInterfaceMod
           !     sum(this%fates(ci)%bc_out(s)%litt_flux_cel_n_si(1:nlevdecomp) * &
           !         this%fates(ci)%bc_in(s)%dz_decomp_sisl(1:nlevdecomp))
 
-          if (decomp_method == mimics_decomp) then
+          if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
              ! Mimics has a structural pool, which is cellulose and lignan
              i_lig_lit = i_cel_lit
           elseif(decomp_method == century_decomp ) then
@@ -1413,7 +1415,7 @@ module CLMFatesInterfaceMod
                sum(this%fates(ci)%bc_out(s)%litt_flux_cel_c_si(1:nlevdecomp) * &
                    this%fates(ci)%bc_in(s)%dz_decomp_sisl(1:nlevdecomp))
 
-          if (decomp_method == mimics_decomp) then
+          if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
              ! Mimics has a structural pool, which is cellulose and lignan
              i_lig_lit = i_cel_lit
           elseif(decomp_method == century_decomp ) then

@@ -74,6 +74,7 @@ module SoilBiogeochemDecompCascadeConType
   integer, public, parameter :: no_soil_decomp = 0                     ! No soil decomposition is done
   integer, public, parameter :: century_decomp = 1                     ! CENTURY decomposition method type
   integer, public, parameter :: mimics_decomp = 2                      ! MIMICS decomposition method type
+  integer, public, parameter :: mimicsplus_decomp = 3                  ! MIMICS+ decomposition method type
   integer, public            :: decomp_method  = ispval                ! Type of decomposition to use
   logical, public :: use_soil_matrixcn = .false.  ! true => use cn matrix solution for soil BGC
   type(decomp_cascade_type), public :: decomp_cascade_con
@@ -119,6 +120,8 @@ contains
           decomp_method = century_decomp
        case( 'MIMICSWieder2015' )
           decomp_method = mimics_decomp
+       case( 'MIMICSplusAas2023' )
+          decomp_method = mimicsplus_decomp
        case default
           call endrun('Bad soil_decomp_method = '//soil_decomp_method )
        end select
@@ -152,7 +155,7 @@ contains
           if (decomp_method == century_decomp) then
              ndecomp_pools = 6
              ndecomp_cascade_transitions = 8
-          else if (decomp_method == mimics_decomp) then
+          else if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
              ndecomp_pools = 7
              ndecomp_cascade_transitions = 14
           end if
@@ -160,7 +163,7 @@ contains
           if (decomp_method == century_decomp) then
              ndecomp_pools = 7
              ndecomp_cascade_transitions = 10
-          else if (decomp_method == mimics_decomp) then
+          else if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
              ndecomp_pools = 8
              ndecomp_cascade_transitions = 15
           end if

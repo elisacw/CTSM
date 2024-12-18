@@ -11,7 +11,7 @@ module SoilBiogeochemPotentialMod
   use decompMod                          , only : bounds_type
   use clm_varpar                         , only : nlevdecomp, ndecomp_cascade_transitions, ndecomp_pools
   use clm_varpar                         , only : i_cop_mic, i_oli_mic
-  use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, mimics_decomp, decomp_method
+  use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, mimics_decomp, mimicsplus_decomp, decomp_method
   use SoilBiogeochemStateType            , only : soilbiogeochem_state_type
   use SoilBiogeochemCarbonStateType      , only : soilbiogeochem_carbonstate_type
   use SoilBiogeochemCarbonFluxType       , only : soilbiogeochem_carbonflux_type
@@ -199,7 +199,7 @@ contains
                   else   ! CWD -> litter OR mimics_decomp is true
                      pmnf_decomp_cascade(c,j,k) = 0._r8
 
-                     if (decomp_method == mimics_decomp) then
+                     if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
                         ! N:C ratio of donor pools (N:C instead of C:N because
                         ! already checked that we're not dividing by zero)
                         decomp_nc_loss_donor = &
@@ -234,7 +234,7 @@ contains
       ! Compare cn_gain to target C:N ratio of microbial biomass pools
       ! to determine immobilization vs. mineralization (in second do k
       ! transitions loop).
-      if (decomp_method == mimics_decomp) then
+      if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
          do j = 1,nlevdecomp
             do fc = 1,num_bgc_soilc
                c = filter_bgc_soilc(fc)
@@ -307,7 +307,7 @@ contains
                else
                   gross_nmin_vr(c,j) = gross_nmin_vr(c,j) - pmnf_decomp_cascade(c,j,k)
                end if
-               if (decomp_method == mimics_decomp) then
+               if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
                   gross_nmin_vr(c,j) = gross_nmin_vr(c,j) + p_decomp_npool_to_din(c,j,k)
                end if
             end do

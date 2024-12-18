@@ -183,7 +183,7 @@ contains
     use CNFUNMod         , only: CNFUN
     use subgridAveMod    , only: p2c
     use perf_mod         , only : t_startf, t_stopf
-    use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con,  mimics_decomp, decomp_method
+    use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, mimics_decomp, mimicsplus_decomp, decomp_method
     !
     ! !ARGUMENTS:
     type(bounds_type)                       , intent(in)    :: bounds
@@ -610,7 +610,7 @@ contains
 
                end if
           
-               if (decomp_method == mimics_decomp) then
+               if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
                   ! turn off fpi for MIMICS and only lets plants
                   ! take up available mineral nitrogen.
                   ! TODO slevis: -ve or tiny sminn_vr could cause problems
@@ -708,7 +708,7 @@ contains
 
                end if
                
-               if (decomp_method == mimics_decomp) then
+               if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
                   ! turn off fpi for MIMICS and only lets plants
                   ! take up available mineral nitrogen.
                   ! TODO slevis: -ve or tiny sminn_vr could cause problems
@@ -811,7 +811,7 @@ contains
 
          end if
 
-         if (decomp_method == mimics_decomp) then
+         if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
             do j = 1, nlevdecomp
                do fc=1,num_bgc_soilc
                   c = filter_bgc_soilc(fc)
