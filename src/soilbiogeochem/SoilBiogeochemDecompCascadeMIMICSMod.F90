@@ -178,158 +178,175 @@ contains
     logical            :: readv   ! has variable been read in or not
     real(r8)           :: tempr   ! temporary to read in constant
     character(len=100) :: tString ! temp. var for reading
+    character(len=20)  :: param_pref ! parameter prefix
     !-----------------------------------------------------------------------
 
+    param_pref = 'mimics'
+    if (decomp_method == mimicsplus_decomp) then
+      param_pref = 'mimicsplus'
+    endif
+
     ! Read off of netcdf file
-    tString='mimics_initial_Cstocks_depth'
+    tString= trim(param_pref) // '_initial_Cstocks_depth'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%mimics_initial_Cstocks_depth=tempr
 
     allocate(params_inst%mimics_initial_Cstocks(ndecomp_pools_max))
-    tString='mimics_initial_Cstocks'
+    tString= trim(param_pref) // '_initial_Cstocks'
     call ncd_io(trim(tString), params_inst%mimics_initial_Cstocks(:), 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
 
     allocate(params_inst%mimics_mge(ndecomp_pools_max))
-    tString='mimics_mge'
+    tString= trim(param_pref) // '_mge'
     call ncd_io(trim(tString), params_inst%mimics_mge(:), 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
 
     allocate(params_inst%mimics_vmod(ndecomp_pools_max))
-    tString='mimics_vmod'
+    tString= trim(param_pref) // '_vmod'
     call ncd_io(trim(tString), params_inst%mimics_vmod(:), 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
 
     allocate(params_inst%mimics_vslope(ndecomp_pools_max))
-    tString='mimics_vslope'
+    tString= trim(param_pref) // '_vslope'
     call ncd_io(trim(tString), params_inst%mimics_vslope(:), 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
 
     allocate(params_inst%mimics_vint(ndecomp_pools_max))
-    tString='mimics_vint'
+    tString= trim(param_pref) // '_vint'
     call ncd_io(trim(tString), params_inst%mimics_vint(:), 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
 
     allocate(params_inst%mimics_kmod(ndecomp_pools_max))
-    tString='mimics_kmod'
+    tString= trim(param_pref) // '_kmod'
     call ncd_io(trim(tString), params_inst%mimics_kmod(:), 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
 
     allocate(params_inst%mimics_kslope(ndecomp_pools_max))
-    tString='mimics_kslope'
+    tString= trim(param_pref) // '_kslope'
     call ncd_io(trim(tString), params_inst%mimics_kslope(:), 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
 
     allocate(params_inst%mimics_kint(ndecomp_pools_max))
-    tString='mimics_kint'
+    tString= trim(param_pref) // '_kint'
     call ncd_io(trim(tString), params_inst%mimics_kint(:), 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
 
     allocate(params_inst%mimics_p_scalar(2))
-    tString='mimics_p_scalar'
+    tString= trim(param_pref) // '_p_scalar'
     call ncd_io(trim(tString), params_inst%mimics_p_scalar(:), 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
 
     allocate(params_inst%mimics_desorp(2))
-    tString='mimics_desorp'
+    tString= trim(param_pref) // '_desorp'
     call ncd_io(trim(tString), params_inst%mimics_desorp(:), 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
 
     allocate(params_inst%mimics_fphys_r(2))
-    tString='mimics_fphys_r'
+    tString= trim(param_pref) // '_fphys_r'
     call ncd_io(trim(tString), params_inst%mimics_fphys_r(:), 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
 
     allocate(params_inst%mimics_fphys_k(2))
-    tString='mimics_fphys_k'
+    tString= trim(param_pref) // '_fphys_k'
     call ncd_io(trim(tString), params_inst%mimics_fphys_k(:), 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
 
     allocate(params_inst%mimics_fmet(4))
-    tString='mimics_fmet'
+    tString= trim(param_pref) // '_fmet'
     call ncd_io(trim(tString), params_inst%mimics_fmet(:), 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
 
     allocate(params_inst%mimics_fchem_r(2))
-    tString='mimics_fchem_r'
+    tString= trim(param_pref) // '_fchem_r'
     call ncd_io(trim(tString), params_inst%mimics_fchem_r(:), 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
 
     allocate(params_inst%mimics_fchem_k(2))
-    tString='mimics_fchem_k'
+    tString= trim(param_pref) // '_fchem_k'
     call ncd_io(trim(tString), params_inst%mimics_fchem_k(:), 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
 
     allocate(params_inst%mimics_tau_r(2))
-    tString='mimics_tau_r'
+    tString= trim(param_pref) // '_tau_r'
     call ncd_io(trim(tString), params_inst%mimics_tau_r(:), 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
 
     allocate(params_inst%mimics_tau_k(2))
-    tString='mimics_tau_k'
+    tString= trim(param_pref) // '_tau_k'
     call ncd_io(trim(tString), params_inst%mimics_tau_k(:), 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
 
-    tString='mimics_nue_into_mic'
+    tString= trim(param_pref) // '_nue_into_mic'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%mimics_nue_into_mic = tempr
 
-    tString='mimics_tau_mod_factor'
+    tString= trim(param_pref) // '_tau_mod_factor'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%mimics_tau_mod_factor = tempr
 
-    tString='mimics_tau_mod_min'
+    tString= trim(param_pref) // '_tau_mod_min'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%mimics_tau_mod_min = tempr
 
-    tString='mimics_tau_mod_max'
+    tString= trim(param_pref) // '_tau_mod_max'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%mimics_tau_mod_max = tempr
 
-    tString='mimics_ko_r'
+    tString= trim(param_pref) // '_ko_r'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%mimics_ko_r = tempr
 
-    tString='mimics_ko_k'
+    tString= trim(param_pref) // '_ko_k'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%mimics_ko_k = tempr
 
-    tString='mimics_densdep'
+    tString= trim(param_pref) // '_densdep'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%mimics_densdep = tempr
 
-    tString='mimics_desorpQ10'
+    tString= trim(param_pref) // '_desorpQ10'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%mimics_desorpQ10 = tempr
 
-    tString='mimics_t_soi_ref'
+    tString= trim(param_pref) // '_t_soi_ref'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%mimics_t_soi_ref = tempr
 
-    tString='mimics_cn_mod_num'
+    tString= trim(param_pref) // '_cn_mod_num'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%mimics_cn_mod_num = tempr
 
-    tString='mimics_cn_r'
+    tString= trim(param_pref) // '_cn_r'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%mimics_cn_r = tempr
 
-    tString='mimics_cn_k'
+    tString= trim(param_pref) // '_cn_k'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%mimics_cn_k = tempr
+
+   ! Parameters specific for mimicsplus / mimics parameters that have updated values in mimicsplus
+    
+    if (decomp_method == mimicsplus_decomp) then 
+
+    tString='name_parameter'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%name_parameter = tempr
+
+    end if
 
   end subroutine readParams
 
