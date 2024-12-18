@@ -337,6 +337,11 @@ contains
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%mimics_cn_k = tempr
 
+    tString= trim(param_pref) // '_fi'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%mimicsplus_fi = tempr
+
    ! Parameters specific for mimicsplus / mimics parameters that have updated values in mimicsplus
     
     if (decomp_method == mimicsplus_decomp) then 

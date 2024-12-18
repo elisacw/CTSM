@@ -164,6 +164,7 @@ module pftconMod
      real(r8), allocatable :: wood_density  (:)   ! wood density (kg/m3)
      real(r8), allocatable :: crit_onset_gdd_sf(:)! scale factor for crit_onset_gdd
      real(r8), allocatable :: ndays_on(:)         ! number of days to complete leaf onset
+     real(r8), allocatable :: mimics_fi(:)        ! fraction of litter going directly to SOM pools [-]
 
      !  crop
 
@@ -506,6 +507,7 @@ contains
     allocate( this%wood_density  (0:mxpft) )
     allocate( this%crit_onset_gdd_sf (0:mxpft) )
     allocate( this%ndays_on      (0:mxpft) )
+    allocate(this%mimics_fi(2))
  
   end subroutine InitAllocate
 
@@ -1095,6 +1097,9 @@ contains
     !
     ! clm 5 nitrogen variables
     !
+    call ncd_io('mimics_fi',this%mimics_fi, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=' ERROR: error in reading in pft data'//errMsg(sourcefile, __LINE__))
+    
     if (use_flexibleCN) then
        call ncd_io('i_vcad', this%i_vcad, 'read', ncid, readvar=readv) 
        if ( .not. readv ) call endrun(msg=' ERROR: error in reading in pft data'//errMsg(sourcefile, __LINE__)) 
