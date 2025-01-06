@@ -166,12 +166,12 @@ contains
             if (.not. use_soil_matrixcn) then ! to be consistent with C
                if (decomp_method == mimicsplus_decomp) then
                   do i = i_litr_min, i_litr_max  ! in MIMICS these are 1 and 2
-                     nf_soil%decomp_npools_sourcesink_col(c,j,i) = (1 - mimicsplus_fi(i)) * &
+                     nf_soil%decomp_npools_sourcesink_col(c,j,i) = (1 - mimics_fi(i)) * &
                         nf_veg%phenology_n_to_litr_n_col(c,j,i) * dt
                   end do
-                  nf_soil%decomp_npools_sourcesink_col(c,j,i_phys_som) = mimicsplus_fi(1) * &
+                  nf_soil%decomp_npools_sourcesink_col(c,j,i_phys_som) = mimics_fi(1) * &
                      nf_veg%phenology_n_to_litr_n_col(c,j,i_met_lit) * dt
-                  nf_soil%decomp_npools_sourcesink_col(c,j,i_chem_som) = mimicsplus_fi(2) * &
+                  nf_soil%decomp_npools_sourcesink_col(c,j,i_chem_som) = mimics_fi(2) * &
                      nf_veg%phenology_n_to_litr_n_col(c,j,i_str_lit) * dt
                else
                do i = i_litr_min, i_litr_max

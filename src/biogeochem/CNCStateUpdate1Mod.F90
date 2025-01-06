@@ -9,7 +9,7 @@ module CNCStateUpdate1Mod
   use clm_varpar                         , only : ndecomp_cascade_transitions, nlevdecomp
   use clm_time_manager                   , only : get_step_size_real
   use clm_varpar                         , only : i_litr_min, i_litr_max, i_cwd
-  use clm varpar                         , only : i_met_lit, i_str_lit, i_phys_som, i_chem_som
+  use clm_varpar                         , only : i_met_lit, i_str_lit, i_phys_som, i_chem_som
   use pftconMod                          , only : npcropmin, nc3crop, pftcon
   use abortutils                         , only : endrun
   use decompMod                          , only : bounds_type
@@ -18,7 +18,7 @@ module CNCStateUpdate1Mod
   use CropType                           , only : crop_type
   use CropReprPoolsMod                   , only : nrepr, repr_grain_min, repr_grain_max
   use CropReprPoolsMod                   , only : repr_structure_min, repr_structure_max
-  use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, decomp_method, mimicsplus_decomp, use_soil_matrixcn
+  use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, decomp_method, mimics_decomp, mimicsplus_decomp, use_soil_matrixcn
   use SoilBiogeochemCarbonFluxType       , only : soilbiogeochem_carbonflux_type
   use SoilBiogeochemCarbonStateType      , only : soilbiogeochem_carbonstate_type
   use PatchType                          , only : patch
@@ -209,12 +209,12 @@ contains
                   ! phenology and dynamic land cover fluxes
                   if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
                      do i = i_litr_min, i_litr_max  ! in MIMICSplus these are 1 and 2
-                        cf_soil%decomp_cpools_sourcesink_col(c,j,i) = (1 - mimicsplus_fi(i)) * &
+                        cf_soil%decomp_cpools_sourcesink_col(c,j,i) = (1 - mimics_fi(i)) * &
                            cf_veg%phenology_c_to_litr_c_col(c,j,i) * dt
                      end do
-                     cf_soil%decomp_cpools_sourcesink_col(c,j,i_phys_som) = mimicsplus_fi(1) * &
+                     cf_soil%decomp_cpools_sourcesink_col(c,j,i_phys_som) = mimics_fi(1) * &
                         cf_veg%phenology_c_to_litr_c_col(c,j,i_met_lit) * dt
-                     cf_soil%decomp_cpools_sourcesink_col(c,j,i_chem_som) = mimicsplus_fi(2) * &
+                     cf_soil%decomp_cpools_sourcesink_col(c,j,i_chem_som) = mimics_fi(2) * &
                         cf_veg%phenology_c_to_litr_c_col(c,j,i_str_lit) * dt
                else
                   do i = i_litr_min, i_litr_max

@@ -19,6 +19,7 @@ module SoilBiogeochemDecompCascadeMIMICSMod
   use abortutils                         , only : endrun
   use CNSharedParamsMod                  , only : CNParamsShareInst, nlev_soildecomp_standard 
   use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, InitSoilTransfer, use_soil_matrixcn
+  use SoilBiogeochemDecompCascadeConType , only : decomp_method, mimics_decomp, mimicsplus_decomp
   use SoilBiogeochemStateType            , only : soilbiogeochem_state_type
   use SoilBiogeochemCarbonFluxType       , only : soilbiogeochem_carbonflux_type
   use SoilBiogeochemCarbonStateType      , only : soilbiogeochem_carbonstate_type
@@ -343,13 +344,74 @@ contains
     params_inst%mimicsplus_fi = tempr
 
    ! Parameters specific for mimicsplus / mimics parameters that have updated values in mimicsplus
+   !ECW currently the normal mimics parameters are in use (even if they are edited in mimicsplus)
     
     if (decomp_method == mimicsplus_decomp) then 
 
-    tString='name_parameter'
+    tString='mimicsplus_k_myc_som'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%name_parameter = tempr
+    params_inst%mimicsplus_k_myc_som = tempr
+
+    tString='mimicsplus_k_mo'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%mimicsplus_k_mo = tempr
+
+    tString='mimicsplus_vmax_myc'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%mimicsplus_vmax_myc = tempr
+
+    tString='mimicsplus_k_m_emyc'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%mimicsplus_k_m_emyc = tempr
+
+    tString='mimicsplus_mge_ecm'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%mimicsplus_mge_ecm = tempr
+
+    tString='mimicsplus_mge_am'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%mimicsplus_mge_am = tempr
+
+    tString='mimicsplus_fphys_ecm'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%mimicsplus_fphys_ecm = tempr
+
+    tString='mimicsplus_fchem_ecm'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%mimicsplus_fchem_ecm = tempr
+
+    tString='mimicsplus_tau_ecm'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%mimicsplus_tau_ecm = tempr
+
+    tString='mimicsplus_fphys_am'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%mimicsplus_fphys_am = tempr
+
+    tString='mimicsplus_fchem_am'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%mimicsplus_fchem_am = tempr
+
+    tString='mimicsplus_tau_am'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%mimicsplus_tau_am = tempr
+
+    tString='mimicsplus_cn_myc'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%mimicsplus_cn_myc = tempr
 
     end if
 

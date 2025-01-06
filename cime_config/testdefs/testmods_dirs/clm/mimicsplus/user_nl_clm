@@ -1,1 +1,2 @@
 soil_decomp_method = 'MIMICSplusAas2023'
+paramfile = "/cluster/projects/nn2806k/elisacw/parameters/clm_params_mimicsplus_sulman_18.12.24.nc"
