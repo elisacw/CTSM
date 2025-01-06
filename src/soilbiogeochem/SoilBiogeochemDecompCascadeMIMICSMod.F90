@@ -49,6 +49,9 @@ module SoilBiogeochemDecompCascadeMIMICSMod
   real(r8), private, allocatable :: fphys_m1(:,:)
   real(r8), private, allocatable :: fphys_m2(:,:)
   real(r8), private, allocatable :: p_scalar(:,:)
+
+  private :: r_moist                            ! calculates moisture modifier according to CORPSE
+
   integer, private :: i_phys_som  ! index of physically protected Soil Organic Matter (SOM)
   integer, private :: i_chem_som  ! index of chemically protected SOM
   integer, private :: i_avl_som  ! index of available (aka active) SOM
@@ -913,6 +916,7 @@ contains
     real(r8):: depth_scalar(bounds%begc:bounds%endc,1:nlevdecomp) 
     real(r8):: w_d_o_scalars  ! product of w_scalar * depth_scalar * o_scalar
     real(r8):: mino2lim                     !minimum anaerobic decomposition rate
+    real(r8):: moist_mod                            ! moisture modifier to replace w_scalar
     real(r8):: mimics_fmet_p1
     real(r8):: mimics_fmet_p2
     real(r8):: mimics_fmet_p3
@@ -1331,14 +1335,31 @@ contains
             m2_conc = (decomp_cpools_vr(c,j,i_oli_mic) / col%dz(c,j)) * &
                       g_to_mg * cm3_to_m3
 
+
             ! Product of w_scalar * depth_scalar * o_scalar
             w_d_o_scalars = w_scalar(c,j) * depth_scalar(c,j) * o_scalar(c,j)
+            moist_mod = r_moist(h2osoi_liq(c,j),watsat(c,j), h2osoi_ice(c,j), col%dz(c,j)) 
+
+            ! Turnover rate microbes with unit conversions (hourly -> second)
+              ! modifies turnover based on soil temperature and depth (norm_froot_prof)
+            if (t_soi_degC < 0) then
+               tau_m1 = mimics_tau_r_p1 * exp(mimics_tau_r_p2 * fmet) * min_modifier / &
+                      secsphr
+               tau_m2 = mimics_tau_k_p1 * exp(mimics_tau_k_p2 * fmet) * min_modifier / &
+                      secsphr
+            else
+               tau_m1 = mimics_tau_r_p1 * exp(mimics_tau_r_p2 * fmet) * max(norm_froot_prof(c,j),min_modifier) / &
+                      secsphr
+               tau_m2 = mimics_tau_k_p1 * exp(mimics_tau_k_p2 * fmet) * max(norm_froot_prof(c,j),min_modifier) / &
+                      secsphr
+            end if
+
 
             ! decomp_k used in SoilBiogeochemPotentialMod.F90
             ! also updating pathfrac terms that vary with time
             term_1 = vmax_l1_m1 * m1_conc / (km_l1_m1 + m1_conc)
             term_2 = vmax_l1_m2 * m2_conc / (km_l1_m2 + m2_conc)
-            decomp_k(c,j,i_met_lit) = (term_1 + term_2) * w_d_o_scalars
+            decomp_k(c,j,i_met_lit) = (term_1 + term_2) * moist_mod
             if (term_1 + term_2 /= 0._r8) then
                pathfrac_decomp_cascade(c,j,i_l1m1) = term_1 / (term_1 + term_2)
                pathfrac_decomp_cascade(c,j,i_l1m2) = term_2 / (term_1 + term_2)
@@ -1349,7 +1370,7 @@ contains
 
             term_1 = vmax_l2_m1 * m1_conc / (km_l2_m1 + m1_conc)
             term_2 = vmax_l2_m2 * m2_conc / (km_l2_m2 + m2_conc)
-            decomp_k(c,j,i_str_lit) = (term_1 + term_2) * w_d_o_scalars
+            decomp_k(c,j,i_str_lit) = (term_1 + term_2) * moist_mod
             if (term_1 + term_2 /= 0._r8) then
                pathfrac_decomp_cascade(c,j,i_l2m1) = term_1 / (term_1 + term_2)
                pathfrac_decomp_cascade(c,j,i_l2m2) = term_2 / (term_1 + term_2)
@@ -1360,7 +1381,7 @@ contains
 
             term_1 = vmax_s1_m1 * m1_conc / (km_s1_m1 + m1_conc)
             term_2 = vmax_s1_m2 * m2_conc / (km_s1_m2 + m2_conc)
-            decomp_k(c,j,i_avl_som) = (term_1 + term_2) * w_d_o_scalars
+            decomp_k(c,j,i_avl_som) = (term_1 + term_2) * moist_mod
             if (term_1 + term_2 /= 0._r8) then
                pathfrac_decomp_cascade(c,j,i_s1m1) = term_1 / (term_1 + term_2)
                pathfrac_decomp_cascade(c,j,i_s1m2) = term_2 / (term_1 + term_2)
@@ -1374,17 +1395,17 @@ contains
             term_1 = vmax_l2_m1 * m1_conc / (mimics_ko_r * km_l2_m1 + m1_conc)
             term_2 = vmax_l2_m2 * m2_conc / (mimics_ko_k * km_l2_m2 + m2_conc)
             ! The right hand side is OXIDAT in the testbed (line 1145)
-            decomp_k(c,j,i_chem_som) = (term_1 + term_2) * w_d_o_scalars
+            decomp_k(c,j,i_chem_som) = (term_1 + term_2) * moist_mod
 
             ! Currently, mimics_densdep = 1 so as to have no effect
             decomp_k(c,j,i_cop_mic) = tau_m1 * &
-                   m1_conc**(mimics_densdep - 1.0_r8) * w_d_o_scalars
+                   m1_conc**(mimics_densdep - 1.0_r8) * moist_mod
             favl = min(1.0_r8, max(0.0_r8, 1.0_r8 - fphys_m1(c,j) - fchem_m1))
             pathfrac_decomp_cascade(c,j,i_m1s1) = favl
             pathfrac_decomp_cascade(c,j,i_m1s2) = fchem_m1
 
             decomp_k(c,j,i_oli_mic) = tau_m2 * &
-                   m2_conc**(mimics_densdep - 1.0_r8) * w_d_o_scalars
+                   m2_conc**(mimics_densdep - 1.0_r8) * moist_mod
             favl = min(1.0_r8, max(0.0_r8, 1.0_r8 - fphys_m2(c,j) - fchem_m2))
             pathfrac_decomp_cascade(c,j,i_m2s1) = favl
             pathfrac_decomp_cascade(c,j,i_m2s2) = fchem_m2
@@ -1393,7 +1414,7 @@ contains
             ! its own structure
             ! TODO This shows how BGC applies the spinup coefficients
             if (.not. use_fates) then
-               decomp_k(c,j,i_cwd) = k_frag * w_d_o_scalars  ! * spinup_geogterm_cwd(c)
+               decomp_k(c,j,i_cwd) = k_frag * moist_mod  ! * spinup_geogterm_cwd(c)
             end if
 
             ! Tillage
@@ -1447,5 +1468,45 @@ contains
     end associate
 
  end subroutine decomp_rates_mimics
+ 
+
+ !Moisture function, based on testbed code: https://github.com/wwieder/biogeochem_testbed/blob/957a5c634b9f2d0b4cdba0faa06b5a91216ace33/SOURCE_CODE/mimics_cycle.f90#L401-L419
+ real(r8) function r_moist(h2osoi_liq,watsat, h2osoi_ice, dz) !As in testbed (and CLM) version of MIMICS            
+   
+ !  !USES
+ use clm_varcon, only: denh2o, denice
+ 
+ ! !ARGUMENTS:
+ real(r8), intent(in)    :: h2osoi_liq ! liquid water content kg/m2
+ real(r8), intent(in)    :: watsat ! porosity m3/m3
+ real(r8), intent(in)    :: h2osoi_ice ! ice content kg/m2 
+ real(r8), intent(in)    :: dz ! soil layer thickness 
+
+ ! !LOCAL VARIABLES
+ real(r8):: wliq !water liquid
+ real(r8):: wice !water ice
+
+
+ !NOTE: This moisture function represent both inhibition bc. very dry conditions, and very wet (anaerobic) conditions. 
+ !FROM mimics_cycle.f90 in testbed:
+ ! ! Read in soil moisture data as in CORPSE
+ !  theta_liq  = min(1.0, casamet%moistavg(npt)/soil%ssat(npt))     ! fraction of liquid water-filled pore space (0.0 - 1.0)
+ !  theta_frzn = min(1.0, casamet%frznmoistavg(npt)/soil%ssat(npt)) ! fraction of frozen water-filled pore space (0.0 - 1.0)
+ !  air_filled_porosity = max(0.0, 1.0-theta_liq-theta_frzn)
+ !
+ !  if (mimicsbiome%fWFunction .eq. CORPSE) then
+ !    ! CORPSE water scalar, adjusted to give maximum values of 1
+ !    fW = (theta_liq**3 * air_filled_porosity**2.5)/0.022600567942709
+ !    fW = max(0.05, fW)
+ wliq = h2osoi_liq / dz * denh2o
+ wice = h2osoi_ice / dz * denice
+ wliq  = min(1.0_r8, wliq/watsat)     ! fraction of liquid water-filled pore space (0.0 - 1.0)
+ wice = min(1.0_r8, wice/watsat)     ! fraction of frozen water-filled pore space (0.0 - 1.0)
+ !ECW check equations, find out how theta_l & theta_f are called in the rest of CTSM 
+
+ r_moist = ((wliq**3)*max(0.0_r8, 1.0_r8-wliq-wice)**2.5_r8)/0.022600567942709_r8
+ r_moist = max(0.05, r_moist) !ECW This is probably what I will replace w_d_o_scalar with
+end function r_moist
+
 
 end module SoilBiogeochemDecompCascadeMIMICSMod
