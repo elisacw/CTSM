@@ -347,8 +347,8 @@ contains
     else if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
        call decomp_rates_mimics(bounds, num_bgc_soilc, filter_bgc_soilc, &
             num_bgc_vegp, filter_bgc_vegp, clm_fates, &
-            soilstate_inst, temperature_inst, cnveg_carbonflux_inst, ch4_inst, &
-            soilbiogeochem_carbonflux_inst, soilbiogeochem_carbonstate_inst, &
+            soilstate_inst, temperature_inst, cnveg_carbonflux_inst, waterstatebulk_inst, ch4_inst, &
+            soilbiogeochem_carbonflux_inst, soilbiogeochem_carbonstate_inst, soilbiogeochem_state_inst, &
             cnveg_state_inst%idop_patch)
     end if
     call t_stopf('DecompRate')

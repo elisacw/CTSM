@@ -31,6 +31,7 @@ module SoilBiogeochemDecompCascadeMIMICSMod
   use GridcellType                       , only : grc
   use SoilBiogeochemStateType            , only : get_spinup_latitude_term
   use CLMFatesInterfaceMod               , only : hlm_fates_interface_type
+  use WaterStateBulkType                 , only : waterstatebulk_type
 
   !
   implicit none
@@ -127,7 +128,24 @@ module SoilBiogeochemDecompCascadeMIMICSMod
      real(r8) :: mimics_cn_mod_num  ! adjusts microbial CN based on fmet
      real(r8) :: mimics_t_soi_ref  ! reference soil temperature (degC)
      real(r8) :: mimics_initial_Cstocks_depth  ! Soil depth for initial C stocks for a cold-start (m)
+     real(r8) :: mimics_fi
      real(r8), allocatable :: mimics_initial_Cstocks(:)  ! Initial C stocks for a cold-start (gC/m3)
+
+     real(r8) :: mimicsplus_k_myc_som
+     real(r8) :: mimicsplus_k_mo
+     real(r8) :: mimicsplus_vmax_myc
+     real(r8) :: mimicsplus_k_m_emyc
+     real(r8) :: mimicsplus_mge_ecm
+     real(r8) :: mimicsplus_mge_am
+     real(r8) :: mimicsplus_fphys_ecm
+     real(r8) :: mimicsplus_fchem_ecm
+     real(r8) :: mimicsplus_tau_ecm
+     real(r8) :: mimicsplus_fphys_am
+     real(r8) :: mimicsplus_fchem_am
+     real(r8) :: mimicsplus_tau_am
+     real(r8) :: mimicsplus_cn_myc
+
+
      ! The next few vectors are dimensioned by the number of decomposition
      ! transitions that make use of the corresponding parameters, currently
      ! six. The transitions are represented in this order:
@@ -154,6 +172,8 @@ module SoilBiogeochemDecompCascadeMIMICSMod
      real(r8), allocatable :: mimics_desorp(:)
      real(r8), allocatable :: mimics_tau_r(:)
      real(r8), allocatable :: mimics_tau_k(:)
+
+     
   end type params_type
   !
   type(params_type), private :: params_inst
@@ -344,7 +364,7 @@ contains
     tString= trim(param_pref) // '_fi'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%mimicsplus_fi = tempr
+    params_inst%mimics_fi = tempr
 
    ! Parameters specific for mimicsplus / mimics parameters that have updated values in mimicsplus
    !ECW currently the normal mimics parameters are in use (even if they are edited in mimicsplus)
@@ -471,8 +491,8 @@ contains
          is_metabolic                   => decomp_cascade_con%is_metabolic                       , & ! Output: [logical           (:)     ]  TRUE => pool is metabolic material                        
          is_cellulose                   => decomp_cascade_con%is_cellulose                       , & ! Output: [logical           (:)     ]  TRUE => pool is cellulose                                 
          is_lignin                      => decomp_cascade_con%is_lignin                          , & ! Output: [logical           (:)     ]  TRUE => pool is lignin                                    
-         spinup_factor                  => decomp_cascade_con%spinup_factor                        & ! Output: [real(r8)          (:)     ]  factor for AD spinup associated with each pool           
-
+         spinup_factor                  => decomp_cascade_con%spinup_factor                       & ! Output: [real(r8)          (:)     ]  factor for AD spinup associated with each pool           
+         
          )
 
       allocate(desorp(bounds%begc:bounds%endc,1:nlevdecomp))
@@ -843,9 +863,9 @@ contains
   !-----------------------------------------------------------------------
   subroutine decomp_rates_mimics(bounds, num_bgc_soilc, filter_bgc_soilc, &
        num_soilp, filter_soilp, clm_fates, &
-       soilstate_inst, temperature_inst, cnveg_carbonflux_inst, &
+       soilstate_inst, temperature_inst, cnveg_carbonflux_inst, waterstatebulk_inst, &
        ch4_inst, soilbiogeochem_carbonflux_inst, soilbiogeochem_carbonstate_inst, &
-       idop)
+       soilbiogeochem_state_inst, idop)
     !
     ! !DESCRIPTION:
     ! Calculate rates and decomposition pathways for the MIMICS
@@ -853,11 +873,12 @@ contains
     !
     ! !USES:
     use clm_time_manager , only : get_average_days_per_year, get_step_size
-    use clm_varcon       , only : secspday, secsphr, tfrz
+    use clm_varcon       , only : secspday, secsphr, tfrz, spval
     use clm_varcon       , only : g_to_mg, cm3_to_m3
     use subgridAveMod    , only : p2c
     use PatchType        , only : patch
     use pftconMod        , only : pftname
+    use clm_varpar       , only : nlevdecomp_full
     use TillageMod       , only : get_do_tillage
     use TillageMod       , only : get_apply_tillage_multipliers
     !
@@ -873,13 +894,19 @@ contains
     type(ch4_type)                       , intent(in)    :: ch4_inst
     type(soilbiogeochem_carbonflux_type) , intent(inout) :: soilbiogeochem_carbonflux_inst
     type(soilbiogeochem_carbonstate_type), intent(in)    :: soilbiogeochem_carbonstate_inst
+    type(soilbiogeochem_state_type)      , intent(in)    :: soilbiogeochem_state_inst
     type(hlm_fates_interface_type)       , intent(inout) :: clm_fates
+    type(waterstatebulk_type)            , intent(in)    :: waterstatebulk_inst
     integer, optional                    , intent(in)    :: idop(:) ! patch day of planting
     !
     ! !LOCAL VARIABLES:
     real(r8), parameter :: eps = 1.e-6_r8
+    real(r8), parameter :: min_modifier = 0.1       ! minimum value in microbial turnover
     real(r8):: frw(bounds%begc:bounds%endc) ! rooting fraction weight
     real(r8), allocatable:: fr(:,:)         ! column-level rooting fraction by soil depth
+    real(r8), allocatable:: norm_froot_prof(:,:)    ! normalized fine root profile
+    real(r8):: min_froot                            !minimum root fraction in column
+    real(r8):: max_froot                            !maximum root fraction in column   
     real(r8):: psi                          ! temporary soilpsi for water scalar
     real(r8):: k_frag                       ! fragmentation rate constant CWD (1/sec)
     real(r8):: fmet
@@ -961,11 +988,13 @@ contains
          minpsi         => CNParamsShareInst%minpsi                    , & ! Input:  [real(r8)         ]  minimum soil suction (mm)
          maxpsi         => CNParamsShareInst%maxpsi                    , & ! Input:  [real(r8)         ]  maximum soil suction (mm)
          soilpsi        => soilstate_inst%soilpsi_col                  , & ! Input:  [real(r8) (:,:)   ]  soil water potential in each soil layer (MPa)          
+         watsat         => soilstate_inst%watsat_col                   , & ! Input:  [real(r8) (:,:)  ]  volumetric soil water at saturation (porosity)  
          t_soisno       => temperature_inst%t_soisno_col               , & ! Input:  [real(r8) (:,:)   ]  soil temperature (Kelvin)  (-nlevsno+1:nlevgrnd)       
          o2stress_sat   => ch4_inst%o2stress_sat_col                   , & ! Input:  [real(r8) (:,:)   ]  Ratio of oxygen available to that demanded by roots, aerobes, & methanotrophs (nlevsoi)
          o2stress_unsat => ch4_inst%o2stress_unsat_col                 , & ! Input:  [real(r8) (:,:)   ]  Ratio of oxygen available to that demanded by roots, aerobes, & methanotrophs (nlevsoi)
          finundated     => ch4_inst%finundated_col                     , & ! Input:  [real(r8) (:)     ]  fractional inundated area                                
          decomp_cpools_vr => soilbiogeochem_carbonstate_inst%decomp_cpools_vr_col , &  ! Input: [real(r8) (:,:,:) ] (gC/m3)  vertically-resolved decomposing (litter, cwd, soil) C pools
+         froot_prof     => soilbiogeochem_state_inst%froot_prof_patch  , & ! Input:  [real(r8) (:,:) ]  (1/m) profile of fine roots                     
          pathfrac_decomp_cascade => soilbiogeochem_carbonflux_inst%pathfrac_decomp_cascade_col                                                                    , &  ! Output: [real(r8) (:,:,:) ]  what fraction of C leaving a given pool passes through a given transition (frac)
          rf_decomp_cascade       => soilbiogeochem_carbonflux_inst%rf_decomp_cascade_col                                                                          , & ! Input:  [real(r8)          (:,:,:) ]  respired fraction in decomposition step (frac)
          w_scalar       => soilbiogeochem_carbonflux_inst%w_scalar_col , & ! Output: [real(r8) (:,:)   ]  soil water scalar for decomp                           
@@ -974,7 +1003,10 @@ contains
          ligninNratioAvg => soilbiogeochem_carbonflux_inst%litr_lig_c_to_n_col, &  ! Input: [real(r8) (:) ] C:N ratio of litter lignin
          decomp_k       => soilbiogeochem_carbonflux_inst%decomp_k_col , & ! Output: [real(r8) (:,:,:) ]  rate for decomposition (1./sec)
          Ksoil          => soilbiogeochem_carbonflux_inst%Ksoil        , & ! Output: [real(r8) (:,:,:) ]  rate constant for decomposition (1./sec)
-         spinup_factor  => decomp_cascade_con%spinup_factor              & ! Input:  [real(r8)          (:)     ]  factor for AD spinup associated with each pool           
+         spinup_factor  => decomp_cascade_con%spinup_factor            , & ! Input:  [real(r8)          (:)     ]  factor for AD spinup associated with each pool           
+         h2osoi_liq     => waterstatebulk_inst%h2osoi_liq_col                    , & ! Output: [real(r8) (:,:) ] liquid water (kg/m2) (new)             
+         h2osoi_ice     => waterstatebulk_inst%h2osoi_ice_col                      & ! Output: [real(r8) (:,:) ] ice lens (kg/m2) (new)
+            
          )
 
       if (get_do_tillage() .and. .not. present(idop)) then
@@ -991,6 +1023,9 @@ contains
 
       ! translate to per-second time constant
       k_frag = 1._r8 / (secspday * days_per_year * CNParamsShareInst%tau_cwd)
+
+      allocate(norm_froot_prof(bounds%begc:bounds%endc, 1:nlevdecomp_full))
+      norm_froot_prof(bounds%begc:bounds%endc, 1:nlevdecomp_full)=0._r8
 
      ! calc ref rate
       if ( spinup_state >= 1 ) then
@@ -1062,6 +1097,30 @@ contains
          end do
       endif
 
+      ! root fraction is used for calculating microbial tunrover rate, it functions as a sort of depth profile
+        ! get root fraction from patch to column level
+      call p2c(bounds, nlevdecomp_full, &
+             froot_prof(bounds%begp:bounds%endp,1:nlevdecomp_full), &
+             norm_froot_prof(bounds%begc:bounds%endc,1:nlevdecomp_full), 'unity')
+      ! normalize root fraction
+      do fc = 1,num_bgc_soilc
+         c = filter_bgc_soilc(fc)
+           min_froot = minval(norm_froot_prof(c,1:nlevdecomp))
+           max_froot = maxval(norm_froot_prof(c,1:nlevdecomp))
+      do j = 1,nlevdecomp
+         ! all turnover will be happening in just 1 soil layer
+         if ( nlevdecomp .eq. 1 ) then
+            norm_froot_prof(c,j) = 1._r8
+         else
+            if (max_froot - min_froot == 0._r8 .or. min_froot == spval .or. max_froot == spval) then
+               norm_froot_prof(c,j) = min_modifier
+            else
+               norm_froot_prof(c,j) = (norm_froot_prof(c,j) - min_froot) / (max_froot - min_froot)
+            endif
+         endif
+      enddo
+      enddo
+      
       !--- time dependent coefficients-----!
       if ( nlevdecomp .eq. 1 ) then
 
@@ -1468,7 +1527,7 @@ contains
     end associate
 
  end subroutine decomp_rates_mimics
- 
+
 
  !Moisture function, based on testbed code: https://github.com/wwieder/biogeochem_testbed/blob/957a5c634b9f2d0b4cdba0faa06b5a91216ace33/SOURCE_CODE/mimics_cycle.f90#L401-L419
  real(r8) function r_moist(h2osoi_liq,watsat, h2osoi_ice, dz) !As in testbed (and CLM) version of MIMICS            
