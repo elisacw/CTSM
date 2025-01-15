@@ -176,7 +176,7 @@ module SoilBiogeochemDecompCascadeMIMICSMod
      
   end type params_type
   !
-  type(params_type), private :: params_inst
+  type(params_type), public :: params_inst
 
   character(len=*), parameter, private :: sourcefile = &
        __FILE__
