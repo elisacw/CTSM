@@ -173,6 +173,41 @@ module SoilBiogeochemDecompCascadeMIMICSMod
      real(r8), allocatable :: mimics_tau_r(:)
      real(r8), allocatable :: mimics_tau_k(:)
 
+     ! Sulman parameter
+     real(r8) :: sulman_cn_m          !Soil microbial C:N ratio
+     real(r8) :: sulman_v_nh4         !Maximum NH4+ immobilization rate [year-1]
+     real(r8) :: sulman_v_no3         !Maximum NO3- immobilization rate [year-1]
+     real(r8) :: sulman_vmax_denit    !Maximum denitrification decomposition rate at reference temperature [year-1]
+     real(r8) :: sulman_fden          !Maximum denitrification decomposition rate at reference temperature [unitless]
+     real(r8) :: sulman_kdenit        !Half-saturation constant for nitrate concentration in denitrification [kg NO3-N kg NO3-N demand-1 year-1]
+     real(r8) :: sulman_root_no3      !Maximum root active nitrate uptake rate [kg N m-3 year-1]
+     real(r8) :: sulman_root_nh4      !Maximum root active ammonium uptake rate [kg N m-3 year-1]
+     real(r8) :: sulman_km_no3        !Half-saturation nitrate concentration for root active uptake [kg N m-3]
+     real(r8) :: sulman_km_nh4        !Half-saturation nitrate concentration for root active uptake [kg N m-3]
+     real(r8) :: sulman_r_rhiz        !Radius of the rhizosphere [m]
+     real(r8) :: sulman_v_scav        !Maximum N uptake rate by scavenging mycorrhizae [kg N m-3 year-1]
+     real(r8) :: sulman_k_scav_Ninorg  !Half-saturation inorganic N concentration for mycorrhizal uptake [kg N m-3]
+     real(r8) :: sulman_k_scav        !Half-saturation mycorrhizal biomass concentration for scavenging [kg C m-3]
+     real(r8) :: sulman_km_mine       !Half-saturation mycorrhizal biomass concentration for scavenging [kg C m-3]
+     real(r8) :: sulman_cue_mine      !Carbon use efficiency of mycorrhizal mining [fraction]
+     real(r8) :: sulman_nue_mine      !Nitrogen use efficiency of mycorrhizal mining [fraction]
+     real(r8) :: sulman_vmax_ref_mine !Maximum decomposition rate at reference temperature for mycorrhizal mining [year-1]
+     real(r8) :: sulman_rfix          !N fixation rate per unit symbiotic biomass [kg N kg biomass C-1 year-1]
+     real(r8) :: sulman_kgrowth       !Half-saturation of intermediate C pool for symbiotic growth [kg C m -2]
+     real(r8) :: sulman_rgrowth       !Maximum symbiont growth rate [kg C m-2 year-1]
+     real(r8) :: sulman_tau_sym       !Fraction of symbiotic biomass turnover not used for maintenance respiration [fraction]
+     real(r8) :: sulman_growth_scav   !N scavenger growth efficiency [unitless]
+     real(r8) :: sulman_growth_mine   !N miner growth efficiency [unitless]
+     real(r8) :: sulman_growth_fix    !N fixer growth efficiency [unitless]
+     real(r8) :: sulman_tau_scav      !N scavenger turnover time [year-1]
+     real(r8) :: sulman_tau_mine      !N miner turnover time [year-1]
+     real(r8) :: sulman_tau_fix       !N fixer turnover time [year-1]
+     real(r8) :: sulman_cn_scav       !N scavenger C:N [unitless]
+     real(r8) :: sulman_cn_mine       !N miner C:N [unitless]
+     real(r8) :: sulman_cn_fix        !N fixer C:N [unitless]
+     real(r8) :: sulman_tau_int       !Turnover time of intermediate C pool [year-1]
+     real(r8) :: sulman_rup_veg       !Vegetation N uptake rate from intermediate N pool [year-1]
+     real(r8) :: sulman_fnalloc       !Fraction of NPP allocated to N uptake per unit N stress [fraction]
      
   end type params_type
   !
@@ -435,6 +470,179 @@ contains
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%mimicsplus_cn_myc = tempr
+
+    
+    ! Sulman et al. Parameters
+
+    tString='sulman_cn_m'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_cn_m=tempr
+
+    tString='sulman_v_nh4'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_v_nh4=tempr
+    
+    tString='sulman_v_no3'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_v_no3=tempr
+    
+    tString='sulman_vmax_denit'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_vmax_denit=tempr
+    
+    tString='sulman_fden'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_fden=tempr
+    
+    tString='sulman_kdenit'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_kdenit=tempr
+    
+    tString='sulman_root_no3'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_root_no3=tempr
+    
+    tString='sulman_root_nh4'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_root_nh4=tempr
+    
+    tString='sulman_km_no3'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_km_no3=tempr
+    
+    tString='sulman_km_nh4'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_km_nh4=tempr
+    
+    tString='sulman_r_rhiz'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_r_rhiz=tempr
+    
+    tString='sulman_v_scav'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_v_scav=tempr
+    
+    tString='sulman_k_scav_Ninorg'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_k_scav_inorg=tempr
+    
+    tString='sulman_k_scav'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_k_scav=tempr
+    
+    tString='sulman_km_mine'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_km_mine=tempr
+    
+    tString='sulman_cue_mine'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_cue_mine=tempr
+    
+    tString='sulman_nue_mine'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_nue_mine=tempr
+    
+    tString='sulman_vmax_ref_mine'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_vmax_ref_mine=tempr
+    
+    tString='sulman_rfix'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_rfix=tempr
+    
+    tString='sulman_kgrowth'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_kgrowth=tempr
+    
+    tString='sulman_rgrowth'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_rgrowth=tempr
+    
+    tString='sulman_tau_sym'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_tau_sym=tempr
+
+    tString='sulman_growth_scav'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_growth_scav=tempr
+
+    tString='sulman_growth_mine'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_growth_mine=tempr
+
+    tString='sulman_growth_fix'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_growth_fix=tempr
+    
+    tString='sulman_tau_scav'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_tau_scav=tempr
+
+    tString='sulman_tau_mine'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_tau_mine=tempr
+
+    tString='sulman_tau_fix'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_tau_fix=tempr
+    
+    tString='sulman_cn_scav'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_cn_scav=tempr
+
+    tString='sulman_cn_mine'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_cn_mine=tempr
+    
+    tString='sulman_cn_fix'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_cn_fix=tempr
+    
+    tString='sulman_tau_int'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_tau_int=tempr
+    
+    tString='sulman_rup_veg'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_rup_veg=tempr
+    
+    tString='sulman_fnalloc'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_fnalloc=tempr
 
     end if
 
