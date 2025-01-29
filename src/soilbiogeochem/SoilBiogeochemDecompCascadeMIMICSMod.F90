@@ -114,7 +114,7 @@ module SoilBiogeochemDecompCascadeMIMICSMod
   real(r8), private :: kslope_l2_m2
   real(r8), private :: kslope_s1_m2
 
-  type, private :: params_type
+  type, public :: params_type
      real(r8) :: mimics_nue_into_mic  ! microbial N use efficiency for N fluxes
      real(r8) :: mimics_desorpQ10
      real(r8) :: mimics_densdep  ! exponent controling the density dependence of microbial turnover
