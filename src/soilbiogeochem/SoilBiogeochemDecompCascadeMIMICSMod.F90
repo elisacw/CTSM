@@ -537,7 +537,7 @@ contains
     tString='sulman_k_scav_Ninorg'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%sulman_k_scav_inorg=tempr
+    params_inst%sulman_k_scav_Ninorg=tempr
     
     tString='sulman_k_scav'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
