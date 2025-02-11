@@ -253,7 +253,14 @@ contains
    livecrootn_storage   => cnveg_nitrogenstate_inst%livecrootn_storage_patch     , & ! Input:  [real(r8) (:)     ]  (gN/m2) live coarse root N storage                
    h2osoi_liq           => waterstatebulk_inst%h2osoi_liq_col                    , & ! Output: [real(r8) (:,:) ] liquid water (kg/m2) (new)  
    t_soisno             => temperature_inst%t_soisno_col                         , & ! Input:  [real(r8) (:,:)   ]  soil temperature (Kelvin)  (-nlevsno+1:nlevgrnd)       
-   availc               => cnveg_carbonflux_inst%availc_patch                    & ! Output: [real(r8) (:)   ]  C flux available for allocation (gC/m2/s)
+   availc               => cnveg_carbonflux_inst%availc_patch                    , & ! Output: [real(r8) (:)   ]  C flux available for allocation (gC/m2/s)
+   
+   sminn_vr               => soilbiogeochem_nitrogenstate_inst%sminn_vr_col        , & ! Input:  [real(r8) (:,:) ]  (gN/m3) soil mineral N                
+   smin_nh4_vr            => soilbiogeochem_nitrogenstate_inst%smin_nh4_vr_col     , & ! Input:  [real(r8) (:,:) ]  (gN/m3) soil mineral NH4              
+   smin_no3_vr            => soilbiogeochem_nitrogenstate_inst%smin_no3_vr_col     , & ! Input:  [real(r8) (:,:) ]  (gN/m3) soil mineral NO3              
+   smin_no3_to_plant_vr   => soilbiogeochem_nitrogenflux_inst%smin_no3_to_plant_vr_col     , & ! Input:  [real(r8) (:,:) ]
+   smin_nh4_to_plant_vr   => soilbiogeochem_nitrogenflux_inst%smin_nh4_to_plant_vr_col     , & ! Input:  [real(r8) (:,:) ]
+   perecm                 => pftcon%perecm                                           & ! Input:   The fraction of ECM-associated PFT 
    )
    
    sulman_vmax_denit_fast = params_inst%sulman_vmax_denit(1)
@@ -315,11 +322,11 @@ contains
 
 
    ! Root uptake of nitrogen
-   call root_N_uptake()
+   call active_root_N_uptake(froot_carbon(begp:endp), smin_no3_to_plant_vr(c,j), smin_nh4_to_plant_vr(c,j), no3_uptake, nh4_uptake)
 
    ! Scavenging (AM-style)
-   call myc_scavenger_N_uptake()
-
+   call myc_scavenger_N_uptake(scav_C_biomass, smin_no3_to_plant_vr(c,j), smin_nh4_to_plant_vr(c,j), myc_efficiency, no3_uptake, nh4_uptake)
+   
    ! Mycorrhizal N mining (ECM-style)
    call myc_miner_N_uptake()
 
@@ -328,8 +335,8 @@ contains
 
    !-----------------------------------------------------------------------
    
-  
-   ! Mycorrhizal scavengers
+  ! GROWTH AND TURNOVER
+  ! Mycorrhizal scavengers
    scav_growth = sulman_rgrowth * scav_C_reservoir / (scav_C_reservoir + sulman_kgrowth) * sulman_growth_scav * dt
    maint_resp = min(scav_C_biomass/sulman_tau_scav * (1.0 - sulman_tau_sym) * dt, scav_growth)
    ! Nitrogen limitation
@@ -395,6 +402,7 @@ contains
 
    !----------------------------------------------------------------
 
+   ! RETURN OF INVESTMENT
    ! Calculate N released to plants per uptake pathway - Return Of Investment (line 553 in vegn_dynamics)
    ! multiplied with secspday * days_per_year to get values per second (parameter is in per year)
 
@@ -417,7 +425,7 @@ contains
 
 
    ! Miners
-   if () ! IF MINE PATHWAY IS ACTIVE DO...
+   if () ! IF MINE PATHWAY IS ACTIVE DO... if the patch has miners from per ecm 
    mine_N_to_plant = mine_N_reservoir * sulman_rup_veg * secspday * days_per_year
    if (mine_C_biomass < 0.0_r8) then 
       mine_roi = (max(0.0_r8, mine_N_to_plant)dt) / (mine_C_biomass / sulman_growth_mine / sulman_tau_mine)
@@ -442,7 +450,7 @@ contains
 
 
    ! Nitrogen Fixers
-   if () ! IF FIXER PATHWAY IS ACTIVE DO...
+   if () ! IF FIXER PATHWAY IS ACTIVE DO... from frac_fix FUN
    fix_N_to_plant = fix_N_reservoir * sulman_rup_veg * secspday * days_per_year
    if (fix_C_biomass < 0.0_r8) then 
       fix_roi = (fix_N_to_plant / dt) / (fix_C_biomass / sulman_growth_fix / sulman_tau_fix)
@@ -463,9 +471,7 @@ contains
 
    !----------------------------------------
 
-   ! PLANT UPTAKE STRATEGIES
-
-    !----------------------------------------
+   ! FUNCTIONS
 
    function Vmax_myc(soil_T)
       real, intent(in)  :: soil_T               ! Soil temperature in Kelvin
@@ -516,17 +522,16 @@ contains
    !----------------------------------------
   
    ! PLANT UPTAKE STRATEGIES
-  
+
    ! Nitrogen uptake from the rhizosphere by roots (active transport across root-soil interface)
    ! Mineral nitrogen is taken up from the rhizosphere only
-   subroutine active_root_N_uptake(bounds, froot_carbon, soilbiogeochem_nitrogenstate_inst, soilstate_inst, &
+   subroutine active_root_N_uptake(bounds, froot_carbon, no3_soil, nh4_soil, soilstate_inst, &
       no3_uptake, nh4_uptake) ! not done
 
       use clm_varcon        , only : rpi
       use decompMod         , only : bounds_type
 
       type(bounds_type)      , intent(in)    :: bounds
-      type(soilbiogeochem_nitrogenstate_type) , intent(inout) :: soilbiogeochem_nitrogenstate_inst
       type(soilstate_type)            , intent(in)    :: soilstate_inst
 
     ! !LOCAL VARIABLES:
@@ -537,31 +542,29 @@ contains
       begc = bounds%begc; endc= bounds%endc
 
 
-      real,intent(in)    :: froot_carbon( bounds%begp: )    ! fine root carbon (gC/m2) [pft]   
+      real,intent(in)    :: froot_carbon( bounds%begp: )    ! fine root carbon (gC/m2)   [pft]   
+      real,intent(in)    :: no3_soil                        ! avaliable soil mineral NO3 [gN/m3]
+      real,intent(in)    :: nh4_soil                        ! avaliable soil mineral NH4 [gN/m3]
       real,intent(inout) :: no3_uptake
       real,intent(inout) :: nh4_uptake
 
-      real(r8) :: root_cross_sec_area
-      real(r8) :: root_length_density
-      real(r8) :: root_biomass_density
-      real(r8) :: rhizosphere_frac
-      real(r8) :: no3_uptake
-      real(r8) :: nh4_uptake
-      real(r8), parameter :: c_to_b = 2.0_r8           !(g biomass /g C)
+      real(r8) :: root_biomass_density    ! root biomass density [g/m3]
+      real(r8) :: root_cross_sec_area     ! root cross sectional area [m2]
+      real(r8) :: root_length_density     ! root length density [m/m3]
+      real(r8) :: rhizosphere_frac        ! fraction of rihzosphere [-] 
+                                          ! sulman_r_rhiz [m] 
+      real(r8), public, parameter :: root_radius = 0.29e-03_r8 !(m)
+
+      real(r8), parameter :: c_to_b = 2.0_r8                ![g biomass /g C]
 
       associate(                                                                           &
-         sminn_vr               => soilbiogeochem_nitrogenstate_inst%sminn_vr_col        , & ! Input:  [real(r8) (:,:) ]  (gN/m3) soil mineral N                
-         smin_nh4_vr            => soilbiogeochem_nitrogenstate_inst%smin_nh4_vr_col     , & ! Input:  [real(r8) (:,:) ]  (gN/m3) soil mineral NH4              
-         smin_no3_vr            => soilbiogeochem_nitrogenstate_inst%smin_no3_vr_col     , & ! Input:  [real(r8) (:,:) ]  (gN/m3) soil mineral NO3              
          ivt                    => patch%itype                                           , & ! Input:  [integer  (:)   ]  patch vegetation type
          rootfr                 => soilstate_inst%rootfr_patch                           , & ! Input:   [real(r8) (:,:)]
          dz                     => col%dz                                                , & ! Input:  [real(r8) (:,:) ]  layer thickness (m)
-         root_radius  => pftcon%root_radius                  , & ! Input: 0.29e-03_r8 !(m) 
-         root_density => pftcon%root_density                  & ! Input: 0.31e06_r8 !(g biomass / m3 root) 
+         root_radius            => pftcon%root_radius                  , & ! Input: 0.29e-03_r8 !(m) 
+         root_density           => pftcon%root_density                  & ! Input: 0.31e06_r8 !(g biomass / m3 root) 
          )
       
-     
-
          no3_uptake = 0.0_r8
          nh4_uptake = 0.0_r8
          total_active_root_N_uptake = 0.0_r8
@@ -571,6 +574,11 @@ contains
          c = patch%column(p)
          do j = 1, nlevdecomp
 
+           ! Calculate Nitrogen concentration in soil layers
+           ! smin_nh4_vr_col and smin_no3_vr_col should be already per layer and tell how much N is there           
+
+
+           ! Root calculations (Sulman calculated root surface, nor sure how different that is)
            ! calculate conversion from conductivity to conductance
            root_biomass_density = c_to_b * froot_carbon(p) * rootfr(p,j) / dz(c,j)
            ! ensure minimum root biomass (using 1gC/m2)
@@ -579,10 +587,13 @@ contains
            root_cross_sec_area = rpi*params_inst%sulman_r_rhiz(ivt(p))**2
            root_length_density = root_biomass_density / (root_density(ivt(p)) * root_cross_sec_area)
      
-           rhizosphere_frac = min(rpi*((sulman_r_rhiz+r_r)**2-r_r**2)*root_length_density,1.0_r8) 
+           rhizosphere_frac = min(rpi*((sulman_r_rhiz+root_radius)**2-root_radius**2)*root_length_density,1.0_r8)  ! Kinda sus
+
            
-           no3_uptake = rhizosphere_frac * params_inst%sulman_root_no3 * (smin_no3_vr(c,j) / (smin_no3_vr(c,j) + params_inst%sulman_km_no3))
-           nh4_uptake = rhizosphere_frac * params_inst%sulman_root_nh4 * (smin_nh4_vr(c,j) / (smin_nh4_vr(c,j) + params_inst%sulman_km_nh4))
+           ! Calculate Nitrocen uptake by roots
+           
+           no3_uptake = rhizosphere_frac * params_inst%sulman_root_no3 * (no3_soil(c,j) / (no3_soil(c,j) + params_inst%sulman_km_no3))
+           nh4_uptake = rhizosphere_frac * params_inst%sulman_root_nh4 * (nh4_soil(c,j) / (nh4_soil(c,j) + params_inst%sulman_km_nh4))
   
            ! add some if statements that if plant wants to take up more no3 /nh4 than in soil sth happens
   
@@ -595,31 +606,34 @@ contains
    end subroutine active_root_N_uptake
 
 
-   
-   subroutine myc_scavenger_N_uptake(X, X, X, myc_efficiency, dt, X)
+   subroutine myc_scavenger_N_uptake(myc_biomass, no3_soil, nh4_soil, myc_efficiency, no3_uptake, nh4_uptake)
 
       real,intent(in)     :: myc_biomass             ! (kgC/m2)
       real,intent(in)     :: layer_thickness         ! (m)
+      real,intent(in)     :: no3_soil               ! avaliable soil mineral NO3 [gN/m3]
+      real,intent(in)     :: nh4_soil               ! avaliable soil mineral NH4 [gN/m3]
+      
       real,intent(inout)  :: no3_uptake              ! (kgN/m2/year)
       real,intent(inout)  :: nh4_uptake              ! (kgN/m2/year)
-      real, intent(out)  :: myc_efficiency           ! units: kgN/kg myc biomass C. Should give N uptake efficiency even when myc biomass is zero
+      real, intent(out)   :: myc_efficiency          ! [kgN/kg C myc biomass]N uptake efficiency even when myc biomass is zero
 
    
       associate(  
       crootfr           => soilstate_inst%crootfr_patch                          , & ! Input:   [real(r8) (:,:)] fraction of roots for carbon in each soil layer  (nlevgrnd)
       frootc            => cnveg_carbonstate_inst%frootc_patch                   , & ! Input:   [real(r8) (:)]  (gC/m2) fine root C
-      smin_nh4_vr       => soilbiogeochem_nitrogenstate_inst%smin_nh4_vr_col     , & ! Input:  [real(r8) (:,:) ]  (gN/m3) soil mineral NH4              
-      smin_no3_vr       => soilbiogeochem_nitrogenstate_inst%smin_no3_vr_col     , & ! Input:  [real(r8) (:,:) ]  (gN/m3) soil mineral NO3              
       sulman_k_scav_Ninorg => params_inst%sulman_k_scav_Ninorg                   , & ! Half-saturation inorganic N concentration for mycorrhizal uptake [kg N m-3]
-      sulman_k_scav        => params_inst%sulman_k_scav                            & ! Half-saturation mycorrhizal biomass concentration for scavenging [kg C m-3]
+      sulman_k_scav        => params_inst%sulman_k_scav                          , & ! Half-saturation mycorrhizal biomass concentration for scavenging [kg C m-3]
+      sulman_v_scav        => params_inst%sulman_v_scav                            & !Maximum N uptake rate by scavenging mycorrhizae [kg N m-3 year-1]
       )
+
+      ! Check if there is mycorrhizal biomass per patch and per layer   
 
       ! Calculationg a root profile
       ! https://escomp.github.io/ctsm-docs/versions/master/html/tech_note/Plant_Hydraulics/CLM50_Tech_Note_Plant_Hydraulics.html?highlight=root
       root_dens_sum = sum(crootfr(p,:) * frootc(p,:))
       do j = 1:nlev
          root_dens(p,j) = (crootfr(p,j) * frootc(p,j)) / root_dens_sum
-      end do 
+      end do
 
       ! Calculating mycorrhizal biomass per soil layer
       myc%C_pool(p)
@@ -627,25 +641,37 @@ contains
 
       ! Check if there is  mycorrhizal biomass in soil layer
       do j = 1:nlev
-         if (myc_c_layer > 0) then 
+         if (myc_c_layer >= 0) then 
 
             ! If there is mycorrhizal biomass in soil layer, calculate N uptake
             do j = 1, nlevdecomp
                ! sulman_v_scav is different in Sulman code
-               no3_uptake = sulman_v_scav * (smin_no3_vr / dz) / ((smin_no3_vr / dz) + sulman_k_scav_Ninorg) * &
-                           (scav_C_biomass / dz) / ((scav_C_biomass / dz) + sulman_k_scav)
+               no3_uptake = sulman_v_scav * no3_soil(c,j) / (no3_soil(c,j) + sulman_k_scav_Ninorg) * &
+                           scav_C_biomass(c,j) / (scav_C_biomass + sulman_k_scav)
 
-               nh4_uptake = sulman_v_scav * (smin_nh4_vr / dz) / ((smin_nh4_vr / dz) + sulman_k_scav_Ninorg) * &
-                           (scav_C_biomass / dz) / ((scav_C_biomass / dz) + sulman_k_scav)
+               nh4_uptake = sulman_v_scav * nh4_soil(c,j) / (nh4_soil(c,j) + sulman_k_scav_Ninorg) * &
+                           scav_C_biomass(c,j) / (scav_C_biomass(c,j) + sulman_k_scav)
 
-               !no3_uptake = min() 
-               !nh4_uptake = min()
-               total_n_uptake = total_n_uptake + (no3_uptake + nh4_uptake) * dt
+               ! NO3 and NH4 uptake depends on how much N is avaliable in soil
+               no3_uptake = min(no3_uptake(c,j), no3_soil(c,j)) 
+               nh4_uptake = min(nh4_uptake(c,j), nh4_soil(c,j))
+               
+               myc_efficiency = (no3_uptake(c,j) + nh4_uptake(c,j)) / scav_C_biomass(c,j)
+
+               ! Total uptake is scaled 
             end do
+         end if 
+
+         if ( == 0) then ! leaves, fine roots, and sapwood biomass find a variable for living biomass in soil
+            no3_uptake     = 0.0_r8
+            nh4_uptake     = 0.0_r8
+            myc_efficiency = 0.0_r8
          end if
-      end do 
+
+      end do
 
       end associate
+
    end subroutine myc_scavenger_N_uptake
 
    !----------------------------------------
@@ -689,34 +715,58 @@ contains
          
          )
 
+      ! Check if there is mycorrhizal biomass per patch and per layer   
+
+      ! Calculationg a root profile
+      ! https://escomp.github.io/ctsm-docs/versions/master/html/tech_note/Plant_Hydraulics/CLM50_Tech_Note_Plant_Hydraulics.html?highlight=root
+         root_dens_sum = sum(crootfr(p,:) * frootc(p,:))
+         do j = 1:nlev
+            root_dens(p,j) = (crootfr(p,j) * frootc(p,j)) / root_dens_sum
+         end do
+   
+         ! Calculating mycorrhizal biomass per soil layer
+         myc%C_pool(p)
+         myc_c_layer = myc%C_pool(p) * root_dens(p,j)
+   
+         ! Check if there is  mycorrhizal biomass in soil layer
+         do j = 1:nlev
+            if (myc_c_layer >= 0) then 
+               mine_biomass = myc_c_layer    ! DOES THIS HAVE STH TO DO WITH THE mine_C_biomass calculations above?
+            else 
+            N_uptake       = 0.0_r8
+            mine_resp      = 0.0_r8
+            myc_efficiency = 0.0_r8
+            end if 
+         end do
+
+      
       ! Calculate soil temperature for each soil layer
       do j = 1, nlevdecomp
          t_soi_degC         = t_soisno(c,j)  -   tfrz  ! tfrz = 273.15
       end do 
       
-
       ! Calculating water, ice and air content in soil (equivalent to air_filled porosity, theta, theta sat in Sulman)
       wliq = h2osoi_liq / dz * denh2o
       wice = h2osoi_ice / dz * denice
       wliq = min(1.0_r8, wliq/watsat)            ! fraction of liquid water-filled pore space (0.0 - 1.0)
       wice = min(1.0_r8, wice/watsat)            ! fraction of frozen water-filled pore space (0.0 - 1.0)
       wair = max(0.0_r8, 1.0_r8 - wliq- wice)    ! fraction of air-filled pore space (0.0 - 1.0)
+
+      total_mine_biomass = 
  
-      ! Calculationg a root profile
-      ! https://escomp.github.io/ctsm-docs/versions/master/html/tech_note/Plant_Hydraulics/CLM50_Tech_Note_Plant_Hydraulics.html?highlight=root
-      root_dens_sum = sum(crootfr(p,:) * frootc(p,:))
-      do j = 1:nlev
-         root_dens(p,j) = (crootfr(p,j) * frootc(p,j)) / root_dens_sum
-      end do 
-
-      ! Calculating mycorrhizal biomass per soil layer
-      myc%C_pool(p)
-      myc_c_layer = myc%C_pool(p) * root_dens(p,j)
-
+      ! Make sure fluxes are zero before the loop
+      N_uptake       = 0.0_r8
+      total_mine_resp      = 0.0_r8
 
       do j = 1, nlevdecomp
-         call miner_decomposition(XX, XX, t_soisno(c,j), wliq(c,j), wair(c,j), XX, XX)
+         call miner_decomposition((decomp_cpools_vr(c,j,i_chem_som) + decomp_cpools_vr(c,j,i_phys)), &
+         total_mine_biomass(c,j), t_soisno(c,j), wliq(c,j), wair(c,j), N_uptake, mine_resp)
+
+         total_mine_resp = total_mine_resp + mine_resp ! NOT SURE
       end do
+
+      myc_efficiency = N_uptake(c,j) / mine_C_biomass(c,j)
+
 
      ! Organic N Mining by Mycorrhizal Fungi
       end associate
@@ -724,7 +774,7 @@ contains
    end subroutine myc_miner_N_uptake
 
 
-   subroutine miner_decomposition()
+   subroutine miner_decomposition(soil_carbon, myc_biomass, soil_T, soil_water, soil_air, N_uptake, mine_resp)
 
       real, intent(in):: wliq ! water liquid
       real, intent(in):: wice ! water ice
@@ -762,7 +812,7 @@ contains
 
      
 
-      end associate
+
    end subroutine miner_decomposition
   
         
