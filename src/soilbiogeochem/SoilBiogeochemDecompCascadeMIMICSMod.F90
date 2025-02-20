@@ -172,7 +172,9 @@ module SoilBiogeochemDecompCascadeMIMICSMod
      real(r8), allocatable :: mimics_desorp(:)
      real(r8), allocatable :: mimics_tau_r(:)
      real(r8), allocatable :: mimics_tau_k(:)
-
+     real(r8), allocatable :: sulman_cn_symbionts(:)     !C:N ratio of fixers, miners, scavengers as an array
+     real(r8), allocatable :: sulman_initial_C_stocks(:) !Initial carbon stocks of fixers, miners, scavengers as an array
+     
      ! Sulman parameter
      real(r8) :: sulman_cn_m          !Soil microbial C:N ratio
      real(r8) :: sulman_v_nh4         !Maximum NH4+ immobilization rate [year-1]
@@ -643,6 +645,17 @@ contains
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%sulman_fnalloc=tempr
+
+    allocate(params_inst%sulman_cn_symbionts(4))
+    tString='sulman_cn_symbionts'
+    call ncd_io(trim(tString), params_inst%sulman_cn_symbionts(:), 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+
+    allocate(params_inst%sulman_initial_C_stocks(4))
+    tString='sulman_initial_C_stocks'
+    call ncd_io(trim(tString), params_inst%sulman_initial_C_stocks(:), 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+
 
     end if
 
