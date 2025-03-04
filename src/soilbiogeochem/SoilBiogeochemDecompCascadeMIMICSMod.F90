@@ -177,38 +177,38 @@ module SoilBiogeochemDecompCascadeMIMICSMod
      
      ! Sulman parameter
      real(r8) :: sulman_cn_m          !Soil microbial C:N ratio
-     real(r8) :: sulman_v_nh4         !Maximum NH4+ immobilization rate [year-1]
-     real(r8) :: sulman_v_no3         !Maximum NO3- immobilization rate [year-1]
-     real(r8) :: sulman_vmax_denit    !Maximum denitrification decomposition rate at reference temperature [year-1]
+     real(r8) :: sulman_v_nh4         !Maximum NH4+ immobilization rate [s-1]
+     real(r8) :: sulman_v_no3         !Maximum NO3- immobilization rate [s-1]
+     real(r8) :: sulman_vmax_denit    !Maximum denitrification decomposition rate at reference temperature [s-1]
      real(r8) :: sulman_fden          !Maximum denitrification decomposition rate at reference temperature [unitless]
      real(r8) :: sulman_kdenit        !Half-saturation constant for nitrate concentration in denitrification [kg NO3-N kg NO3-N demand-1 year-1]
-     real(r8) :: sulman_root_no3      !Maximum root active nitrate uptake rate [kg N m-3 year-1]
-     real(r8) :: sulman_root_nh4      !Maximum root active ammonium uptake rate [kg N m-3 year-1]
-     real(r8) :: sulman_km_no3        !Half-saturation nitrate concentration for root active uptake [kg N m-3]
-     real(r8) :: sulman_km_nh4        !Half-saturation nitrate concentration for root active uptake [kg N m-3]
+     real(r8) :: sulman_root_no3      !Maximum root active nitrate uptake rate [g N m-3 s-1]
+     real(r8) :: sulman_root_nh4      !Maximum root active ammonium uptake rate [g N m-3 s-1]
+     real(r8) :: sulman_km_no3        !Half-saturation nitrate concentration for root active uptake [g N m-3]
+     real(r8) :: sulman_km_nh4        !Half-saturation nitrate concentration for root active uptake [g N m-3]
      real(r8) :: sulman_r_rhiz        !Radius of the rhizosphere [m]
-     real(r8) :: sulman_v_scav        !Maximum N uptake rate by scavenging mycorrhizae [kg N m-3 year-1]
-     real(r8) :: sulman_k_scav_Ninorg  !Half-saturation inorganic N concentration for mycorrhizal uptake [kg N m-3]
-     real(r8) :: sulman_k_scav        !Half-saturation mycorrhizal biomass concentration for scavenging [kg C m-3]
-     real(r8) :: sulman_km_mine       !Half-saturation mycorrhizal biomass concentration for scavenging [kg C m-3]
+     real(r8) :: sulman_v_scav        !Maximum N uptake rate by scavenging mycorrhizae [g N m-3 s-1]
+     real(r8) :: sulman_k_scav_Ninorg  !Half-saturation inorganic N concentration for mycorrhizal uptake [g N m-3]
+     real(r8) :: sulman_k_scav        !Half-saturation mycorrhizal biomass concentration for scavenging [g C m-3]
+     real(r8) :: sulman_km_mine       !Half-saturation mycorrhizal biomass concentration for scavenging [g C m-3]
      real(r8) :: sulman_cue_mine      !Carbon use efficiency of mycorrhizal mining [fraction]
      real(r8) :: sulman_nue_mine      !Nitrogen use efficiency of mycorrhizal mining [fraction]
-     real(r8) :: sulman_vmax_ref_mine !Maximum decomposition rate at reference temperature for mycorrhizal mining [year-1]
-     real(r8) :: sulman_rfix          !N fixation rate per unit symbiotic biomass [kg N kg biomass C-1 year-1]
-     real(r8) :: sulman_kgrowth       !Half-saturation of intermediate C pool for symbiotic growth [kg C m -2]
-     real(r8) :: sulman_rgrowth       !Maximum symbiont growth rate [kg C m-2 year-1]
+     real(r8) :: sulman_vmax_ref_mine !Maximum decomposition rate at reference temperature for mycorrhizal mining [s-1]
+     real(r8) :: sulman_rfix          !N fixation rate per unit symbiotic biomass [g N g biomass C-1 s-1]
+     real(r8) :: sulman_kgrowth       !Half-saturation of intermediate C pool for symbiotic growth [g C m -2]
+     real(r8) :: sulman_max_symb_growth !Maximum symbiont growth rate [g C m-2 s-1]
      real(r8) :: sulman_tau_sym       !Fraction of symbiotic biomass turnover not used for maintenance respiration [fraction]
      real(r8) :: sulman_growth_scav   !N scavenger growth efficiency [unitless]
      real(r8) :: sulman_growth_mine   !N miner growth efficiency [unitless]
      real(r8) :: sulman_growth_fix    !N fixer growth efficiency [unitless]
-     real(r8) :: sulman_tau_scav      !N scavenger turnover time [year-1]
-     real(r8) :: sulman_tau_mine      !N miner turnover time [year-1]
-     real(r8) :: sulman_tau_fix       !N fixer turnover time [year-1]
+     real(r8) :: sulman_tau_scav      !N scavenger turnover time [s-1]
+     real(r8) :: sulman_tau_mine      !N miner turnover time [s-1]
+     real(r8) :: sulman_tau_fix       !N fixer turnover time [s-1]
      real(r8) :: sulman_cn_scav       !N scavenger C:N [unitless]
      real(r8) :: sulman_cn_mine       !N miner C:N [unitless]
      real(r8) :: sulman_cn_fix        !N fixer C:N [unitless]
-     real(r8) :: sulman_tau_int       !Turnover time of intermediate C pool [year-1]
-     real(r8) :: sulman_rup_veg       !Vegetation N uptake rate from intermediate N pool [year-1]
+     real(r8) :: sulman_tau_int       !Turnover time of intermediate C pool [s-1]
+     real(r8) :: sulman_rup_veg       !Vegetation N uptake rate from intermediate N pool [s-1]
      real(r8) :: sulman_fnalloc       !Fraction of NPP allocated to N uptake per unit N stress [fraction]
      
   end type params_type
@@ -576,10 +576,10 @@ contains
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%sulman_kgrowth=tempr
     
-    tString='sulman_rgrowth'
+    tString='sulman_max_symb_growth'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%sulman_rgrowth=tempr
+    params_inst%sulman_max_symb_growth=tempr
     
     tString='sulman_tau_sym'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)

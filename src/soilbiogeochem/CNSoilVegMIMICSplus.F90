@@ -8,6 +8,7 @@ module CNSoilVegMIMICSplus
   
   ! !USES:
   use shr_kind_mod                        , only : r8 => shr_kind_r8
+  use clm_time_manager                    , only: get_step_size_real
   use clm_varpar                          , only : nlevdecomp
   use clm_varpar                          , only : i_litr_min, i_litr_max, i_cwd
   use clm_varpar                          , only : i_met_lit, i_str_lit, i_phys_som, i_chem_som
@@ -33,24 +34,25 @@ module CNSoilVegMIMICSplus
   use TemperatureType                     , only : temperature_type
   use pftconMod                           , only : pftcon, noveg
   use abortutils                          , only : endrun
-  use shr_log_mod                        , only : errMsg => shr_log_errMsg
+  use shr_log_mod                         , only : errMsg => shr_log_errMsg
+  use ColumnType                          , only : col
   implicit none
   !
   ! !PUBLIC MEMBER FUNCTIONS:
 
   ! !PRIVATE MEMBER FUNCTIONS:
-  public  :: CN_soil_veg_exchange         !
-  private :: active_root_N_uptake         !
-  private :: myc_scavenger_N_uptake       !
-  private :: myc_miner_N_uptake           !
-  private :: miner_decomposition          !
+  public  :: CN_soil_veg_exchange         ! Calculates plant nitrogen stress, carbon transfer, growth & turnover of symbionts, passive root uptake and calls uptake routions
+  private :: active_root_N_uptake         ! Nitrogen uptake strategy for active root uptake
+  private :: myc_scavenger_N_uptake       ! Nitrogen uptake strategy for scavengers
+  private :: myc_miner_N_uptake           ! Nitrogen uptake strategy for miners
+  private :: miner_nuptake                ! Function to calculate mining from soil organic matter pools
+  public  :: update_symbionts             !
 
-  real(r8) :: dt              ! decomp timestep (seconds)
+  real(r8) :: dt                          ! decomp timestep [s]
 
   ! !FUNCTIONS:
   private :: resp_myc                     ! Respiration of mycorrhiza
   private :: Vmax_myc                     ! Michaelis Menten Kinetics for mycorrhiza
-
 
   ! ! PUBLIC DATA
   integer, public :: i_fixer = 1 
@@ -64,9 +66,10 @@ module CNSoilVegMIMICSplus
   real(r8), pointer           :: N_biomass             (:,:) ! Nitrogen biomass
   real(r8), pointer           :: C_reservoir           (:,:) ! Carbon intermediate pool biomass
   real(r8), pointer           :: N_reservoir           (:,:) ! Nitrogen intermediate pool biomass
-  logical, pointer            :: is_active             (:,:) ! if the symbiont type is active
-  character(len=10), pointer  :: symb_name             (:)   ! symbiont name
-  character(len=10), pointer  :: symb_hist_name        (:)   ! symbiont name on history tapes
+  real(r8), pointer           :: symb_eff              (:,:) ! Symbiont efficiency when its biomass is 0
+  logical, pointer            :: is_active             (:,:) ! If the symbiont type is active
+  character(len=10), pointer  :: symb_name             (:)   ! Symbiont name
+  character(len=10), pointer  :: symb_hist_name        (:)   ! Symbiont name on history tapes
    
    contains
 
@@ -102,11 +105,9 @@ contains
    
     local_active(:,:) = .false. 
    
-    
-    
-    this%symb_name(i_fixer) = 'fixer'
-    this%symb_name(i_scav)  = 'scavanger'
-    this%symb_name(i_miner) = 'miner'
+    this%symb_name(i_fixer)      = 'fixer'
+    this%symb_name(i_scav)       = 'scavanger'
+    this%symb_name(i_miner)      = 'miner'
     this%symb_hist_name(i_fixer) = 'FIX'
     this%symb_hist_name(i_scav)  = 'SCAV'
     this%symb_hist_name(i_miner) = 'MINE'
@@ -136,6 +137,7 @@ contains
     call this%InitAllocate (bounds)
     call this%InitHistory (bounds)
     call this%InitCold (bounds)
+
   end subroutine Init
 
   !------------------------------------------------------------------------
@@ -156,7 +158,8 @@ contains
     allocate(this%N_biomass(begp:endp,1:n_symb)) ; this%N_biomass(begp:endp,1:n_symb) = 0.0_r8
     allocate(this%C_reservoir(begp:endp,1:n_symb)) ; this%C_reservoir(begp:endp,1:n_symb) = 0.0_r8
     allocate(this%N_reservoir(begp:endp,1:n_symb)) ; this%N_reservoir(begp:endp,1:n_symb) = 0.0_r8
-
+    allocate(this%symb_eff(begp:endp,1:n_symb)) ; this%symb_eff(begp:endp,1:n_symb) = 0.0_r8
+   
    end subroutine InitAllocate
 
    !-----------------------------------------------------------------------
@@ -164,8 +167,8 @@ contains
    subroutine InitHistory(this, bounds)
       !
       ! !USES:
-      use histFileMod      , only: hist_addfld1d, hist_addfld2d
-      use clm_varcon       , only : spval
+      use histFileMod                , only: hist_addfld1d, hist_addfld2d
+      use clm_varcon                 , only: spval
       !
       ! !ARGUMENTS:
       class(symbiont_type)          :: this
@@ -203,6 +206,7 @@ contains
          avgflag='A', long_name=('Nitrogen intermediate pool of '//this%symb_name(i)//' symbionts'), &
          ptr_patch=data1dptr, set_spec=spval, default='inactive')
       end do
+
    end subroutine InitHistory
 
    !-----------------------------------------------------------------------
@@ -215,13 +219,25 @@ contains
       type(bounds_type), intent(in) :: bounds
       !
       ! !LOCAL VARIABLES:
-      integer :: p,i                        ! indices
+      character(len=128)            :: varname   ! temporary
+      integer :: p,i                             ! indices
       integer :: begp, endp
 
       ! Initial carbon stock in symbiont pools for coldstart (from parameter file ) are separated into:
       ! 90 % = initial C, 10% = initial intermediate C
       do i = 1,n_symb
          do p = bounds%begp,bounds%endp
+            this%symb_eff(p,i) = 0.0001_r8 ! start with an arbitrary number
+            if (i == i_fixer) then
+               this%symb_eff(p,i) = params_inst%sulman_rfix
+            end if
+            if (i == i_scav) then
+               this%symb_eff(p,i) = 1.0_r8
+            endif
+            if (i == i_miner) then
+               this%symb_eff(p,i) = 1.0_r8
+            endif
+
             if (this%is_active(p,i)) then
                this%C_biomass(p,i) = params_inst%sulman_initial_C_stocks(i) * 0.9_r8
                this%C_reservoir(p,i) = params_inst%sulman_initial_C_stocks(i) * 0.1_r8
@@ -240,6 +256,7 @@ contains
             endif
          enddo
       enddo
+
     end subroutine InitCold
 
    !------------------------------------------------------------------------
@@ -247,22 +264,20 @@ contains
    subroutine Restart(this, bounds, ncid, flag)
      !
      ! !USES:
-      use restUtilMod
-      use ncdio_pio  , only : file_desc_t, ncd_defvar, ncd_io, ncd_double, ncd_int, ncd_inqvdlen
-     
-     
-          !
+     use restUtilMod
+     use ncdio_pio                     , only: file_desc_t, ncd_defvar, ncd_io, ncd_double, ncd_int, ncd_inqvdlen
+     !
      ! !ARGUMENTS:
-     class(symbiont_type)             :: this
-     type(bounds_type), intent(in)    :: bounds
-     type(file_desc_t), intent(inout) :: ncid   ! netcdf id
-     character(len=*) , intent(in)    :: flag   ! 'read' or 'write'
+     class(symbiont_type)              :: this
+     type(bounds_type), intent(in)     :: bounds
+     type(file_desc_t), intent(inout)  :: ncid         ! netcdf id
+     character(len=*) , intent(in)     :: flag         ! 'read' or 'write'
      !
      ! !LOCAL VARIABLES:
-     integer                  :: i            ! indices
-     logical                  :: readvar      ! determine if variable is on initial file
-     character(len=128)       :: varname   ! temporary
-     real(r8), pointer :: data1dptr (:)
+     integer                           :: i            ! indices
+     logical                           :: readvar      ! determine if variable is on initial file
+     character(len=128)                :: varname      ! temporary
+     real(r8), pointer                 :: data1dptr (:)
      
      !-----------------------------------------------------------------------
      do i = 1,n_symb
@@ -298,7 +313,17 @@ contains
          call endrun(msg = "ERROR: Symbiont "//this%symb_name(i)// " is not on the restart file."// & 
              errMsg(sourcefile, __LINE__))
       endif
+
+      data1dptr => this%symb_eff(:,i)
+      call restartvar(ncid=ncid, flag=flag, varname=trim('_efficiency'//this%symb_name(i)), xtype=ncd_double,  &
+      dim1name='pft', long_name=('Symbiont'//this%symb_name(i)//' efficiency'), units='g/m2', &
+      interpinic_flag='interp', readvar=readvar, data=data1dptr)
+      if (flag == 'read' .and. (.not. readvar)) then
+         call endrun(msg = "ERROR: Efficiency "//this%symb_name(i)// " is not on the restart file."// & 
+             errMsg(sourcefile, __LINE__))
+      endif
       enddo
+      
    end subroutine Restart
 
    !-----------------------------------------------------------------------
@@ -306,184 +331,165 @@ contains
    subroutine CN_soil_veg_exchange (filter_soilp, filter_bgc_soilc, num_soilp, num_bgc_soilc, bounds, symbiont_inst, &
       cnveg_nitrogenstate_inst, waterstatebulk_inst, temperature_inst, cnveg_carbonflux_inst, &
       soilbiogeochem_nitrogenstate_inst, leaf_prof_patch, froot_prof_patch, croot_prof_patch, soilbiogeochem_nitrogenflux_inst, &
-      waterflux_inst, soilstate_inst, cnveg_carbonstate_inst)
+      waterflux_inst, soilstate_inst, cnveg_carbonstate_inst, soilbiogeochem_carbonstate_inst)
 
    ! !DESCRIPTION:
-
+   !
+   ! Calculates plant nitrogen stress, carbon transfer, growth & turnover of symbionts, passive root uptake and calls uptake routions
+   !
    ! !USES:
-      use clm_varcon          , only: pct_to_frac
-      use clm_time_manager    , only: get_step_size_real
-      use WaterFluxType       , only: waterflux_type
-      use SoilStateType       , only: soilstate_type
-      use TemperatureType     , only: temperature_type
-      use CNVegCarbonStateType, only: cnveg_carbonstate_type
-      
+   use clm_varcon                         , only: pct_to_frac
+   use WaterFluxType                      , only: waterflux_type
+   use SoilStateType                      , only: soilstate_type
+   use TemperatureType                    , only: temperature_type
+   use CNVegCarbonStateType               , only: cnveg_carbonstate_type
+   use SoilBiogeochemCarbonStateType      , only: soilbiogeochem_carbonstate_type
+   use SoilBiogeochemNitrogenStateType    , only: soilbiogeochem_nitrogenstate_type      
    !
    ! !ARGUMENTS:
-   type(symbiont_type)                     , intent(inout) :: symbiont_inst
-   type(bounds_type)                       , intent(in)    :: bounds 
-   type(cnveg_nitrogenstate_type)          , intent(in)    :: cnveg_nitrogenstate_inst
-   type(soilbiogeochem_nitrogenflux_type)  , intent(inout) :: soilbiogeochem_nitrogenflux_inst 
-   type(waterstatebulk_type)               , intent(in)    :: waterstatebulk_inst
-   type(temperature_type)                  , intent(in)    :: temperature_inst
-   type(cnveg_carbonflux_type)             , intent(in)    :: cnveg_carbonflux_inst
-   type(soilbiogeochem_nitrogenstate_type) , intent(in)    :: soilbiogeochem_nitrogenstate_inst
-   type(waterflux_type)                    , intent(in)    :: waterflux_inst
-   type(soilstate_type)                    , intent(in)    :: soilstate_inst
-   type(cnveg_carbonstate_type)            , intent(in)    :: cnveg_carbonstate_inst
+   type(symbiont_type)                    , intent(inout) :: symbiont_inst
+   type(bounds_type)                      , intent(in)    :: bounds 
+   type(cnveg_nitrogenstate_type)         , intent(in)    :: cnveg_nitrogenstate_inst
+   type(soilbiogeochem_nitrogenflux_type) , intent(inout) :: soilbiogeochem_nitrogenflux_inst 
+   type(waterstatebulk_type)              , intent(in)    :: waterstatebulk_inst
+   type(temperature_type)                 , intent(in)    :: temperature_inst
+   type(cnveg_carbonflux_type)            , intent(in)    :: cnveg_carbonflux_inst
+   type(soilbiogeochem_nitrogenstate_type), intent(in)    :: soilbiogeochem_nitrogenstate_inst
+   type(waterflux_type)                   , intent(in)    :: waterflux_inst
+   type(soilstate_type)                   , intent(in)    :: soilstate_inst
+   type(cnveg_carbonstate_type)           , intent(in)    :: cnveg_carbonstate_inst
+   type(soilbiogeochem_carbonstate_type)  , intent(in)    :: soilbiogeochem_carbonstate_inst
 
-   
-   integer                                 , intent(in)    :: num_soilp           ! number of soil patches in filter
-   integer                                 , intent(in)    :: filter_soilp(:)     ! filter for soil patches
-   integer                                 , intent(in)    :: num_bgc_soilc       ! number of soil columns in filter
-   integer                                 , intent(in)    :: filter_bgc_soilc(:) ! filter for soil columns
+   integer                                , intent(in)    :: num_soilp           ! number of soil patches in filter
+   integer                                , intent(in)    :: filter_soilp(:)     ! filter for soil patches
+   integer                                , intent(in)    :: num_bgc_soilc       ! number of soil columns in filter
+   integer                                , intent(in)    :: filter_bgc_soilc(:) ! filter for soil columns
    
    ! !LOCAL VARIABLES
    integer :: p, fp, c, fc, j, k, l, s  ! indices
    integer :: begp, endp, begc,endc
    
-   real(r8)                             , intent(in)    :: leaf_prof_patch(bounds%begp:,1:)
-   real(r8)                             , intent(in)    :: froot_prof_patch(bounds%begp:,1:)
-   real(r8)                             , intent(in)    :: croot_prof_patch(bounds%begp:,1:) 
+   real(r8)                               , intent(in)    :: leaf_prof_patch(bounds%begp:,1:)
+   real(r8)                               , intent(in)    :: froot_prof_patch(bounds%begp:,1:)
+   real(r8)                               , intent(in)    :: croot_prof_patch(bounds%begp:,1:) 
    
-   real(r8)            :: t_soi_degC
-   real(r8), parameter :: N_stress_max = 2.0_r8       ! Maximum N demand of plant, based on current N amount in plant []
-   real(r8)    :: N_stress(bounds%begp:bounds%endp)   ! N demand of plant, based on current N amount in plant []
-   real(r8)    :: C_transfer(bounds%begp:bounds%endp) ! Carbon allocated to N acquisition, higher N_stress leads to higher C_transfer
-   real(r8)    :: root_dens_frac(bounds%begp:bounds%endp,1:nlevdecomp)
-   real(r8)    :: root_dens_sum
+   real(r8)            :: t_soi_degC                                    ! Soil temperature [degrees Celcius]
+   real(r8), parameter :: N_stress_max = 2.0_r8                         ! Maximum nitrogen demand of plant [-]
+   real(r8)    :: N_stress(bounds%begp:bounds%endp)                     ! Nitrogen demand of plant         [gN/m2]
+   real(r8)    :: C_transfer(bounds%begp:bounds%endp)                   ! Carbon allocated to nitrogen acquisition [gC/m2/s)]
+   real(r8)    :: root_dens_frac(bounds%begp:bounds%endp,1:nlevdecomp)  ! Fraction of root density [-]
+   real(r8)    :: root_dens_sum                                         ! sum of fraction of roots for carbon in each soil layer and fine root carbon
    
-   real(r8)    :: scav_N_reservoir
-   real(r8)    :: mine_N_reservoir
-   real(r8)    :: fix_N_reservoir
+   ! Nitrogen uptake variables for pathways into intermediated pools in [gN/m2] OR [gN/m2/s]???
+   real(r8)    :: no3_passiv_up(bounds%begp:bounds%endp,1:nlevdecomp)   ! Passive root NO3 (nitrate) uptake [gN/m2]
+   real(r8)    :: nh4_passiv_up(bounds%begp:bounds%endp,1:nlevdecomp)   ! Passive root NH4 (ammonium) uptake [gN/m2]
+   real(r8)    :: no3_active_up(bounds%begp:bounds%endp,1:nlevdecomp)   ! Active root NO3 (nitrate) uptake [gN/m2]
+   real(r8)    :: nh4_active_up(bounds%begp:bounds%endp,1:nlevdecomp)   ! Active root NH4 (ammonium) uptake [gN/m2]
+   real(r8)    :: no3_scav_up(bounds%begp:bounds%endp,1:nlevdecomp)     ! Scavenger NO3 (nitrate) uptake [gN/m2]
+   real(r8)    :: nh4_scav_up(bounds%begp:bounds%endp,1:nlevdecomp)     ! Scavenger NH4 (ammonium) uptake [gN/m2]
+   real(r8)    :: n_somc_miner_up(bounds%begp:bounds%endp,1:nlevdecomp) ! Miner nitrogen uptake from SOMc pool [gN/m2]
+   real(r8)    :: n_somp_miner_up(bounds%begp:bounds%endp,1:nlevdecomp) ! Minier nitrogen uptake from SOMp pool [gN/m2]
+   real(r8)    :: N_fixation(bounds%begp:bounds%endp)                   ! Nitrogen uptake from fixation [gN/m2]
 
-   ! Uptake variables for pathways
-   real(r8)    :: no3_passiv_up(bounds%begp:bounds%endp,1:nlevdecomp)     ! Passive root NO3 (nitrate) uptake
-   real(r8)    :: nh4_passiv_up(bounds%begp:bounds%endp,1:nlevdecomp)     ! Passive root NH4 (ammonium) uptake
-   real(r8)    :: no3_active_up(bounds%begp:bounds%endp,1:nlevdecomp)     ! Active root NO3 (nitrate) uptake
-   real(r8)    :: nh4_active_up(bounds%begp:bounds%endp,1:nlevdecomp)     ! Active root NH4 (ammonium) uptake
-   real(r8)    :: no3_scav_up(bounds%begp:bounds%endp,1:nlevdecomp)       ! Scavenger NO3 (nitrate) uptake
-   real(r8)    :: nh4_scav_up(bounds%begp:bounds%endp,1:nlevdecomp)       ! Scavenger NH4 (ammonium) uptake
-   real(r8)    :: n_somc_miner_up(bounds%begp:bounds%endp,1:nlevdecomp)   ! Miner nitrogen uptake from SOMc pool
-   real(r8)    :: n_somp_miner_up(bounds%begp:bounds%endp,1:nlevdecomp)   ! Minier nitrogen uptake from SOMp pool
 
-   ! N_to_plant(bounds%begp:bounds%endp,1:n_symb)
-   real(r8)    :: N_to_plant_scav(bounds%begp:bounds%endp)  ! N_to_plant_scav(p) = N_to_plant(p,i_scav)
+   ! Nitrogen uptake by plant from intermediate pools 
+   ! Rewrite as N_to_plant(bounds%begp:bounds%endp,1:n_symb) N_to_plant_scav(p) = N_to_plant(p,i_scav)
+   real(r8)    :: N_to_plant_scav(bounds%begp:bounds%endp)      
    real(r8)    :: N_to_plant_mine(bounds%begp:bounds%endp)
    real(r8)    :: N_to_plant_fix(bounds%begp:bounds%endp)
+   
+   ! Growth
+   real(r8) :: scav_growth             ! Symbiotic biomass growth rate for scavangers [g/m2/s]
+   real(r8) :: mine_growth             ! Symbiotic biomass growth rate for miners     [g/m2/s]  
+   real(r8) :: fix_growth              ! Symbiotic biomass growth rate for fixers     [g/m2/s]
+   real(r8) :: maint_resp                              ! Respiration, calculated for scav, mine, fix and updated to total_myc_resp 
+   real(r8) :: myc_resp(bounds%begp:bounds%endp)       ! 
+   real(r8) :: total_myc_resp(bounds%begp:bounds%endp) ! Total repiration of scav, mine and fix
 
-   real(r8) :: scav_C_biomass(bounds%begp:bounds%endp)          ! Scavenger C biomass
-   real(r8) :: scav_N_biomass(bounds%begp:bounds%endp)          ! Scavenger N biomass
-   real(r8) :: mine_C_biomass(bounds%begp:bounds%endp)          ! Miner C biomass
-   real(r8) :: mine_N_biomass(bounds%begp:bounds%endp)          ! Miner N biomass
-   real(r8) :: fix_C_biomass(bounds%begp:bounds%endp)           ! Fixer C biomass
-   real(r8) :: fix_N_biomass(bounds%begp:bounds%endp)           ! Fixer N biomass
+   real(r8) :: froot_carbon(bounds%begp:bounds%endp)                    ! fine root biomass [gC/m2]
+   real(r8) :: myc_biomass_layer(bounds%begp:bounds%endp, 1:nlevdecomp) ! Mycorrhyzal biomass per soil layer [gC/m2]
+   real(r8) :: somc_nuptake(bounds%begp:bounds%endp, 1:nlevdecomp)      ! Nitrogen uptake from SOMc pool by miners   [gN/m2] or s?
+   real(r8) :: somp_nuptake(bounds%begp:bounds%endp, 1:nlevdecomp)      ! Nitrogen uptake from SOMp pool by miners   [gN/m2]
+   real(r8) :: somc_cuptake(bounds%begp:bounds%endp, 1:nlevdecomp)      ! Carbon uptake from SOMc pool by miners     [gC/m2]
+   real(r8) :: somp_cuptake(bounds%begp:bounds%endp, 1:nlevdecomp)      ! Carbon uptake from SOMp pool by miners     [gC/m2]
 
    dt           = get_step_size_real()
-
    
    associate(                                                   &
-   sulman_cn_m          => params_inst%sulman_cn_m            , &   !Soil microbial C:N ratio
-   sulman_v_nh4         => params_inst%sulman_v_nh4           , &   !Maximum NH4+ immobilization rate [year-1]
-   sulman_v_no3         => params_inst%sulman_v_no3           , &   !Maximum NO3- immobilization rate [year-1]
-   sulman_vmax_denit    => params_inst%sulman_vmax_denit      , &   !Maximum denitrification decomposition rate at reference temperature [year-1]
-   sulman_fden          => params_inst%sulman_fden            , &   !Maximum denitrification decomposition rate at reference temperature [unitless]
-   sulman_kdenit        => params_inst%sulman_kdenit          , &   !Half-saturation constant for nitrate concentration in denitrification [kg NO3-N kg NO3-N demand-1 year-1]
-   sulman_root_no3      => params_inst%sulman_root_no3        , &   !Maximum root active nitrate uptake rate [kg N m-3 year-1]
-   sulman_root_nh4      => params_inst%sulman_root_nh4        , &   !Maximum root active ammonium uptake rate [kg N m-3 year-1]
-   sulman_km_no3        => params_inst%sulman_km_no3          , &   !Half-saturation nitrate concentration for root active uptake [kg N m-3]
-   sulman_km_nh4        => params_inst%sulman_km_nh4          , &   !Half-saturation nitrate concentration for root active uptake [kg N m-3]
-   sulman_r_rhiz        => params_inst%sulman_r_rhiz          , &   !Radius of the rhizosphere [m]
-   sulman_v_scav        => params_inst%sulman_v_scav          , &   !Maximum N uptake rate by scavenging mycorrhizae [kg N m-3 year-1]
-   sulman_k_scav_Ninorg => params_inst%sulman_k_scav_Ninorg   , &   !Half-saturation inorganic N concentration for mycorrhizal uptake [kg N m-3]
-   sulman_k_scav        => params_inst%sulman_k_scav          , &   !Half-saturation mycorrhizal biomass concentration for scavenging [kg C m-3]
-   sulman_km_mine       => params_inst%sulman_km_mine         , &   !Half-saturation mycorrhizal biomass concentration for mining [kg C m-3]
-   sulman_cue_mine      => params_inst%sulman_cue_mine        , &   !Carbon use efficiency of mycorrhizal mining [fraction]
-   sulman_nue_mine      => params_inst%sulman_nue_mine        , &   !Nitrogen use efficiency of mycorrhizal mining [fraction]
-   sulman_vmax_ref_mine => params_inst%sulman_vmax_ref_mine   , &   !Maximum decomposition rate at reference temperature for mycorrhizal mining [year-1]
-   sulman_rfix          => params_inst%sulman_rfix            , &   !N fixation rate per unit symbiotic biomass [kg N kg biomass C-1 year-1]
-   sulman_kgrowth       => params_inst%sulman_kgrowth         , &   !Half-saturation of intermediate C pool for symbiotic growth [kg C m -2]
-   sulman_rgrowth       => params_inst%sulman_rgrowth         , &   !Maximum symbiont growth rate [kg C m-2 year-1]
-   sulman_tau_sym       => params_inst%sulman_tau_sym         , &   !Fraction of symbiotic biomass turnover not used for maintenance respiration [fraction]
-   sulman_growth_scav   => params_inst%sulman_growth_scav     , &   !N scavenger growth efficiency [unitless]
-   sulman_growth_mine   => params_inst%sulman_growth_mine     , &   !N miner growth efficiency [unitless]
-   sulman_growth_fix    => params_inst%sulman_growth_fix      , &   !N fixer growth efficiency [unitless]
-   sulman_tau_scav      => params_inst%sulman_tau_scav        , &   !N scavenger turnover time [year-1]
-   sulman_tau_mine      => params_inst%sulman_tau_mine        , &   !N miner turnover time [year-1]
-   sulman_tau_fix       => params_inst%sulman_tau_fix         , &   !N fixer turnover time [year-1]
-   sulman_cn_scav       => params_inst%sulman_cn_scav         , &   !N scavenger C:N [unitless]
-   sulman_cn_mine       => params_inst%sulman_cn_mine         , &   !N miner C:N [unitless]
-   sulman_cn_fix        => params_inst%sulman_cn_fix          , &   !N fixer C:N [unitless]
-   sulman_tau_int       => params_inst%sulman_tau_int         , &   !Turnover time of intermediate C pool [year-1]
-   sulman_rup_veg       => params_inst%sulman_rup_veg         , &   !Vegetation N uptake rate from intermediate N pool [year-1]
-   sulman_fnalloc       => params_inst%sulman_fnalloc         , &   !Fraction of NPP allocated to N uptake per unit N stress [fraction] 
-   sulman_initial_C_stocks => params_inst%sulman_initial_C_stocks , &   ! Initial carbon stocks in fixer, miner, scavenger pools (only for coldstart)
-   sulman_cn_symbionts     => params_inst%sulman_cn_symbionts     , &   ! C:N ratios of fixer, miner, scavengers as array
+   sulman_cn_m          => params_inst%sulman_cn_m            , &   ! Soil microbial C:N ratio [-]
+   sulman_v_nh4         => params_inst%sulman_v_nh4           , &   ! Maximum NH4+ immobilization rate [s-1]
+   sulman_v_no3         => params_inst%sulman_v_no3           , &   ! Maximum NO3- immobilization rate [s-1]
+   sulman_vmax_denit    => params_inst%sulman_vmax_denit      , &   ! Maximum denitrification decomposition rate at reference temperature [s-1]
+   sulman_fden          => params_inst%sulman_fden            , &   ! Maximum denitrification decomposition rate at reference temperature [-]
+   sulman_kdenit        => params_inst%sulman_kdenit          , &   ! Half-saturation constant for nitrate concentration in denitrification [kg NO3-N kg NO3-N demand-1 year-1] !EDIT
+   sulman_root_no3      => params_inst%sulman_root_no3        , &   ! Maximum root active nitrate uptake rate [g N m-3 s-1]
+   sulman_root_nh4      => params_inst%sulman_root_nh4        , &   ! Maximum root active ammonium uptake rate [g N m-3 s-1]
+   sulman_km_no3        => params_inst%sulman_km_no3          , &   ! Half-saturation nitrate concentration for root active uptake [g N m-3]
+   sulman_km_nh4        => params_inst%sulman_km_nh4          , &   ! Half-saturation nitrate concentration for root active uptake [g N m-3]
+   sulman_r_rhiz        => params_inst%sulman_r_rhiz          , &   ! Radius of the rhizosphere [m]
+   sulman_v_scav        => params_inst%sulman_v_scav          , &   ! Maximum N uptake rate by scavenging mycorrhizae [g N m-3 s-1]
+   sulman_k_scav_Ninorg => params_inst%sulman_k_scav_Ninorg   , &   ! Half-saturation inorganic N concentration for mycorrhizal uptake [g N m-3]
+   sulman_k_scav        => params_inst%sulman_k_scav          , &   ! Half-saturation mycorrhizal biomass concentration for scavenging [g C m-3]
+   sulman_km_mine       => params_inst%sulman_km_mine         , &   ! Half-saturation mycorrhizal biomass concentration for mining [g C m-3]
+   sulman_cue_mine      => params_inst%sulman_cue_mine        , &   ! Carbon use efficiency of mycorrhizal mining [fraction]
+   sulman_nue_mine      => params_inst%sulman_nue_mine        , &   ! Nitrogen use efficiency of mycorrhizal mining [fraction]
+   sulman_vmax_ref_mine => params_inst%sulman_vmax_ref_mine   , &   ! Maximum decomposition rate at reference temperature for mycorrhizal mining [s-1]
+   sulman_rfix          => params_inst%sulman_rfix            , &   ! N fixation rate per unit symbiotic biomass [kg N kg biomass C-1 s-1]
+   sulman_kgrowth       => params_inst%sulman_kgrowth         , &   ! Half-saturation of intermediate C pool for symbiotic growth [g C m -2]
+   sulman_max_symb_growth => params_inst%sulman_max_symb_growth, &  ! Maximum symbiont growth rate [g C m-2 s-1]
+   sulman_tau_sym       => params_inst%sulman_tau_sym         , &   ! Fraction of symbiotic biomass turnover not used for maintenance respiration [fraction]
+   sulman_growth_scav   => params_inst%sulman_growth_scav     , &   ! N scavenger growth efficiency [unitless]
+   sulman_growth_mine   => params_inst%sulman_growth_mine     , &   ! N miner growth efficiency [unitless]
+   sulman_growth_fix    => params_inst%sulman_growth_fix      , &   ! N fixer growth efficiency [unitless]
+   sulman_tau_scav      => params_inst%sulman_tau_scav        , &   ! N scavenger turnover time [s-1]
+   sulman_tau_mine      => params_inst%sulman_tau_mine        , &   ! N miner turnover time [s-1]
+   sulman_tau_fix       => params_inst%sulman_tau_fix         , &   ! N fixer turnover time [s-1]
+   sulman_cn_scav       => params_inst%sulman_cn_scav         , &   ! N scavenger C:N [unitless]
+   sulman_cn_mine       => params_inst%sulman_cn_mine         , &   ! N miner C:N [unitless]
+   sulman_cn_fix        => params_inst%sulman_cn_fix          , &   ! N fixer C:N [unitless]
+   sulman_tau_int       => params_inst%sulman_tau_int         , &   ! Turnover time of intermediate C pool [s-1]
+   sulman_rup_veg       => params_inst%sulman_rup_veg         , &   ! Vegetation N uptake rate from intermediate N pool [s-1]
+   sulman_fnalloc       => params_inst%sulman_fnalloc         , &   ! Fraction of NPP allocated to N uptake per unit N stress [fraction] 
+   sulman_initial_C_stocks => params_inst%sulman_initial_C_stocks, &! Initial carbon stocks in fixer, miner, scavenger pools (only for coldstart)
+   sulman_cn_symbionts     => params_inst%sulman_cn_symbionts , &   ! C:N ratios of fixer, miner, scavengers as array
 
-   crootfr              => soilstate_inst%crootfr_patch                      , & ! Input:   [real(r8) (:,:)] fraction of roots for carbon in each soil layer  (nlevgrnd)
-   frootc               => cnveg_carbonstate_inst%frootc_patch               , & ! Input:   [real(r8) (:)]  (gC/m2) fine root C
-   leafc                => cnveg_carbonstate_inst%leafc_patch                , & ! Input:  [real(r8) (:)     ]  (gC/m2) leaf C                                    
-   leafn                => cnveg_nitrogenstate_inst%leafn_patch              , & ! Input:  [real(r8) (:)     ]  (gN/m2) leaf N                                    
-   leafn_storage        => cnveg_nitrogenstate_inst%leafn_storage_patch      , & ! Input:  [real(r8) (:)     ]  (gN/m2) leaf N storage                            
-   frootn               => cnveg_nitrogenstate_inst%frootn_patch             , & ! Input:  [real(r8) (:)     ]  (gN/m2) fine root N                               
-   frootn_storage       => cnveg_nitrogenstate_inst%frootn_storage_patch     , & ! Input:  [real(r8) (:)     ]  (gN/m2) fine root N storage                       
-   livecrootn           => cnveg_nitrogenstate_inst%livecrootn_patch         , & ! Input:  [real(r8) (:)     ]  (gN/m2) live coarse root N                        
-   livecrootn_storage   => cnveg_nitrogenstate_inst%livecrootn_storage_patch , & ! Input:  [real(r8) (:)     ]  (gN/m2) live coarse root N storage                
-   h2osoi_liq           => waterstatebulk_inst%h2osoi_liq_col                , & ! Output: [real(r8) (:,:) ] liquid water (kg/m2) (new)  
-   t_soisno             => temperature_inst%t_soisno_col                     , & ! Input:  [real(r8) (:,:)   ]  soil temperature (Kelvin)  (-nlevsno+1:nlevgrnd)       
-   availc               => cnveg_carbonflux_inst%availc_patch                , & ! Output: [real(r8) (:)   ]  C flux available for allocation (gC/m2/s)
+   crootfr              => soilstate_inst%crootfr_patch                      , & ! Input: (:,:) fraction of roots for carbon in each soil layer  (nlevgrnd)
+   frootc               => cnveg_carbonstate_inst%frootc_patch               , & ! Input:   (:) (gC/m2) fine root C
+   leafc                => cnveg_carbonstate_inst%leafc_patch                , & ! Input:   (:) (gC/m2) leaf C                                    
+   leafn                => cnveg_nitrogenstate_inst%leafn_patch              , & ! Input:   (:) (gN/m2) leaf N                                    
+   leafn_storage        => cnveg_nitrogenstate_inst%leafn_storage_patch      , & ! Input:   (:) (gN/m2) leaf N storage                            
+   frootn               => cnveg_nitrogenstate_inst%frootn_patch             , & ! Input:   (:) (gN/m2) fine root N                               
+   frootn_storage       => cnveg_nitrogenstate_inst%frootn_storage_patch     , & ! Input:   (:) (gN/m2) fine root N storage                       
+   livecrootn           => cnveg_nitrogenstate_inst%livecrootn_patch         , & ! Input:   (:) (gN/m2) live coarse root N                        
+   livecrootn_storage   => cnveg_nitrogenstate_inst%livecrootn_storage_patch , & ! Input:   (:) (gN/m2) live coarse root N storage                
+   h2osoi_liq           => waterstatebulk_inst%h2osoi_liq_col                , & ! Output:(:,:) (kg/m2) liquid water (new)  
+   t_soisno             => temperature_inst%t_soisno_col                     , & ! Input: (:,:) (-nlevsno+1:nlevgrnd) soil temperature (Kelvin)      
+   availc               => cnveg_carbonflux_inst%availc_patch                , & ! Output:) (:) (gC/m2/s) C flux available for allocation 
    
-   sminn_vr               => soilbiogeochem_nitrogenstate_inst%sminn_vr_col        , & ! Input:  [real(r8) (:,:) ]  (gN/m3) soil mineral N                
-   smin_nh4_vr            => soilbiogeochem_nitrogenstate_inst%smin_nh4_vr_col     , & ! Input:  [real(r8) (:,:) ]  (gN/m3) soil mineral NH4              
-   smin_no3_vr            => soilbiogeochem_nitrogenstate_inst%smin_no3_vr_col     , & ! Input:  [real(r8) (:,:) ]  (gN/m3) soil mineral NO3              
-   smin_no3_to_plant_vr   => soilbiogeochem_nitrogenflux_inst%smin_no3_to_plant_vr_col     , & ! Input:  [real(r8) (:,:) ]
-   smin_nh4_to_plant_vr   => soilbiogeochem_nitrogenflux_inst%smin_nh4_to_plant_vr_col     , & ! Input:  [real(r8) (:,:) ]
+   sminn_vr             => soilbiogeochem_nitrogenstate_inst%sminn_vr_col            , & ! Input:  [real(r8) (:,:) ]  (gN/m3) soil mineral N                
+   smin_nh4_vr          => soilbiogeochem_nitrogenstate_inst%smin_nh4_vr_col         , & ! Input:  [real(r8) (:,:) ]  (gN/m3) soil mineral NH4              
+   smin_no3_vr          => soilbiogeochem_nitrogenstate_inst%smin_no3_vr_col         , & ! Input:  [real(r8) (:,:) ]  (gN/m3) soil mineral NO3              
+   smin_no3_to_plant_vr => soilbiogeochem_nitrogenflux_inst%smin_no3_to_plant_vr_col , & ! Input:  [real(r8) (:,:) ]  (gN/m3/s)
+   smin_nh4_to_plant_vr => soilbiogeochem_nitrogenflux_inst%smin_nh4_to_plant_vr_col , & ! Input:  [real(r8) (:,:) ]  (gN/m3/s)
    
+   decomp_cpools_vr     => soilbiogeochem_carbonstate_inst%decomp_cpools_vr_col   , &  ! Input: [real(r8) (:,:,:) ] (gC/m3)  vertically-resolved decomposing (litter, cwd, soil) C pools
+   decomp_npools_vr     => soilbiogeochem_nitrogenstate_inst%decomp_npools_vr_col , &  ! Input: [real(r8) (:,:,:) ] (gN/m3)  vertically-resolved decomposing (litter, cwd, soil) N pools
+         
    ! Symbiont variables  
-   is_active              => symbiont_inst%is_active                                       , & ! Input: [logical (:,:)] if symbiont uptake pathway is active for patch
-   perecm                 => pftcon%perecm                                                 , & ! Input:   The fraction of ECM-associated PFT 
-   C_reservoir            => symbiont_inst%C_reservoir                                     , &
-   C_biomass              => symbiont_inst%C_biomass                                       , & 
-   N_biomass              => symbiont_inst%N_biomass                                         &
+   is_active            => symbiont_inst%is_active      , & ! Input: [logical (:,:)] if symbiont uptake pathway is active for patch
+   perecm               => pftcon%perecm                , & ! Input: The fraction of ECM-associated PFT 
+   symb_eff             => symbiont_inst%symb_eff       , & ! Symbiont efficiency in nitrogen uptake
+   C_reservoir          => symbiont_inst%C_reservoir    , & ! Carbon reservoir in intermediate pools [gC/m2]
+   N_reservoir          => symbiont_inst%N_reservoir    , & ! Nitrogen reservoir in intermediate pools [gN/m2]
+   C_biomass            => symbiont_inst%C_biomass      , & ! Carbon biomass of symbiont [gC/m2]
+   N_biomass            => symbiont_inst%N_biomass        & ! Nitrogen biomass of symbiont [gN/m2]
    )
-   
-   !-----------------------------------------------------------------------
-   
-   begp = bounds%begp
-   endp = bounds%endp
-   begc = bounds%begc
-   endc = bounds%endc
-   
-   !scav_c_biomass(:) = 0.0_r8
-   ! do p.... 
-   !scav_c_biomass(p) = symbiont_inst%C_biomass(p,i_scav)
-   !....
-   !enddo
 
-   scav_C_biomass(begp:endp)  = 0.0_r8
-   mine_C_biomass(begp:endp)  = 0.0_r8
-   fix_C_biomass(begp:endp)   = 0.0_r8
-   scav_N_biomass(begp:endp)  = 0.0_r8
-   mine_N_biomass(begp:endp)  = 0.0_r8
-   fix_N_biomass(begp:endp)   = 0.0_r8
-
-   do fp = 1,num_soilp        
-      p = filter_soilp(fp)
-      c = patch%column(p)
-
-      scav_C_biomass(p)    = symbiont_inst%C_biomass(p,i_scav)
-      mine_C_biomass(p)    = symbiont_inst%C_biomass(p,i_miner)
-      fix_C_biomass(p)     = symbiont_inst%C_biomass(p,i_fixer)
-      scav_N_biomass(p)    = symbiont_inst%N_biomass(p,i_scav)
-      mine_N_biomass(p)    = symbiont_inst%N_biomass(p,i_miner)
-      fix_N_biomass(p)     = symbiont_inst%N_biomass(p,i_fixer)
-   enddo 
-   
    !-----------------------------------------------------------------------
    
    ! Calculationg a root profile
    ! https://escomp.github.io/ctsm-docs/versions/master/html/tech_note/Plant_Hydraulics/CLM50_Tech_Note_Plant_Hydraulics.html?highlight=root
-   root_dens_frac(begp:endp,1:nlevdecomp) = 0.0_r8
+   root_dens_frac(p,j) = 0.0_r8
    do fp = 1,num_soilp        
       p = filter_soilp(fp)
       c = patch%column(p)
@@ -491,10 +497,10 @@ contains
       root_dens_sum = 0.0_r8
 
       do j = 1, nlevdecomp
-         root_dens_sum = root_dens_sum + crootfr(p,j) * frootc(p,j)
+         root_dens_sum = root_dens_sum + crootfr(p,j) * frootc(p)
       end do
       do j = 1, nlevdecomp
-         root_dens_frac(p,j) = (crootfr(p,j) * frootc(p,j)) / root_dens_sum
+         root_dens_frac(p,j) = (crootfr(p,j) * frootc(p)) / root_dens_sum
       end do
    end do
 
@@ -502,37 +508,143 @@ contains
 
    ! Calculation of N_stress: N stress indicates the nitrogen content in a plant and is used to calculate how much carbon 
    ! the plant allocates belowground = the higher N stress, the higher is the carbon allocation belowground 
+
    do fp = 1,num_soilp        
       p = filter_soilp(fp)
       c = patch%column(p)
 
-      N_stress(p) = (N_stress_max*(leafn + frootn + livecrootn) - (leafn_storage + frootn_storage + livecrootn_storage)) / &
-                    (leafn + frootn + livecrootn)
+      N_stress(p) = (N_stress_max*(leafn(p) + frootn(p) + livecrootn(p)) - (leafn_storage(p) + frootn_storage(p) + livecrootn_storage(p))) / &
+                    (leafn(p) + frootn(p) + livecrootn(p))
       
       ! Calculate the amount of C transferent to N aquisation
       ! Dynamic allocation of a fraction of NPP to root exudation
-      C_transfer(p) = max(availc(p),0) * sulman_fnalloc * N_stress
+      C_transfer(p) = max(availc(p), 0.0_r8) * sulman_fnalloc * N_stress(p)
 
       ! Plant N uptake per symbiont pathway
-      N_to_plant_scav = scav_N_reservoir * sulman_rup_veg * dt
-      N_to_plant_mine = mine_N_reservoir * sulman_rup_veg * dt 
-      N_to_plant_fix = fix_N_reservoir  * sulman_rup_veg * dt
-   end do
+      N_to_plant_scav(p) = N_reservoir(p,i_scav) * sulman_rup_veg * dt
+      N_to_plant_mine(p) = N_reservoir(p,i_miner) * sulman_rup_veg * dt 
+      N_to_plant_fix(p) = N_reservoir(p,i_fixer)  * sulman_rup_veg * dt
 
       ! Passive nitrogen uptake from the rhizosphere by roots with soil water uptake:
       
       ! smin_no3_vr is per column and has to be per patch
       ! if water in layer:
-   
       do j = 1,nlevdecomp
          t_soi_degC = t_soisno(c,j) - tfrz     ! Soil temperature in degrees Celcius
          if (t_soi_degC < 0.01 .and. h2osoi_liq(c,j) > 0.0_r8) then
             no3_passiv_up(p,j)= waterflux_inst%qflx_tran_veg_patch(p) * (smin_no3_vr(c,j) / h2osoi_liq(c,j))
-            nh4_passiv_up(p,j) = waterflux_inst%qflx_tran_veg_patch(p) * (smin_nh4_vr(c,j) / h2osoi_liqc,j))
+            nh4_passiv_up(p,j) = waterflux_inst%qflx_tran_veg_patch(p) * (smin_nh4_vr(c,j) / h2osoi_liq(c,j))
          end if
       enddo 
+   end do
+
+   ! Nitrogen limitation:
+   ! Nitrogen is limited in individual uptake pathways, but also needs to be limited as a total
+   ! Start with scavengers taking up N from the inorganic N pool
+   ! Then active root uptake takes up what is left in inorganic N pool
+   ! Then passive root uptake takes up what is left in inorganic N pool
+   
+   ! Root uptake of nitrogen
+   ! patch loop whithin
+   ! loops are inside routines
+
+   somc_nuptake(bounds%begp:bounds%endp, 1:nlevdecomp) = 0.0_r8
+   somp_nuptake(bounds%begp:bounds%endp, 1:nlevdecomp) = 0.0_r8
+   somc_cuptake(bounds%begp:bounds%endp, 1:nlevdecomp) = 0.0_r8
+   somp_cuptake(bounds%begp:bounds%endp, 1:nlevdecomp) = 0.0_r8
+   
+   ! Mycorrhizal N mining (ECM-style)
+   call myc_miner_N_uptake(filter_soilp, filter_bgc_soilc, num_soilp, num_bgc_soilc, &
+                             bounds, symbiont_inst, temperature_inst, soilstate_inst, waterstatebulk_inst, &
+                             soilbiogeochem_carbonstate_inst, soilbiogeochem_nitrogenstate_inst, &
+                             root_dens_frac(bounds%begp:bounds%endp,1:nlevdecomp), &
+                             somc_nuptake(begp:endp,1:nlevdecomp), somp_nuptake(begp:endp,1:nlevdecomp), &
+                             somc_cuptake(begp:endp,1:nlevdecomp), somp_cuptake(begp:endp,1:nlevdecomp))
+      
+   ! Scavenging (AM-style)
+   call myc_scavenger_N_uptake(filter_soilp, filter_bgc_soilc, num_soilp, num_bgc_soilc, &
+                                 bounds, symbiont_inst, soilstate_inst, cnveg_carbonstate_inst, &
+                                 root_dens_frac(p,j), smin_no3_to_plant_vr(c,j), smin_nh4_to_plant_vr(c,j), &
+                                 no3_scav_up(p,j), nh4_scav_up(p,j))
+    
+   do p = bounds%begp,bounds%endp
+      call active_root_N_uptake(filter_soilp, filter_bgc_soilc, num_soilp, num_bgc_soilc, bounds, &
+                                soilstate_inst, froot_carbon(begp:endp), &
+                                smin_no3_to_plant_vr(c,j), smin_nh4_to_plant_vr(c,j), &
+                                no3_active_up(p,j), nh4_active_up(p,j))
+      
+      ! Symbiotic N2 Fixation
+      N_fixation(p) = C_biomass(p,i_fixer)*sulman_rfix*dt ! sulman_rfix different values
+   enddo
+
+   !----------------------------------------------------------------------
+   
+   ! GROWTH AND TURNOVER
+ 
+   ! Mycorrhizal scavengers
+      scav_growth = sulman_max_symb_growth * C_reservoir(p,i_scav) / (C_reservoir(p,i_scav) + sulman_kgrowth) * sulman_growth_scav * dt
+      maint_resp = min(C_biomass(p,i_scav)/sulman_tau_scav * (1.0 - sulman_tau_sym) * dt, scav_growth)
+      ! Nitrogen limitation
+      if (scav_growth - maint_resp > sulman_cn_scav * N_reservoir(p,i_scav) * 0.9) then
+         ! Not enough nitrogen to support growth. Limit to available N, and leave a little bit left over for plant
+         scav_growth = sulman_cn_scav * N_reservoir(p,i_scav) * 0.9 + maint_resp
+      end if
+   
+      total_myc_resp(p) = total_myc_resp(p) + scav_growth / sulman_growth_scav * (1.0 - sulman_growth_scav)
+   
+      ! Intermediate pool scavenger
+      ! Here I could make myc stop from dying if the are very little myc they don't die!!!!!!!!!!!!!!!!!!!
+      ! To adress problem from line 597
+      N_reservoir(p,i_scav) = N_reservoir(p,i_scav) + N_biomass(p,i_scav) * (1 - sulman_tau_sym / sulman_tau_scav *dt)
+      C_biomass(p,i_scav) = C_biomass(p,i_scav) + scav_growth - C_biomass(p,i_scav) / sulman_tau_scav * dt 
+      ! N_biomass(p,i_scav) = N_biomass(p,i_scav) + scav_growth - maint_resp) / sulman_cn_scav - N_biomass(p,i_scav) / sulman_tau_scav * sulman_tau_sym * dt
+      N_biomass(p,i_scav) = C_biomass(p,i_scav) / sulman_cn_scav
+      C_reservoir(p,i_scav) = C_reservoir(p,i_scav) - scav_growth / sulman_growth_scav
+      ! N_reservoir(p,i_scav) = N_reservoir(p,i_scav) - (scav_growth - maint_resp) / sulman_cn_scav
+      N_reservoir(p,i_scav) = N_reservoir(p,i_scav) - N_biomass(p,i_scav)
    
    
+      ! Mycorrhizal miners
+      mine_growth = sulman_max_symb_growth * C_reservoir(p,i_miner) / (C_reservoir(p,i_miner) + sulman_kgrowth) * sulman_growth_mine * dt
+      maint_resp = min(C_biomass(p,i_miner)/sulman_tau_mine * (1.0 - sulman_tau_sym) * dt, mine_growth)
+      ! Nitrogen limitation
+      if (mine_growth - maint_resp > sulman_cn_mine * N_reservoir(p,i_miner) * 0.9) then
+         ! Not enough nitrogen to support growth. Limit to available N, and leave a little bit left over for plant
+         mine_growth = sulman_cn_mine * N_reservoir(p,i_miner) * 0.9 + maint_resp
+      end if
+   
+      total_myc_resp(p) = total_myc_resp(p) + mine_growth / sulman_growth_mine * (1.0 - sulman_growth_mine)
+   
+      ! Intermediate pool miner
+      N_reservoir(p,i_miner) = N_reservoir(p,i_miner) + N_biomass(p,i_miner) * (1 - sulman_tau_sym / sulman_tau_mine *dt)
+      C_biomass(p,i_miner) = C_biomass(p,i_miner) + mine_growth - C_biomass(p,i_miner) / sulman_tau_mine * dt 
+      ! N_biomass(p,i_miner) = N_biomass(p,i_miner) + mine_growth - maint_resp) / sulman_cn_mine - N_biomass(p,i_miner) / sulman_tau_mine * sulman_tau_sym * dt
+      N_biomass(p,i_miner) = C_biomass(p,i_miner) / sulman_cn_mine
+      C_reservoir(p,i_miner) = C_reservoir(p,i_miner) - mine_growth / sulman_growth_mine
+      ! N_reservoir(p,i_miner) = N_reservoir(p,i_miner) - (mine_growth - maint_resp) / sulman_cn_mine
+      N_reservoir(p,i_miner) = N_reservoir(p,i_miner) - N_biomass(p,i_miner)
+   
+   
+      ! Nitrogen Fixation
+      fix_growth = sulman_max_symb_growth * C_reservoir(p,i_fixer) / (C_reservoir(p,i_fixer) + sulman_kgrowth) * sulman_growth_fix * dt
+      maint_resp = min(C_biomass(p,i_fixer) / sulman_tau_fix * (1.0 - sulman_tau_sym) * dt, fix_growth)
+      ! if (fix_growth > sulman_cn_fix * N_reservoir(p,i_fixer) * 0.9) then
+         ! Not enough nitrogen to support growth. Limit to available N, and leave a little bit left over for plant
+         ! fix_growth = sulman_cn_fix * N_reservoir(p,i_fixer) * 0.9
+      ! end if
+   
+      total_myc_resp(p) = total_myc_resp(p) + fix_growth / sulman_growth_fix * (1.0 - sulman_growth_fix)
+   
+      ! NOT SURE WHAT EXACTLY N_FIXATION IS
+      N_fixation = N_fixation - N_biomass(p,i_fixer) * (1 - sulman_tau_sym / sulman_tau_fix * dt)
+      C_biomass(p,i_fixer) = C_biomass(p,i_fixer) + fix_growth - C_biomass(p,i_fixer) / sulman_tau_fix * dt
+      ! N_biomass(p,i_fixer) = N_biomass(p,i_fixer) + (fix_growth - maint_resp) / sulman_cn_fix - fix_N_biomass / sulman_tau_fix * sulman_tau_sym * dt
+      N_biomass(p,i_fixer) = N_biomass(p,i_fixer) / sulman_cn_fix
+      C_reservoir(p,i_fixer) = C_reservoir(p,i_fixer) - (fix_growth) / sulman_growth_fix
+      ! fix_N_reservoir = fix_N_reservoir - fix_growth / sulman_cn_mine ! WHY C:N MINER?
+      ! N fixers just make all the N they need for their biomass
+      ! N_fixation = N_fixation + (fix_growth - maint_resp) / sulman_cn_mine ! WHY C:N MINER?
+      N_fixation = N_fixation + N_biomass(p,i_fixer)
    
    end associate
    end subroutine CN_soil_veg_exchange
@@ -542,42 +654,47 @@ contains
    ! FUNCTIONS
 
    function Vmax_myc(soil_T)
-      real, intent(in)   :: soil_T                 ! Soil temperature in Kelvin
-      real, parameter    :: Tref=293.15            ! Reference Temperature in Kelvin
-      real, dimension(:) :: alpha
-      real, dimension(:) :: Vmax_myc
-      real, parameter    :: Ea=(37e3)              ! Activation energy (kJ/mol)
-      real, parameter    :: R_gas = 8.314472       ! Universal gas constant, J K-1 mol-1
+      real(r8), intent(in)   :: soil_T                 ! Soil temperature in Kelvin
+      real(r8), parameter    :: Tref=293.15            ! Reference Temperature in Kelvin
+      real(r8), parameter    :: Ea=(37e3)              ! Activation energy (kJ/mol)
+      real(r8), parameter    :: R_gas = 8.314472       ! Universal gas constant, J K-1 mol-1
+      real(r8)               :: alpha
+      real(r8)               :: Vmax_myc
 
       alpha = params_inst%sulman_vmax_ref_mine / exp(-Ea /(R_gas*Tref))
       Vmax_myc = alpha * exp(-Ea / R_gas * soil_T)
    end function Vmax_myc
 
    
-   function resp_myc(Cavail, myc_biomass, soil_T, wliq, wair)
-      ! DO STH WITH CAVAIL
-      real, intent(in) :: myc_biomass                ! mycorrhizal biomass [kgC/m2]
-      real, intent(in) :: soil_T                     ! Soil temperature in Kelvin
-      real, intent(in) :: wliq                       ! water liquid                        
-      real, intent(in) :: wair                       ! air in soil
+   function resp_myc(soil_carbon, myc_biomass, soil_T, wliq, wair)
+      ! not actual respiration but the carbon removed from soil (rename)
+      ! USES
+      use decompMod         , only : bounds_type
+      !
+      ! ARGUMENTS
+      real(r8), intent(in) :: soil_carbon                    ! Carbon 
+      real(r8), intent(in) :: myc_biomass                ! mycorrhizal biomass [kgC/m2]
+      real(r8), intent(in) :: soil_T                     ! Soil temperature in Kelvin
+      real(r8), intent(in) :: wliq                       ! water liquid                        
+      real(r8), intent(in) :: wair                       ! air in soil
 
-      real, parameter  :: enzyme_frac=1.0            ! Relative amount of enzymes produced by microbes
-      real, parameter  :: substrate_diffusion_exp = 3.0    ! Exponent for theta dependence at low theta. See Davison et al DAMM model paper
-      real, parameter  :: gas_diffusion_exp = 2.5          ! Exponent for gas diffusion power law dependence on theta See Meslin et al 2010, SSAJ
-      real, parameter  :: min_anaerobic_resp_factor = 0.0  ! Minimum for high soil moisture Resp limitation
-      real, parameter  :: min_dry_resp_factor       = 0.0  ! Minimum for low soil moisture Resp limitation
+      real(r8), parameter  :: enzyme_frac=1.0            ! Relative amount of enzymes produced by microbes
+      real(r8), parameter  :: substrate_diffusion_exp = 3.0    ! Exponent for theta dependence at low theta. See Davison et al DAMM model paper
+      real(r8), parameter  :: gas_diffusion_exp = 2.5          ! Exponent for gas diffusion power law dependence on theta See Meslin et al 2010, SSAJ
+      real(r8), parameter  :: min_anaerobic_resp_factor = 0.0  ! Minimum for high soil moisture Resp limitation CHECK
+      real(r8), parameter  :: min_dry_resp_factor       = 0.0  ! Minimum for low soil moisture Resp limitation CHECK
 
-      real(r8)         :: resp_myc
-      real(r8)         :: enzymes
-      real(r8)         :: Cavail
-      real(r8)         :: theta_func
 
       ! LOCAL VARIABLES:
+      real(r8)             :: enzymes
+      real(r8)             :: theta_func
       real(r8)         :: theta_resp_max
       real(r8)         :: aerobic_max
+      real(r8)         :: resp_myc
       
       ! From solving theta dependence for maximum:
       theta_resp_max = substrate_diffusion_exp/(gas_diffusion_exp*(1.0+substrate_diffusion_exp/gas_diffusion_exp))
+
       aerobic_max=theta_resp_max**substrate_diffusion_exp*(1.0-theta_resp_max)**gas_diffusion_exp
 
       ! Functional dependence on soil moisture, normalized so max is 1
@@ -589,19 +706,13 @@ contains
 
       enzymes = myc_biomass * enzyme_frac
 
-      ! Pre check: if ther eis no carbon / no water content in soil / no enzymes = no mycorrhizal repiration
-      if (sum(Cavail).eq.0.0_r8 .or. wliq .eq. 0.0_r8 .or. enzymes .eq. 0.0_r8) then
-         resp_myc = 0.0_r8
-         return
-      endif
-
       ! If there is carbon avaliable, calculate mycorrhizal repiration
-      if (Cavail < 0.0_r8) then 
-         resp_myc = Vmax_myc(soil_T) * Cavail * enzymes / (sum(Cavail) * params_inst%sulman_km_mine + enzymes) * &
-         theta_func(wliq, wair)
+      if (soil_carbon > 0.0_r8 .and. wliq > 0.0_r8) then 
+         resp_myc = Vmax_myc(soil_T) * soil_carbon * enzymes / (soil_carbon * params_inst%sulman_km_mine + enzymes) * theta_func
       else 
          resp_myc = 0.0_r8
       end if 
+
    end function resp_myc
 
    !----------------------------------------
@@ -610,12 +721,16 @@ contains
 
    ! Nitrogen uptake from the rhizosphere by roots (active transport across root-soil interface)
    ! Mineral nitrogen is taken up from the rhizosphere only
-   subroutine active_root_N_uptake( filter_soilp, filter_bgc_soilc, num_soilp, num_bgc_soilc, bounds, &
+
+   subroutine active_root_N_uptake(filter_soilp, filter_bgc_soilc, num_soilp, num_bgc_soilc, bounds, &
                                     soilstate_inst, froot_carbon, no3_soil, nh4_soil, no3_uptake, nh4_uptake)
       ! ! USES:
-      use clm_varcon        , only : rpi
-      use decompMod         , only : bounds_type
+      use clm_varcon        , only: rpi
+      use decompMod         , only: bounds_type
       use SoilStateType     , only: soilstate_type
+
+      ! ! LOCAL VARIABLES:
+      integer :: p, fp, c, fc, j, k, l, s  ! indices
 
       ! ! ARGUMENTS
       integer, intent(in)    :: num_soilp           ! number of soil patches in filter
@@ -626,32 +741,30 @@ contains
       type(bounds_type)      , intent(in)    :: bounds
       type(soilstate_type)   , intent(in)    :: soilstate_inst
 
-      real,intent(in)    :: froot_carbon(bounds%begp:bounds%endp) !,1:nlevdecomp)    ! fine root carbon (gC/m2)   [pft]   
-      real,intent(in)    :: no3_soil(bounds%begc:bounds%endc,1:nlevdecomp)                                             ! avaliable soil mineral NO3 [gN/m3]
-      real,intent(in)    :: nh4_soil(bounds%begc:bounds%endc,1:nlevdecomp)                                             ! avaliable soil mineral NH4 [gN/m3]
-      real,intent(inout) :: no3_uptake(bounds%begp:bounds%endp,1:nlevdecomp)
-      real,intent(inout) :: nh4_uptake(bounds%begp:bounds%endp,1:nlevdecomp)
+      real(r8), intent(in)   :: froot_carbon( bounds%begp: )                        ! fine root carbon (gC/m2) [pft] 
+      real(r8),intent(in)    :: no3_soil(bounds%begc:bounds%endc,1:nlevdecomp)      ! avaliable soil mineral NO3 [gN/m3]
+      real(r8),intent(in)    :: nh4_soil(bounds%begc:bounds%endc,1:nlevdecomp)      ! avaliable soil mineral NH4 [gN/m3]
+      real(r8),intent(inout) :: no3_uptake(bounds%begp:bounds%endp,1:nlevdecomp)    ! NO3 uptake from soil [kgN/m2/s]
+      real(r8),intent(inout) :: nh4_uptake(bounds%begp:bounds%endp,1:nlevdecomp)    ! NH4 uptake from soil [kgN/m2/s]
 
-      real(r8) :: root_biomass_density    ! root biomass density [g/m3]
-      real(r8) :: root_cross_sec_area     ! root cross sectional area [m2]
-      real(r8) :: root_length_density     ! root length density [m/m3]
-      real(r8) :: rhizosphere_frac        ! fraction of rihzosphere [-] 
-                                          ! sulman_r_rhiz [m] 
-
+      real(r8) :: root_biomass_density                                              ! root biomass density [g/m3]
+      real(r8) :: root_cross_sec_area                                               ! root cross sectional area [m2]
+      real(r8) :: root_length_density                                               ! root length density [m/m3]
+      real(r8) :: rhizosphere_frac(bounds%begp:bounds%endp)                         ! fraction of rihzosphere [-] 
+                                                                                    ! sulman_r_rhiz [m] 
       real(r8), parameter :: root_radius = 0.29e-03_r8      !(m)
       real(r8), parameter :: c_to_b = 2.0_r8                ![g biomass /g C]
 
       associate(                                                         &
+         sulman_r_rhiz          => params_inst%sulman_r_rhiz           , & ! Radius of the rhizosphere [m]
          ivt                    => patch%itype                         , & ! Input: [integer (:)] patch vegetation type
          rootfr                 => soilstate_inst%rootfr_patch         , & ! Input: [real(r8) (:,:)]
-         dz                     => col%dz                              , & ! Input: [real(r8) (:,:)] layer thickness (m)
          root_radius            => pftcon%root_radius                  , & ! Input: 0.29e-03_r8 (m) 
          root_density           => pftcon%root_density                   & ! Input: 0.31e06_r8 (g biomass / m3 root) 
          )
       
          no3_uptake = 0.0_r8
          nh4_uptake = 0.0_r8
-         total_active_root_N_uptake = 0.0_r8
 
       do fp = 1,num_soilp
          p = filter_soilp(fp)
@@ -663,40 +776,58 @@ contains
 
            ! Root calculations (Sulman calculated root surface, nor sure how different that is)
            ! calculate conversion from conductivity to conductance
-           root_biomass_density = c_to_b * froot_carbon(p) * rootfr(p,j) / dz(c,j)
+           root_biomass_density = c_to_b * froot_carbon(p) * rootfr(p,j) / col%dz(c,j)
            ! ensure minimum root biomass (using 1gC/m2)
            root_biomass_density = max(c_to_b*1._r8,root_biomass_density)
            ! Root length density: m root per m3 soil 
-           root_cross_sec_area = rpi*params_inst%sulman_r_rhiz(ivt(p))**2
+           root_cross_sec_area = rpi*root_radius(ivt(p))**2
            root_length_density = root_biomass_density / (root_density(ivt(p)) * root_cross_sec_area)
-     
-           rhizosphere_frac = min(rpi*((sulman_r_rhiz+root_radius)**2-root_radius**2)*root_length_density,1.0_r8)  ! Kinda sus
+
+           rhizosphere_frac(p) = min(rpi*((params_inst%sulman_r_rhiz+root_radius(p))**2-root_radius(p)**2)*root_length_density,1.0_r8)  ! Kinda sus
            
            ! Calculate Nitrocen uptake by roots
-           no3_uptake(p,j) = rhizosphere_frac * params_inst%sulman_root_no3 * (no3_soil(c,j) / (no3_soil(c,j) + params_inst%sulman_km_no3))
-           nh4_uptake(p,j) = rhizosphere_frac * params_inst%sulman_root_nh4 * (nh4_soil(c,j) / (nh4_soil(c,j) + params_inst%sulman_km_nh4))
+           no3_uptake(p,j) = rhizosphere_frac(p) * params_inst%sulman_root_no3 * (no3_soil(c,j) / (no3_soil(c,j) + params_inst%sulman_km_no3))
+           nh4_uptake(p,j) = rhizosphere_frac(p) * params_inst%sulman_root_nh4 * (nh4_soil(c,j) / (nh4_soil(c,j) + params_inst%sulman_km_nh4))
   
            ! add some if statements that if plant wants to take up more no3 /nh4 than in soil sth happens
   
-           !total_active_root_N_uptake(p) = total_active_root_N_uptake(p) + no3_uptake + nh4_uptake
          end do
       end do
       end associate
+
    end subroutine active_root_N_uptake
 
    !----------------------------------------
-  
-   subroutine myc_scavenger_N_uptake(myc_biomass,root_dens_frac, no3_soil, nh4_soil, dz, myc_efficiency, no3_uptake, nh4_uptake)
 
-      real,intent(in)     :: myc_biomass            ! (kgC/m2)
-      real,intent(in)     :: dz                     ! (m)
-      real,intent(in)     :: root_dens_frac
-      real,intent(in)     :: no3_soil               ! avaliable soil mineral NO3 [gN/m3]
-      real,intent(in)     :: nh4_soil               ! avaliable soil mineral NH4 [gN/m3]
-      
-      real,intent(inout)  :: no3_uptake             ! (kgN/m2/year)
-      real,intent(inout)  :: nh4_uptake             ! (kgN/m2/year)
-      real, intent(out)   :: myc_efficiency         ! [kgN/kgC per myc biomass] Nitrogen uptake efficiency of symbiont type (for ROI calculations)
+   subroutine myc_scavenger_N_uptake(filter_soilp, filter_bgc_soilc, num_soilp, num_bgc_soilc, &
+                                       bounds, symbiont_inst, soilstate_inst, cnveg_carbonstate_inst, & 
+                                       root_dens_frac, no3_soil, nh4_soil, no3_uptake, nh4_uptake)
+      !
+      ! !USES:
+      use SoilStateType           , only: soilstate_type
+      use CNVegCarbonStateType    , only: cnveg_carbonstate_inst
+      !
+      ! ! ARGUMENTS
+      type(bounds_type)           , intent(in)     :: bounds
+      type(symbiont_type)         , intent(inout)  :: symbiont_inst 
+      type(soilstate_type)        , intent(in)     :: soilstate_inst
+      type(cnveg_carbonstate_type), intent(in)     :: cnveg_carbonstate_inst
+
+      integer                     , intent(in)     :: num_soilp           ! number of soil patches in filter
+      integer                     , intent(in)     :: filter_soilp(:)     ! filter for soil patches
+      integer                     , intent(in)     :: num_bgc_soilc       ! number of soil columns in filter
+      integer                     , intent(in)     :: filter_bgc_soilc(:) ! filter for soil columns
+      !
+      ! ! LOCAL VARIABLES:
+      integer :: p, fp, c, fc, j, k, l, s  ! indices
+
+      real(r8),intent(in)     :: root_dens_frac(bounds%begp:bounds%endp,1:nlevdecomp)     ! Fraction of root desity []
+      real(r8),intent(in)     :: no3_soil(bounds%begc:bounds%endc,1:nlevdecomp)           ! avaliable soil mineral NO3 [gN/m3]
+      real(r8),intent(in)     :: nh4_soil(bounds%begc:bounds%endc,1:nlevdecomp)           ! avaliable soil mineral NH4 [gN/m3]
+      real(r8),intent(inout)  :: no3_uptake(bounds%begp:bounds%endp,1:nlevdecomp)         ! NO3 uptake from soil [kgN/m2/s]
+      real(r8),intent(inout)  :: nh4_uptake(bounds%begp:bounds%endp,1:nlevdecomp)         ! NH4 uptake from soil [kgN/m2/s]
+
+      real(r8) :: myc_biomass_layer(bounds%begp:bounds%endp, 1:nlevdecomp)                ! Mycorrhyzal biomass per layer [kgC/m2]
 
       associate(                                                                  &
       sulman_k_scav_Ninorg => params_inst%sulman_k_scav_Ninorg                  , & ! Half-saturation inorganic N concentration for mycorrhizal uptake [kg N m-3]
@@ -704,195 +835,213 @@ contains
       sulman_v_scav        => params_inst%sulman_v_scav                         , & ! Maximum N uptake rate by scavenging mycorrhizae [kg N m-3 year-1]
       crootfr              => soilstate_inst%crootfr_patch                      , & ! Input:   [real(r8) (:,:)] fraction of roots for carbon in each soil layer  (nlevgrnd)
       frootc               => cnveg_carbonstate_inst%frootc_patch               , & ! Input:   [real(r8) (:)]  (gC/m2) fine root C
-      leafc                => cnveg_carbonstate_inst%leafc_patch                  & ! Input:  [real(r8) (:)     ]  (gC/m2) leaf C                                    
+      leafc                => cnveg_carbonstate_inst%leafc_patch                , & ! Input:   [real(r8) (:)]  (gC/m2) leaf C                                    
+      C_reservoir          => symbiont_inst%C_reservoir                         , & ! Carbon reservoir in intermediate pools[gC/m2/s]
+      N_reservoir          => symbiont_inst%N_reservoir                         , & ! Nitrogen reservoir in intermediate pools[gN/m2/s]
+      C_biomass            => symbiont_inst%C_biomass                           , & ! Carbon biomass of symbiont [gC/m2/s]
+      N_biomass            => symbiont_inst%N_biomass                           , & ! Nitrogen biomass of symbiont [gN/m2/s]
+      symb_efficiency      => symbiont_inst%symb_eff                              &
       )
 
-      ! Check if there is mycorrhizal biomass per patch and per layer
-      ! Calculating mycorrhizal biomass per soil layer
-      !myc%C_pool(p)
-      !myc_c_layer = myc%C_pool(p) * root_dens(p,j)
-      do j = 1, nlevdecomp
-         myc_biomass_layer(p, j) = myc_biomass(p) * root_dens(p, j)
-      end do
+      myc_biomass_layer(bounds%begp:bounds%endp, 1:nlevdecomp) = 0.0_r8
 
-      ! In Sulman code calculations are still done if there is no biomass in the soil. They multiplu by 0.0001
-      ! and creat biomass out of nowher (so that mycorrhiza can grow)
-      ! THIS DOES NOT WORK IN CTSM
-      ! It probably wont pass balance checks (Rosie). Instead:
-      ! Make sure that mycorrhizal pool never goes to 0
-
-      ! Check if there is  mycorrhizal biomass in soil layer
-      do j = 1, nlevdecomp
-         if (myc_biomass_layer >= 0) then 
-
-            ! If there is mycorrhizal biomass in soil layer, calculate N uptake
-            do j = 1, nlevdecomp
-               ! sulman_v_scav is different in Sulman code
-               no3_uptake = sulman_v_scav * no3_soil(c,j) / (no3_soil(c,j) + sulman_k_scav_Ninorg) * &
-                           scav_C_biomass(c,j) / (scav_C_biomass + sulman_k_scav)
-
-               nh4_uptake = sulman_v_scav * nh4_soil(c,j) / (nh4_soil(c,j) + sulman_k_scav_Ninorg) * &
-                           scav_C_biomass(c,j) / (scav_C_biomass(c,j) + sulman_k_scav)
-
-               ! NO3 and NH4 uptake depends on how much N is avaliable in soil
-               no3_uptake = min(no3_uptake(c,j), no3_soil(c,j)) 
-               nh4_uptake = min(nh4_uptake(c,j), nh4_soil(c,j))
+      !do p = bounds%begp,bounds%endp ! patch loop
+         do fp = 1,num_soilp
+            p = filter_soilp(fp)
+            c = patch%column(p)
                
-               myc_efficiency = (no3_uptake(c,j) + nh4_uptake(c,j)) / scav_C_biomass(c,j)
-
-               ! Total uptake is scaled 
+            ! Check if there is mycorrhizal biomass per patch and per layer
+            ! Calculating mycorrhizal biomass per soil layer
+            do j = 1, nlevdecomp
+               myc_biomass_layer(p,j) = C_biomass(p,i_scav) * root_dens_frac(p,j)
             end do
-         end if 
-
-         if ( (leafc + frootc) == 0) then ! leaves, fine roots, and sapwood biomass find a variable for living biomass in soil
-            no3_uptake     = 0.0_r8
-            nh4_uptake     = 0.0_r8
-            myc_efficiency = 0.0_r8
-         end if
-      end do
+   
+            ! In Sulman code calculations are still done if there is no biomass in the soil. They multiplu by 0.0001
+            ! and creat biomass out of nowher (so that mycorrhiza can grow)
+            ! THIS DOES NOT WORK IN CTSM
+            ! It probably wont pass balance checks (Rosie). Instead:
+            ! Make sure that mycorrhizal pool never goes to 0
+   
+            ! Check if there is  mycorrhizal biomass in soil layer
+            do j = 1, nlevdecomp
+               if (myc_biomass_layer(p,j) >= 0) then 
+            
+                  ! Ensure uptake values are zero if there is no leaf or fine root biomass
+                  if ((leafc(p) + frootc(p)) == 0) then 
+                     no3_uptake(p,j)            = 0.0_r8
+                     nh4_uptake(p,j)            = 0.0_r8
+                     symb_efficiency(p, i_scav) = 0.0_r8
+                     cycle  ! Skip to next iteration of loop
+                  end if
+            
+                  ! If there is mycorrhizal biomass in the soil layer, calculate N uptake
+                  no3_uptake(p,j) = sulman_v_scav * no3_soil(c,j) / (no3_soil(c,j) + sulman_k_scav_Ninorg) * &
+                              C_biomass(p,i_scav) / (C_biomass(p,i_scav) + sulman_k_scav)
+            
+                  nh4_uptake(p,j) = sulman_v_scav * nh4_soil(c,j) / (nh4_soil(c,j) + sulman_k_scav_Ninorg) * &
+                              C_biomass(p,i_scav) / (C_biomass(p,i_scav) + sulman_k_scav)
+            
+                  ! NO3 and NH4 uptake depends on how much N is available in soil
+                  no3_uptake(p,j) = min(no3_uptake(p,j), no3_soil(c,j))  ! Removed incorrect (c,j) indexing
+                  nh4_uptake(p,j) = min(nh4_uptake(p,j), nh4_soil(c,j))  ! Removed incorrect (c,j) indexing
+            
+                  ! Compute efficiency, ensuring no division by zero
+                  if (C_biomass(p,i_scav) > 0.0_r8) then
+                     symb_efficiency(p,i_scav) = (no3_uptake(p,j) + nh4_uptake(p,j)) / C_biomass(p,i_scav)
+                  else
+                     symb_efficiency(p,i_scav) = 0.0_r8
+                  endif
+         
+               end if
+            end do
+         enddo
+     ! end do
       end associate
 
    end subroutine myc_scavenger_N_uptake
 
    !----------------------------------------
 
-   ! Miner
-   subroutine myc_miner_N_uptake (temperature_inst, root_dens_frac, soil_carbon, myc_biomass, dz, total_N_uptake, total_myc_resp, dt)
+   subroutine myc_miner_N_uptake (filter_soilp, filter_bgc_soilc, num_soilp, num_bgc_soilc, &
+                                 bounds, symbiont_inst, temperature_inst, soilstate_inst, waterstatebulk_inst, &
+                                 soilbiogeochem_carbonstate_inst, soilbiogeochem_nitrogenstate_inst, &
+                                 root_dens_frac, somc_nuptake,somp_nuptake, somc_cuptake, somp_cuptake)
 
       ! USES
-      use TemperatureType                 , only : temperature_type
-      use clm_varcon                      , only : tfrz
-      use clm_varcon                      , only : denh2o, denice
-       
+      use clm_varpar                            , only: nlevdecomp
+      use clm_varpar                            , only: i_met_lit, i_str_lit, i_phys_som, i_chem_som
+      use TemperatureType                       , only: temperature_type
+      use clm_varcon                            , only: tfrz
+      use clm_varcon                            , only: denh2o, denice
+      use SoilStateType                         , only: soilstate_type
+      use WaterStateBulkType                    , only: waterstatebulk_type
+      use SoilBiogeochemDecompCascadeConType    , only: decomp_method, mimics_decomp, mimicsplus_decomp
+      use SoilBiogeochemDecompCascadeMIMICSMod  , only: decomp_rates_mimics
+      use SoilBiogeochemCarbonStateType         , only: soilbiogeochem_carbonstate_type 
+      use SoilBiogeochemNitrogenStateType       , only: soilbiogeochem_nitrogenstate_type 
 
       ! ARGUMENTS
-      type(temperature_type)              , intent(in)    :: temperature_inst
+      type(bounds_type)                         , intent(in)    :: bounds
+      type(symbiont_type)                       , intent(inout) :: symbiont_inst 
+      type(temperature_type)                    , intent(in)    :: temperature_inst
+      type(soilstate_type)                      , intent(in)    :: soilstate_inst
+      type(waterstatebulk_type)                 , intent(in)    :: waterstatebulk_inst
+      type(soilbiogeochem_carbonstate_type)     , intent(in)    :: soilbiogeochem_carbonstate_inst
+      type(soilbiogeochem_nitrogenstate_type)   , intent(in)    :: soilbiogeochem_nitrogenstate_inst
 
-      real(r8)                :: t_soi_degC              ! Soil temperature            (degrees Celsius)
-      real,intent(in)         :: root_dens_frac
-      real, intent(in)        :: myc_biomass             ! (kgC/m2)
-      real, intent(in)        :: soil_carbon             ! 
-      real(r8), intent(in)    :: dz                      ! soil layer thickness 
-      real(r8), intent(in)    :: dt                      ! decomposition time step
-      
-      real(r8), intent(inout) :: total_N_uptake
-      real(r8), intent(inout) :: total_myc_resp
+      integer                                   , intent(in)     :: num_soilp           ! number of soil patches in filter
+      integer                                   , intent(in)     :: filter_soilp(:)     ! filter for soil patches
+      integer                                   , intent(in)     :: num_bgc_soilc       ! number of soil columns in filter
+      integer                                   , intent(in)     :: filter_bgc_soilc(:) ! filter for soil columns
+
+      real(r8), intent(in)    :: root_dens_frac(bounds%begp:bounds%endp, 1:nlevdecomp)  ! Fraction of root desity []
+      real(r8), intent(inout) :: somc_nuptake(bounds%begp:bounds%endp,1:nlevdecomp)     ! Nitrogen removed from SOMc pool into int miner pool []
+      real(r8), intent(inout) :: somp_nuptake(bounds%begp:bounds%endp,1:nlevdecomp)     ! Nitrogen removed from SOMp pool into int miner pool []
+      real(r8), intent(inout) :: somc_cuptake(bounds%begp:bounds%endp,1:nlevdecomp)     ! Carbon removed from SOMc pool into int miner pool []
+      real(r8), intent(inout) :: somp_cuptake(bounds%begp:bounds%endp,1:nlevdecomp)     ! Carbon removed from SOMp pool into int miner pool []
 
       ! LOCAL VARIABLES:
-      real(r8) :: myc_biomass_layer ! Mycorrhizal biomass per layer
-      real(r8) :: wliq ! water liquid
-      real(r8) :: wice ! water ice
-      real(r8) :: wair ! air in soil
+      !
+      integer :: p, fp, c, fc, j, k, l, s ! indices
 
-      associate(                                                  &
-         t_soisno       => temperature_inst%t_soisno_col        , & ! Input:  [real(r8) (:,:)]soil temperature (Kelvin)  (-nlevsno+1:nlevgrnd)
-         watsat         => soilstate_inst%watsat_col            , & ! Input:  [real(r8) (:,:)  ]  volumetric soil water at saturation (porosity)  
-         h2osoi_liq     => waterstatebulk_inst%h2osoi_liq_col   , & ! Output: [real(r8) (:,:) ] liquid water (kg/m2) (new)             
-         h2osoi_ice     => waterstatebulk_inst%h2osoi_ice_col   , & ! Output: [real(r8) (:,:) ] ice lens (kg/m2) (new)
-         t_soisno       => temperature_inst%t_soisno_col          & ! Input:   [real(r8) (:,:)] soil temperature (Kelvin)  (-nlevsno+1:nlevgrnd)
+      real(r8) :: t_soi_degC                                               ! Soil temperature [degrees Celsius]
+      real(r8) :: wliq                                                     ! Soil water content liquid
+      real(r8) :: wice                                                     ! Soil water content ice
+      real(r8) :: wair                                                     ! Soil air content
+      real(r8) :: myc_biomass_layer(bounds%begp:bounds%endp, 1:nlevdecomp) ! Mycorrhyzal biomass per layer [kgC/m2]
+      real(r8) :: total_nuptake                                            ! N uptake from all the layers
+      
+      associate(                                                     &
+         t_soisno          => temperature_inst%t_soisno_col        , &     ! Input:  [real(r8) (:,:)] soil temperature (Kelvin)  (-nlevsno+1:nlevgrnd)
+         watsat            => soilstate_inst%watsat_col            , &     ! Input:  [real(r8) (:,:)]  volumetric soil water at saturation (porosity)  
+         h2osoi_liq        => waterstatebulk_inst%h2osoi_liq_col   , &     ! Output: [real(r8) (:,:) ] liquid water (kg/m2) (new)             
+         h2osoi_ice        => waterstatebulk_inst%h2osoi_ice_col   , &     ! Output: [real(r8) (:,:) ] ice lens (kg/m2) (new)
+         decomp_cpools_vr  => soilbiogeochem_carbonstate_inst%decomp_cpools_vr_col   , &  ! Input: [real(r8) (:,:,:) ] (gC/m3)  vertically-resolved decomposing (litter, cwd, soil) C pools
+         decomp_npools_vr  => soilbiogeochem_nitrogenstate_inst%decomp_npools_vr_col , &  ! Input: [real(r8) (:,:,:) ] (gN/m3)  vertically-resolved decomposing (litter, cwd, soil) N pools
+         C_reservoir       => symbiont_inst%C_reservoir            , &     ! Carbon reservoir in intermediate pools[gC/m2/s]
+         N_reservoir       => symbiont_inst%N_reservoir            , &     ! Nitrogen reservoir in intermediate pools[gN/m2/s]
+         C_biomass         => symbiont_inst%C_biomass              , &     ! Carbon biomass of symbiont [gC/m2/s]
+         N_biomass         => symbiont_inst%N_biomass              , &     ! Nitrogen biomass of symbiont [gN/m2/s]
+         symb_efficiency   => symbiont_inst%symb_eff                 &     ! Symbiont efficiency 
          )
-
-         ! Check if there is mycorrhizal biomass per patch and per layer   
-         !myc%C_pool(p)
-         !myc_c_layer = myc%C_pool(p) * root_dens(p,j)
-         do j = 1, nlevdecomp
-            myc_biomass_layer(p, j) = myc_biomass(p) * root_dens(p, j)
-         end do
-
-         ! Check if there is  mycorrhizal biomass in soil layer
-
+    
          ! In Sulman code calculations are still done if there is no biomass in the soil. They multiplu by 0.0001
          ! and creat biomass out of nowher (so that mycorrhiza can grow)
          ! THIS DOES NOT WORK IN CTSM
          ! It probably wont pass balance checks (Rosie). Instead:
          ! Make sure that mycorrhizal pool never goes to 0
 
-         do j = 1,nlevdecomp
-            if (myc_biomass_layer >= 0) then 
-               mine_biomass = myc_biomass_layer    ! DOES THIS HAVE STH TO DO WITH THE mine_C_biomass calculations above?
-            else 
-            N_uptake       = 0.0_r8
-            mine_resp      = 0.0_r8
-            myc_efficiency = 0.0_r8
-            end if 
-         end do
-      
-         ! Calculate soil temperature for each soil layer
-         do j = 1, nlevdecomp
-            t_soi_degC         = t_soisno(c,j)  -   tfrz  ! tfrz = 273.15
-         end do 
-         
-         ! Calculating water, ice and air content in soil (equivalent to air_filled porosity, theta, theta sat in Sulman)
-         wliq = h2osoi_liq / dz * denh2o
-         wice = h2osoi_ice / dz * denice
-         wliq = min(1.0_r8, wliq/watsat)            ! fraction of liquid water-filled pore space (0.0 - 1.0)
-         wice = min(1.0_r8, wice/watsat)            ! fraction of frozen water-filled pore space (0.0 - 1.0)
-         wair = max(0.0_r8, 1.0_r8 - wliq- wice)    ! fraction of air-filled pore space (0.0 - 1.0)
-   
-         ! Make sure fluxes are zero before the loop
-         total_N_uptake       = 0.0_r8
-         total_myc_resp       = 0.0_r8
-   
-         do j = 1, nlevdecomp
-            ! SOMc to miner
-            call miner_decomposition(decomp_cpools_vr(c,j,i_chem_som), &
-            (decomp_npools_vr(c,j,i_chem_som) + decomp_npools_vr(c,j,i_phys)), &
-            myc_biomass, t_soisno(c,j), wliq(c,j), wair(c,j), N_uptake, mine_resp)
+      myc_biomass_layer(bounds%begp:bounds%endp, 1:nlevdecomp) = 0.0_r8
 
-            ! SOMp to miner
-            call miner_decomposition(decomp_cpools_vr(c,j,i_phys), &
-            (decomp_npools_vr(c,j,i_chem_som) + decomp_npools_vr(c,j,i_phys)), &
-            myc_biomass, t_soisno(c,j), wliq(c,j), wair(c,j), N_uptake, mine_resp)
+     ! do p = bounds%begp,bounds%endp ! patch loop
+         do fp = 1,num_soilp
+            p = filter_soilp(fp)
+            c = patch%column(p)
+
+            ! Calculate soil temperature for each soil layer
+            do j = 1, nlevdecomp
+               t_soi_degC         = t_soisno(c,j)  -   tfrz  ! tfrz = 273.15
+            end do 
+            
+            ! Calculating water, ice and air content in soil (equivalent to air_filled porosity, theta, theta sat in Sulman)
+      
+            ! Make sure fluxes are zero before the loop
+            total_nuptake = 0.0_r8
+            do j = 1, nlevdecomp
+               ! SOMc to miner
+               myc_biomass_layer(p,j) = C_biomass(p,i_miner) * root_dens_frac(p,j)
+               ! this is necessary for miners when they somehow all die.
+               if (C_biomass(p,i_miner) == 0.0_r8) then 
+                  myc_biomass_layer(p,j) = 0.01_r8 * root_dens_frac(p,j)
+               endif 
+               wliq = h2osoi_liq(c,j) / col%dz(c,j) * denh2o
+               wice = h2osoi_ice(c,j) / col%dz(c,j) * denice
+               wliq = min(1.0_r8, wliq/watsat(c,j))            ! fraction of liquid water-filled pore space (0.0 - 1.0)
+               wice = min(1.0_r8, wice/watsat(c,j))            ! fraction of frozen water-filled pore space (0.0 - 1.0)
+               wair = max(0.0_r8, 1.0_r8 - wliq- wice)         ! fraction of air-filled pore space (0.0 - 1.0)
+               ! SOMc to miner
+               somc_nuptake(p,j) = miner_nuptake(decomp_cpools_vr(c,j,i_chem_som), &
+               decomp_npools_vr(c,j,i_chem_som), &
+               myc_biomass_layer(p,j), t_soisno(c,j), wliq, wair) !N_uptake_somc
+               somc_cuptake(p,j) = resp_myc(decomp_cpools_vr(c,j,i_chem_som), myc_biomass_layer(p,j), t_soisno(c,j), wliq, wair)
+               ! SOMp to miner
+               somp_nuptake(p,j) = miner_nuptake(decomp_cpools_vr(c,j,i_phys_som), &
+               decomp_npools_vr(c,j,i_phys_som), &
+               myc_biomass_layer(p,j), t_soisno(c,j), wliq, wair)
+               somp_cuptake(p,j) = resp_myc(decomp_cpools_vr(c,j,i_phys_som), myc_biomass_layer(p,j), t_soisno(c,j), wliq, wair)
    
-            total_myc_resp = total_myc_resp + myc_resp ! NOT SURE
-         end do
-   
-         myc_efficiency = N_uptake(c,j) / mine_C_biomass(c,j)
-   
-   
-        ! Organic N Mining by Mycorrhizal Fungi
+               total_nuptake = total_nuptake + somc_nuptake(p,j) + somp_nuptake(p,j)
+            end do
+      
+            symb_efficiency(p,i_miner) = total_nuptake / C_biomass(p,i_miner) !??
+         end do 
+      !end do
       end associate
 
    end subroutine myc_miner_N_uptake
 
    !----------------------------------------
   
-   subroutine miner_decomposition(soil_carbon, soil_nitrogen, myc_biomass, soil_T, soil_water, soil_air, N_uptake, myc_resp)
-
-      real, intent(in) :: soil_carbon
-      real, intent(in) :: soil_nitrogen
-      real, intent(in) :: myc_biomass
-      real, intent(in) :: soil_T
-      real, intent(in) :: soil_water ! water liquid
-      real, intent(in) :: soil_air   ! air in soil
+   function miner_nuptake(soil_carbon, soil_nitrogen, myc_biomass, soil_T, soil_water, soil_air)
+     ! ! this is scalar subroutine  (all arguments are per patch (column), layer
       
-      real, intent(inout) :: N_uptake  ! Nitrogen taken up by plant
-      real, intent(inout) :: myc_resp  ! Mycorrhizal repiration (CO2) during symbiosis
+      ! ARGUMENTS
 
-      ! LOCAL VARIABLES:
-      real(r8) :: wliq ! water liquid
-      real(r8) :: wice ! water ice
-      real(r8) :: wair ! air in soil
+      real(r8), intent(in) :: soil_carbon        ! 
+      real(r8), intent(in) :: soil_nitrogen     !
+      real(r8), intent(in) :: myc_biomass                    ! Mycorrhyzal biomass [kgC/m2]
+      real(r8), intent(in) :: soil_T
+      real(r8), intent(in) :: soil_water ! water liquid
+      real(r8), intent(in) :: soil_air   ! air in soil
+      real(r8) :: miner_nuptake
+   
+      ! ! LOCAL VARIABLES:
+      real(r8) :: pot_tempN_decomposed
+      real(r8) :: potential_tempResp
 
-      associate(                                                  &
-         t_soisno       => temperature_inst%t_soisno_col        , & ! Input:  [real(r8) (:,:)]soil temperature (Kelvin)  (-nlevsno+1:nlevgrnd)
-         watsat         => soilstate_inst%watsat_col            , & ! Input:  [real(r8) (:,:)  ]  volumetric soil water at saturation (porosity)  
-         h2osoi_liq     => waterstatebulk_inst%h2osoi_liq_col   , & ! Output: [real(r8) (:,:) ] liquid water (kg/m2) (new)             
-         h2osoi_ice     => waterstatebulk_inst%h2osoi_ice_col   , & ! Output: [real(r8) (:,:) ] ice lens (kg/m2) (new)
-         t_soisno       => temperature_inst%t_soisno_col          & ! Input:   [real(r8) (:,:)] soil temperature (Kelvin)  (-nlevsno+1:nlevgrnd)
-         )
+      miner_nuptake    = 0.0_r8
 
-      myc_resp    = 0.0_r8
-      N_uptake    = 0.0_r8
-
-      ! Calculating water, ice and air content in soil (equivalent to air_filled porosity, theta, theta sat in Sulman)
-      wliq = h2osoi_liq / dz * denh2o
-      wice = h2osoi_ice / dz * denice
-      wliq = min(1.0_r8, wliq/watsat)            ! fraction of liquid water-filled pore space (0.0 - 1.0)
-      wice = min(1.0_r8, wice/watsat)            ! fraction of frozen water-filled pore space (0.0 - 1.0)
-      wair = max(0.0_r8, 1.0_r8 - wliq- wice)    ! fraction of air-filled pore space (0.0 - 1.0)
-
-      potential_tempResp=Resp_myc(soil_carbon,myc_biomass,T,wliq,wair)
+      potential_tempResp=resp_myc(soil_carbon, myc_biomass,soil_T,soil_water,soil_air)
 
       ! Don't exceed avaliable C
       if(dt*potential_tempResp > soil_carbon) then
@@ -905,185 +1054,105 @@ contains
          pot_tempN_decomposed=0.0
       end if
 
-      N_uptake = N_uptake + sum(pot_tempN_decomposed*params_inst%sulman_nue_mine)*dt
-      myc_resp = CO2prod + sum(potential_tempResp*(1 - params_inst%sulman_cue_mine))*dt
+      miner_nuptake  = pot_tempN_decomposed*params_inst%sulman_nue_mine*dt
 
-    end associate
-   end subroutine miner_decomposition
+   end function miner_nuptake
    
    !----------------------------------------
 
-   ! GROWTH AND TURNOVER OF SYMBIOTIC BIOMASS
-   ! Intermediate pools:
-   ! line 553 - 604 in veg_dynamics_mod
+  subroutine update_symbionts(bounds, symbiont_inst, cnveg_nitrogenstate_inst, myc_resp)
+   !
+   ! ! USES:
+   use CNVegNitrogenStateType          , only: cnveg_nitrogenstate_type
+   ! ARGUMENTS
+   type(bounds_type)                   , intent(in) :: bounds
+   type(symbiont_type)                 , intent(inout) :: symbiont_inst
+   type(cnveg_nitrogenstate_type)      , intent(in) :: cnveg_nitrogenstate_inst
+   !
+   ! ! LOCAL VARIABLES:
+   integer :: p, fp, c, fc, j, k, l, s  ! indices
 
-   subroutine update_symbionts(this)
+   real(r8)    :: days_per_year
+
+   real(r8)    :: mine_roi             ! Retrurn of investment 
+   real(r8)    :: scav_roi             !
+   real(r8)    :: fix_roi              !
+   real(r8)    :: root_roi             !
+
+   real(r8)    :: C_allocation_to_N_acq
+   real(r8)    :: local_active
    
-   class(symbiont_type)                                    :: this
-
-   real(r8) :: scav_growth             ! Symbiotic biomass growth rate for scavangers 
-   real(r8) :: mine_growth             ! Symbiotic biomass growth rate for miners     
-   real(r8) :: fix_growth              ! Symbiotic biomass growth rate for fixers     
-   real(r8) :: maint_resp              ! Respiration, calculated for scav, mine, fix and updated to total_myc_resp
-   real(r8) :: total_myc_resp          ! Total repiration of scav, mine and fix
-   
-   real(r8) :: scav_C_biomass          ! Scavenger C biomass
-   real(r8) :: scav_N_biomass          ! Scavenger N biomass
-   real(r8) :: mine_C_biomass          ! Miner C biomass
-   real(r8) :: mine_N_biomass          ! Miner N biomass
-   real(r8) :: fix_C_biomass           ! Fixer C biomass
-   real(r8) :: fix_N_biomass           ! Fixer N biomass
-
-   real(r8) :: scav_C_reservoir        ! Carbon reservoir for scavangers
-   real(r8) :: scav_N_reservoir        ! Nitrogen reservoir for scavangers
-   real(r8) :: mine_C_reservoir        ! Carbon reservoir for miners
-   real(r8) :: mine_N_reservoir        ! Nitrogen reservoir for miners
-   real(r8) :: fix_C_reservoir         ! Carbon reservoir for fixers   
-   real(r8) :: fix_N_reservoir         ! Nitrogen reservoir for fixers
-   real(r8) :: N_fixation              !
-
    real(r8) :: reservoir_C_leakage
+   real(r8) :: root_exudate_N_frac
+   real(r8) :: root_exudate_N
+   real(r8) :: root_exudate_C
 
    real(r8) :: symbiont_turnover_C
    real(r8) :: symbiont_turnover_N
+
    real(r8) :: fix_C_alloc
    real(r8) :: scav_C_alloc
    real(r8) :: mine_C_alloc
    real(r8) :: fix_N_alloc
    real(r8) :: scav_N_alloc
    real(r8) :: mine_N_alloc
-   real(r8) :: root_exudate_N_frac
-   real(r8) :: total_plant_N_uptake
-   real(r8) :: plant_N_storage         ! sum of plant N store from (leafn_storage + frootn + frootn_storage)
-
-   associate(                                                                  &
-   leafn_storage        => cnveg_nitrogenstate_inst%leafn_storage_patch      , & ! Input:  [real(r8) (:)     ]  (gN/m2) leaf N storage                            
-   frootn               => cnveg_nitrogenstate_inst%frootn_patch             , & ! Input:  [real(r8) (:)     ]  (gN/m2) fine root N                               
-   frootn_storage       => cnveg_nitrogenstate_inst%frootn_storage_patch       & ! Input:  [real(r8) (:)     ]  (gN/m2) fine root N storage                       
    
+   real(r8) :: plant_N_storage(bounds%begp:bounds%endp)         ! sum of plant N store from (leafn_storage + frootn + frootn_storage)
+  
+   real(r8) :: roi
+   real(r8) :: scav_roi_frac
+   real(r8) :: mine_roi_frac
+   real(r8) :: fix_roi_frac
+   real(r8) :: root_roi_frac
+   real(r8) :: lim_factor
+   real(r8) :: stored_N_loss
+  
+   real(r8) :: fix_alloc_accum
+   real(r8) :: mine_alloc_accum
+   real(r8) :: scav_alloc_accum
+  
+   real, intent(inout)  :: myc_resp(bounds%begp:bounds%endp)   ! Mycorrhizal repiration (CO2) during symbiosis
+   real(r8)             :: N_to_plant_scav(bounds%begp:bounds%endp)
+   real(r8)             :: N_to_plant_mine(bounds%begp:bounds%endp)
+   real(r8)             :: N_to_plant_fix(bounds%begp:bounds%endp)
+   real(r8)             :: root_N_uptake(bounds%begp:bounds%endp)
+   real(r8)             :: total_plant_N_uptake(bounds%begp:bounds%endp)
+   
+   associate(                                                                  &
+   leafn_storage        => cnveg_nitrogenstate_inst%leafn_storage_patch      , & ! Input: [real(r8) (:)] (gN/m2) leaf N storage                            
+   frootn               => cnveg_nitrogenstate_inst%frootn_patch             , & ! Input: [real(r8) (:)] (gN/m2) fine root N                               
+   frootn_storage       => cnveg_nitrogenstate_inst%frootn_storage_patch     , & ! Input: [real(r8) (:)] (gN/m2) fine root N storage                       
+   livecrootn_storage   => cnveg_nitrogenstate_inst%livecrootn_storage_patch , & ! Input:   (:) (gN/m2) live coarse root N storage                
+   is_active              => symbiont_inst%is_active                         , & ! Input: [logical (:,:)] if symbiont uptake pathway is active for patch
+   perecm                 => pftcon%perecm                                   , & ! Input: The fraction of ECM-associated PFT 
+   C_reservoir            => symbiont_inst%C_reservoir                       , & ! Carbon reservoir in intermediate pools[gC/m2/s]
+   N_reservoir            => symbiont_inst%N_reservoir                       , & ! Nitrogen reservoir in intermediate pools[gN/m2/s]
+   C_biomass              => symbiont_inst%C_biomass                         , & ! Carbon biomass of symbiont [gC/m2/s]
+   N_biomass              => symbiont_inst%N_biomass                         , & ! Nitrogen biomass of symbiont [gN/m2/s]
+   symb_eff               => symbiont_inst%symb_eff                            & !
+  
    )
 
-   ! Root uptake of nitrogen
-   ! patch loop whithin
-   ! loops are inside routines
-   do p = bounds%begp,bounds%endp
-
-      ! Nitrogen limitation:
-         ! Nitrogen is limited in individual uptake pathways, but also needs to be limited as a total
-         ! Start with scavengers taking up N from the inorganic N pool
-         ! Then active root uptake takes up what is left in inorganic N pool
-         ! Then passive root uptake takes up what is left in inorganic N pool
-   
-      call active_root_N_uptake(froot_carbon(begp:endp), smin_no3_to_plant_vr(begc:endc,1:nlevdecomp), &
-                                 smin_nh4_to_plant_vr(begc:endc,1:nlevdecomp), &
-                                 no3_active_up(begc:endc,1:nlevdecomp), nh4_active_up(begc:endc,1:nlevdecomp))
-   
-      ! Scavenging (AM-style)
-      ! C_reservoir(p,i_scav)
-      call myc_scavenger_N_uptake(C_biomass(p,i_scav), smin_no3_to_plant_vr(begc:endc,1:nlevdecomp), smin_nh4_to_plant_vr(begc:endc,1:nlevdecomp), &
-                                    myc_efficiency, no3_scav_up(begc:endc,1:nlevdecomp), nh4_scav_up(begc:endc,1:nlevdecomp))
-      
-      ! Mycorrhizal N mining (ECM-style)
-      call myc_miner_N_uptake(temperature_inst, decomp_cpools_vr(c,j,i_chem_som), mine_C_biomass, &
-                              dz, n_somc_miner_up(begc:endc,1:nlevdecomp), total_myc_resp, dt)
-      call myc_miner_N_uptake(temperature_inst, decomp_cpools_vr(c,j,i_phys_som), mine_C_biomass, &
-                              dz, n_somp_miner_up(begc:endc,1:nlevdecomp), total_myc_resp, dt)
-      
-      ! Symbiotic N2 Fixation
-      N_fixation = fix_C_biomass*sulman_rfix*dt ! sulman_rfix different values
-   
-      enddo
-    
-      !----------------------------------------------------------------
-   
-
    ! Add mycorrhizal and fixer turnover (necromass) in SOM pools:
-      symbiont_turnover_C = (mine_C_biomass / params_inst%sulman_tau_mine + scav_C_biomass / params_inst%sulman_tau_scav + &
-                              fix_C_biomass / params_inst%sulman_tau_fix) * dt * params_inst%sulman_tau_sym
-      symbiont_turnover_N = (mine_N_biomass / params_inst%sulman_tau_mine + scav_N_biomass / params_inst%sulman_tau_scav + &
-                              fix_N_biomass / params_inst%sulman_tau_fix) * dt * params_inst%sulman_tau_sym
+      symbiont_turnover_C = (C_biomass(p,i_miner) / params_inst%sulman_tau_mine + C_biomass(p,i_scav) / params_inst%sulman_tau_scav + &
+                              C_biomass(p,i_fixer) / params_inst%sulman_tau_fix) * dt * params_inst%sulman_tau_sym
+      symbiont_turnover_N = (N_biomass(p,i_miner) / params_inst%sulman_tau_mine + N_biomass(p,i_scav) / params_inst%sulman_tau_scav + &
+                              N_biomass(p,i_fixer) / params_inst%sulman_tau_fix) * dt * params_inst%sulman_tau_sym
    
-      myc_resp = myc_resp + (1.0 - params_inst%sulman_tau_sym) * symbiont_turnover_C / sulman_tau_sym
+      myc_resp(p) = myc_resp(p) + (1.0 - params_inst%sulman_tau_sym) * symbiont_turnover_C / params_inst%sulman_tau_sym
    
 
-   ! Update biomass of symbionts
-   ! GROWTH AND TURNOVER
- 
-   ! Mycorrhizal scavengers
-    scav_growth = sulman_rgrowth * scav_C_reservoir / (scav_C_reservoir + sulman_kgrowth) * sulman_growth_scav * dt
-    maint_resp = min(scav_C_biomass/sulman_tau_scav * (1.0 - sulman_tau_sym) * dt, scav_growth)
-    ! Nitrogen limitation
-    if (scav_growth - maint_resp > sulman_cn_scav * scav_N_reservoir * 0.9) then
-       ! Not enough nitrogen to support growth. Limit to available N, and leave a little bit left over for plant
-       scav_growth = sulman_cn_scav * scav_N_reservoir * 0.9 + maint_resp
-    end if
- 
-    total_myc_resp = total_myc_resp + scav_growth / sulman_growth_scav * (1.0 - sulman_growth_scav)
- 
-    ! Intermediate pool scavenger
-    ! Here I could make myc stop from dying if the are very little myc they don't die!!!!!!!!!!!!!!!!!!!
-    ! To adress problem from line 597
-    scav_N_reservoir = scav_N_reservoir + scav_N_biomass * (1 - sulman_tau_sym / sulman_tau_scav *dt)
-    scav_C_biomass = scav_C_biomass + scav_growth - scav_C_biomass / sulman_tau_scav * dt 
-    ! scav_N_biomass = scav_N_biomass + scav_growth - maint_resp) / sulman_cn_scav - scav_N_biomass / sulman_tau_scav * sulman_tau_sym * dt
-    scav_N_biomass = scav_C_biomass / sulman_cn_scav
-    scav_C_reservoir = scav_C_reservoir - scav_growth / sulman_growth_scav
-    ! scav_N_reservoir = scav_N_reservoir - (scav_growth - maint_resp) / sulman_cn_scav
-    scav_N_reservoir = scav_N_reservoir - scav_N_biomass
- 
- 
-    ! Mycorrhizal miners
-    mine_growth = sulman_rgrowth * mine_C_reservoir / (mine_C_reservoir + sulman_kgrowth) * sulman_growth_mine * dt
-    maint_resp = min(mine_C_biomass/sulman_tau_mine * (1.0 - sulman_tau_sym) * dt, mine_growth)
-    ! Nitrogen limitation
-    if (mine_growth - maint_resp > sulman_cn_mine * mine_N_reservoir * 0.9) then
-       ! Not enough nitrogen to support growth. Limit to available N, and leave a little bit left over for plant
-       mine_growth = sulman_cn_mine * mine_N_reservoir * 0.9 + maint_resp
-    end if
- 
-    total_myc_resp = total_myc_resp + mine_growth / sulman_growth_mine * (1.0 - sulman_growth_mine)
- 
-    ! Intermediate pool miner
-    mine_N_reservoir = mine_N_reservoir + mine_N_biomass * (1 - sulman_tau_sym / sulman_tau_mine *dt)
-    mine_C_biomass = mine_C_biomass + mine_growth - mine_C_biomass / sulman_tau_mine * dt 
-    ! mine_N_biomass = mine_N_biomass + mine_growth - maint_resp) / sulman_cn_mine - mine_N_biomass / sulman_tau_mine * sulman_tau_sym * dt
-    mine_N_biomass = mine_C_biomass / sulman_cn_mine
-    mine_C_reservoir = mine_C_reservoir - mine_growth / sulman_growth_mine
-    ! mine_N_reservoir = mine_N_reservoir - (mine_growth - maint_resp) / sulman_cn_mine
-    mine_N_reservoir = mine_N_reservoir - mine_N_biomass
- 
- 
-    ! Nitrogen Fixation
-    fix_growth = sulman_rgrowth * fix_C_reservoir / (fix_C_reservoir + sulman_kgrowth) * sulman_growth_fix * dt
-    maint_resp = min(fix_C_biomass / sulman_tau_fix * (1.0 - sulman_tau_sym) * dt, fix_growth)
-    ! if (fix_growth > sulman_cn_fix * fix_N_reservoir * 0.9) then
-       ! Not enough nitrogen to support growth. Limit to available N, and leave a little bit left over for plant
-       ! fix_growth = sulman_cn_fix * fix_N_reservoir * 0.9
-    ! end if
- 
-    total_myc_resp = total_myc_resp + fix_growth / sulman_growth_fix * (1.0 - sulman_growth_fix)
- 
-    ! NOT SURE WHAT EXACTLY N_FIXATION IS
-    N_fixation = N_fixation - fix_N_biomass * (1 - sulman_tau_sym / sulman_tau_fix * dt)
-    fix_C_biomass = fix_C_biomass + fix_growth - fix_C_biomass / sulman_tau_fix * dt
-    ! fix_N_biomass = fix_N_biomass + (fix_growth - maint_resp) / sulman_cn_fix - fix_N_biomass / sulman_tau_fix * sulman_tau_sym * dt
-    fix_N_biomass = fix_N_biomass / sulman_cn_fix
-    fix_C_reservoir = fix_C_reservoir - (fix_growth) / sulman_growth_fix
-    ! fix_N_reservoir = fix_N_reservoir - fix_growth / sulman_cn_mine ! WHY C:N MINER?
-    ! N fixers just make all the N they need for their biomass
-    ! N_fixation = N_fixation + (fix_growth - maint_resp) / sulman_cn_mine ! WHY C:N MINER?
-    N_fixation = N_fixation + fix_N_biomass
- 
+  
     ! ADD SOME ERRORS IN CASE BIOMASS IS ZERO
 
  
 
     ! Excess C leaks out of reservoir into root exudates at a time scale of one day
     reservoir_C_leakage = 0.0_r8
-    reservoir_C_leakage = reservoir_C_leakage + (scav_C_reservoir + mine_C_reservoir + fix_C_reservoir)*dt*365
-    scav_C_reservoir = scav_C_reservoir - scav_C_reservoir*dt*365
-    mine_C_reservoir = mine_C_reservoir - mine_C_reservoir*dt*365
-    nfix_C_reservoir = nfix_C_reservoir - nfix_C_reservoir*dt*365
+    reservoir_C_leakage = reservoir_C_leakage + (C_reservoir(p,i_scav) + C_reservoir(p,i_miner) + C_reservoir(p,i_fixer))*dt*365
+    C_reservoir(p,i_scav) = C_reservoir(p,i_scav) - C_reservoir(p,i_scav)*dt*365
+    C_reservoir(p,i_miner) = C_reservoir(p,i_miner) - C_reservoir(p,i_miner)*dt*365
+    C_reservoir(p,i_fixer) = C_reservoir(p,i_fixer) - C_reservoir(p,i_fixer)*dt*365
 
 
   
@@ -1093,35 +1162,36 @@ contains
 
    days_per_year = get_average_days_per_year()     ! to get average number of days per year 
 
+
    ! Scavengers
    if (is_active(p,i_scav)) then 
-      scav_N_to_plant = scav_N_reservoir * sulman_rup_veg * secspday * days_per_year
-      if (scav_C_biomass < 0.0_r8) then  ! or (C_biomass(p,i_scav) < 0.0_r8)
-         scav_roi = (max(0.0_r8, scav_N_to_plant) * dt) / (scav_C_biomass / sulman_growth_scav / sulman_tau_scav)
+      N_to_plant_scav(p) = N_reservoir(p,i_scav) * params_inst%sulman_rup_veg * secspday * days_per_year
+      if (C_biomass(p,i_scav) < 0.0_r8) then  ! or (C_biomass(p,i_scav) < 0.0_r8)
+         scav_roi = (max(0.0_r8, N_to_plant_scav(p)) * dt) / (C_biomass(p,i_scav) / params_inst%sulman_growth_scav / params_inst%sulman_tau_scav)
       else 
       ! scav_efficiency is calculated in myc_scavenger_N_uptake under myc_efficiency
-      scav_roi = scav_efficiency / (dt * sulman_growth_scav * sulman_tau_scav) 
+      scav_roi = symb_eff(p,i_scav) / (dt * params_inst%sulman_growth_scav * params_inst%sulman_tau_scav) ! symb_eff
       end if 
    else
-      scav_N_to_plant = 0.0_r8 ; scav_roi = 0.0_r8
+      N_to_plant_scav(p) = 0.0_r8 ; scav_roi = 0.0_r8
    end if 
 
-   scav_N_reservoir = scav_N_reservoir - scav_N_to_plant
+   N_reservoir(p,i_scav) = N_reservoir(p,i_scav) - N_to_plant_scav(p)
 
    ! Miners
    if (is_active(p,i_miner)) then
-      mine_N_to_plant = mine_N_reservoir * sulman_rup_veg * secspday * days_per_year
-      if (mine_C_biomass < 0.0_r8) then 
-         mine_roi = (max(0.0_r8, mine_N_to_plant) * dt) / (mine_C_biomass / sulman_growth_mine / sulman_tau_mine)
+      N_to_plant_mine(p) = N_reservoir(p,i_miner) * params_inst%sulman_rup_veg * secspday * days_per_year
+      if (C_biomass(p,i_miner) < 0.0_r8) then 
+         mine_roi = (max(0.0_r8, N_to_plant_mine(p)) * dt) / (C_biomass(p,i_miner) / params_inst%sulman_growth_mine / params_inst%sulman_tau_mine)
       else 
          ! mine is calculated in one of the mining routines under myc_efficiency
-         mine_roi = mine_efficiency / (dt * sulman_growth_mine * sulman_tau_mine) 
+         mine_roi = symb_eff(p,i_miner) / (dt * params_inst%sulman_growth_mine * params_inst%sulman_tau_mine) 
       end if 
    else
-      mine_N_to_plant = 0.0_r8 ; mine_roi = 0.0_r8
+      N_to_plant_mine(p) = 0.0_r8 ; mine_roi = 0.0_r8
    end if 
 
-   mine_N_reservoir = mine_N_reservoir - mine_N_to_plant
+   N_reservoir(p,i_miner) = N_reservoir(p,i_miner) - N_to_plant_mine(p)
 
    !NOT SUPER SURE WITH THIS ONE
    ! Root uptake of Nitrogen
@@ -1132,19 +1202,19 @@ contains
    end if 
 
    ! Nitrogen Fixers
-   if (local_active(p,i_fixer)) then
-      fix_N_to_plant = fix_N_reservoir * sulman_rup_veg * secspday * days_per_year
-      if (fix_C_biomass < 0.0_r8) then 
-         fix_roi = (fix_N_to_plant / dt) / (fix_C_biomass / sulman_growth_fix / sulman_tau_fix)
+   if (is_active(p,i_fixer)) then
+      N_to_plant_fix(p) = N_reservoir(p,i_fixer) * params_inst%sulman_rup_veg * secspday * days_per_year
+      if (C_biomass(p,i_fixer) < 0.0_r8) then 
+         fix_roi = (N_to_plant_fix(p) / dt) / (C_biomass(p,i_fixer) / params_inst%sulman_growth_fix / params_inst%sulman_tau_fix)
       else 
          ! mine is calculated in one of the mining routines under myc_efficiency
-         fix_roi =  sulman_rfix * sulman_growth_fix * sulman_tau_fix
+         fix_roi =  params_inst%sulman_rfix * params_inst%sulman_growth_fix * params_inst%sulman_tau_fix
       end if 
    else
-      fix_N_to_plant = 0.0_r8 ; fix_roi = 0.0_r8
+      N_to_plant_fix(p) = 0.0_r8 ; fix_roi = 0.0_r8
    end if 
 
-   fix_N_reservoir = fix_N_reservoir - fix_N_to_plant
+   N_reservoir(p,i_fixer) = N_reservoir(p,i_fixer) - N_to_plant_fix(p)
 
 
     ! Adding Smoothing filters to avoid abrupt N changes
@@ -1171,44 +1241,44 @@ contains
     scav_C_alloc = C_allocation_to_N_acq * scav_roi_frac * dt
 
    ! We are accumulating potential (not limited/smoothed) allocation so max allocation can increase over time
-    fix_alloc_accum = Nfix_alloc_accum + C_allocation_to_N_acq * fix_roi_frac * dt
+    fix_alloc_accum = fix_alloc_accum + C_allocation_to_N_acq * fix_roi_frac * dt
     mine_alloc_accum = mine_alloc_accum + C_allocation_to_N_acq * mine_roi_frac * dt
     scav_alloc_accum = scav_alloc_accum + C_allocation_to_N_acq * scav_roi_frac * dt
 
     ! real    :: root_exudate_N_frac = 0.0 ! N fraction of root exudates. See e.g. Drake et al 2013
     
     fix_N_alloc = 0.0
-    mine_N_alloc = mine_C_alloc*sp%root_exudate_N_frac
-    scav_N_alloc = scav_C_alloc*sp%root_exudate_N_frac
+    mine_N_alloc = mine_C_alloc*root_exudate_N_frac
+    scav_N_alloc = scav_C_alloc*root_exudate_N_frac
 
-    plant_N_storage = leafn_storage + frootn_storage + livecrootn_storage
+    plant_N_storage(p) = leafn_storage + frootn_storage + livecrootn_storage
 
     ! Make sure N allocation from plant to symbionts does not completely deplete stored N
-    if (plant_N_storage <= 0.0) then 
+    if (plant_N_storage(p) <= 0.0) then 
       fix_N_alloc=0.0
       mine_N_alloc=0.0
       scav_N_alloc=0.0
     elseif (fix_N_alloc + mine_N_alloc + scav_N_alloc > 0.0 .AND. &
-      fix_N_alloc + mine_N_alloc + scav_N_alloc > plant_N_storage * 0.1) then
+      fix_N_alloc + mine_N_alloc + scav_N_alloc > plant_N_storage(p) * 0.1) then
 
-      lim_factor = plant_N_storage * 0.1 / (fix_N_alloc + mine_N_alloc + scav_N_alloc)
+      lim_factor = plant_N_storage(p) * 0.1 / (fix_N_alloc + mine_N_alloc + scav_N_alloc)
 
-      fix_N_alloc=nfix_N_alloc*lim_factor
+      fix_N_alloc=fix_N_alloc*lim_factor
       mine_N_alloc=mine_N_alloc*lim_factor
       scav_N_alloc=scav_N_alloc*lim_factor
     endif
 
-    scav_C_reservoir = scav_C_reservoir + scav_C_alloc
-    scav_N_reservoir = scav_N_reservoir + scav_N_alloc
-    mine_C_reservoir = mine_C_reservoir + mine_C_alloc
-    mine_N_reservoir = mine_N_reservoir + mine_N_alloc
-    fix_C_reservoir =  fix_C_reservoir + fix_C_alloc
-    fix_N_reservoir =  fix_N_reservoir + fix_N_alloc
+    C_reservoir(p,i_scav) = C_reservoir(p,i_scav) + scav_C_alloc
+    N_reservoir(p,i_scav) = N_reservoir(p,i_scav) + scav_N_alloc
+    C_reservoir(p,i_miner) = C_reservoir(p,i_miner) + mine_C_alloc
+    N_reservoir(p,i_miner) = N_reservoir(p,i_miner) + mine_N_alloc
+    C_reservoir(p,i_fixer) = C_reservoir(p,i_fixer) + fix_C_alloc
+    N_reservoir(p,i_fixer) = N_reservoir(p,i_fixer) + fix_N_alloc
 
-    total_plant_N_uptake = scav_N_to_plant + mine_N_to_plant + fix_N_to_plant + root_N_uptake
-    plant_N_storage = plant_N_storage + total_plant_N_uptake
-    stored_N_loss = max(0.0,min(plant_N_storage), C_allocation_to_N_acq * dt *root_exudate_N_frac)
-    plant_N_storage = plant_N_storage - stored_N_loss
+    total_plant_N_uptake(p) = N_to_plant_scav(p) + N_to_plant_mine(p) + N_to_plant_fix(p) + root_N_uptake(p)
+    plant_N_storage(p) = plant_N_storage(p) + total_plant_N_uptake(p)
+    stored_N_loss = max(0.0_r8, min(plant_N_storage(p)), C_allocation_to_N_acq * dt *root_exudate_N_frac)
+    plant_N_storage(p) = plant_N_storage(p) - stored_N_loss
     root_exudate_N = stored_N_loss - scav_N_alloc - fix_N_alloc - mine_N_alloc
 
     root_exudate_C = C_allocation_to_N_acq * dt - scav_C_alloc - mine_C_alloc -  fix_C_alloc + reservoir_C_leakage
