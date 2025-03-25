@@ -291,7 +291,7 @@ contains
 
       sminn_to_plant_new(bounds%begc:bounds%endc)  =  0._r8
 
-      local_use_fun = use_fun
+      local_use_fun = use_fun .or. decomp_method == mimicsplus_decomp
 
       if_nitrif: if (.not. use_nitrif_denitrif) then
 
@@ -752,7 +752,7 @@ contains
             end do
          end do
 
-         if ( local_use_fun ) then
+         if ( local_use_fun .and. decomp_method /= mimicsplus_decomp ) then
             call t_startf( 'CNFUN' )
             call CNFUN(bounds,num_bgc_soilc,filter_bgc_soilc,num_bgc_vegp,filter_bgc_vegp,waterstatebulk_inst,&
                       waterfluxbulk_inst,temperature_inst,soilstate_inst,cnveg_state_inst,cnveg_carbonstate_inst,&
@@ -771,11 +771,41 @@ contains
                        soilbiogeochem_nitrogenflux_inst%sminn_to_plant_fun_nh4_vr_col(bounds%begc:bounds%endc,1:nlevdecomp),&
                        'unity')
             call t_stopf( 'CNFUN' )
+
+         else if ( decomp_method == mimicsplus_decomp ) then
+           ! call !routine !ECW
+   
          end if
+        
 
 
 
-         if(.not.local_use_fun)then
+      if (use_fun) then
+         do fc=1,num_bgc_soilc
+            c = filter_bgc_soilc(fc)
+            ! sum up N fluxes to plant after initial competition
+            sminn_to_plant(c) = 0._r8 !this isn't use in fun. 
+            do j = 1, nlevdecomp
+               if ((sminn_to_plant_fun_no3_vr(c,j)-smin_no3_to_plant_vr(c,j)).gt.0.0000000000001_r8) then
+                   write(iulog,*) 'problem with limitations on no3 uptake', &
+                              sminn_to_plant_fun_no3_vr(c,j),smin_no3_to_plant_vr(c,j)
+                   call endrun("too much NO3 uptake predicted by FUN")
+               end if
+!KO                  if ((sminn_to_plant_fun_nh4_vr(c,j)-smin_nh4_to_plant_vr(c,j)).gt.0.0000000000001_r8) then
+!KO
+               if ((sminn_to_plant_fun_nh4_vr(c,j)-smin_nh4_to_plant_vr(c,j)).gt.0.0000001_r8) then
+!KO
+                   write(iulog,*) 'problem with limitations on nh4 uptake', &
+                               sminn_to_plant_fun_nh4_vr(c,j),smin_nh4_to_plant_vr(c,j)
+                   call endrun("too much NH4 uptake predicted by FUN")
+               end if
+            end do
+         if (decomp_method == mimicsplus_decomp) then
+            !ECW add code
+         end if
+      end do
+
+         else
             do fc=1,num_bgc_soilc
                c = filter_bgc_soilc(fc)
                ! sum up N fluxes to plant after initial competition
@@ -786,29 +816,7 @@ contains
                   c = filter_bgc_soilc(fc)
                   sminn_to_plant(c) = sminn_to_plant(c) + sminn_to_plant_vr(c,j) * dzsoi_decomp(j)
                end do
-            end do
-         else
-            do fc=1,num_bgc_soilc
-               c = filter_bgc_soilc(fc)
-               ! sum up N fluxes to plant after initial competition
-               sminn_to_plant(c) = 0._r8 !this isn't use in fun. 
-               do j = 1, nlevdecomp
-                  if ((sminn_to_plant_fun_no3_vr(c,j)-smin_no3_to_plant_vr(c,j)).gt.0.0000000000001_r8) then
-                      write(iulog,*) 'problem with limitations on no3 uptake', &
-                                 sminn_to_plant_fun_no3_vr(c,j),smin_no3_to_plant_vr(c,j)
-                      call endrun("too much NO3 uptake predicted by FUN")
-                  end if
-!KO                  if ((sminn_to_plant_fun_nh4_vr(c,j)-smin_nh4_to_plant_vr(c,j)).gt.0.0000000000001_r8) then
-!KO
-                  if ((sminn_to_plant_fun_nh4_vr(c,j)-smin_nh4_to_plant_vr(c,j)).gt.0.0000001_r8) then
-!KO
-                      write(iulog,*) 'problem with limitations on nh4 uptake', &
-                                  sminn_to_plant_fun_nh4_vr(c,j),smin_nh4_to_plant_vr(c,j)
-                      call endrun("too much NH4 uptake predicted by FUN")
-                  end if
-               end do
-            end do
-
+            end do         
          end if
 
          if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then

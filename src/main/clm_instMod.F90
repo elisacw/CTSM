@@ -91,6 +91,7 @@ module clm_instMod
   use LakeCon                         , only : LakeConInit 
   use SoilBiogeochemPrecisionControlMod, only: SoilBiogeochemPrecisionControlInit
   use SoilWaterMovementMod            , only : use_aquifer_layer
+  use CNSoilVegMIMICSplus             , only : symbiont_type  
   !
   implicit none
   private  ! By default everything is private
@@ -148,6 +149,7 @@ module clm_instMod
   type(soilbiogeochem_carbonflux_type)   , public :: c14_soilbiogeochem_carbonflux_inst
   type(soilbiogeochem_nitrogenstate_type), public :: soilbiogeochem_nitrogenstate_inst
   type(soilbiogeochem_nitrogenflux_type) , public :: soilbiogeochem_nitrogenflux_inst
+  type(symbiont_type)                    , public :: symbiont_inst
 
   ! General biogeochem types
   type(ch4_type)      , public            :: ch4_inst
@@ -415,10 +417,12 @@ contains
        if (decomp_method == century_decomp ) then
           call init_decompcascade_bgc(bounds, soilbiogeochem_state_inst, &
                                       soilstate_inst )
-       else if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
+       else if (decomp_method == mimics_decomp) then
           call init_decompcascade_mimics(bounds, soilbiogeochem_state_inst, &
                                          soilstate_inst)
        end if
+
+       call symbiont_inst%Init(bounds)
 
        ! Initalize soilbiogeochem carbon types
 

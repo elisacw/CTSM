@@ -175,6 +175,7 @@ module SoilBiogeochemDecompCascadeMIMICSMod
      real(r8), allocatable :: mimics_tau_k(:)
      real(r8), allocatable :: sulman_cn_symbionts(:)     !C:N ratio of fixers, miners, scavengers as an array
      real(r8), allocatable :: sulman_initial_C_stocks(:) !Initial carbon stocks of fixers, miners, scavengers as an array
+     real(r8), allocatable :: symb_tau_som(:)            !Fraction symbiont necromass into soil organic matter pools
      
      ! Sulman parameter
      real(r8) :: sulman_cn_m          !Soil microbial C:N ratio
@@ -211,6 +212,9 @@ module SoilBiogeochemDecompCascadeMIMICSMod
      real(r8) :: sulman_tau_int       !Turnover time of intermediate C pool [s-1]
      real(r8) :: sulman_rup_veg       !Vegetation N uptake rate from intermediate N pool [s-1]
      real(r8) :: sulman_fnalloc       !Fraction of NPP allocated to N uptake per unit N stress [fraction]
+     real(r8) :: symb_tau_somc        !Fraction symbiont necromass into soil organic matter pools
+     real(r8) :: symb_tau_soma
+     real(r8) :: symb_tau_somp
      
   end type params_type
   !
@@ -647,6 +651,22 @@ contains
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%sulman_fnalloc=tempr
 
+    tString='symb_tau_somc'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%symb_tau_somc=tempr
+
+    tString='symb_tau_soma'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%symb_tau_soma=tempr
+
+    tString='symb_tau_somp'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%symb_tau_somp=tempr
+
+
     allocate(params_inst%sulman_cn_symbionts(4))
     tString='sulman_cn_symbionts'
     call ncd_io(trim(tString), params_inst%sulman_cn_symbionts(:), 'read', ncid, readvar=readv)
@@ -656,6 +676,12 @@ contains
     tString='sulman_initial_C_stocks'
     call ncd_io(trim(tString), params_inst%sulman_initial_C_stocks(:), 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+
+    allocate(params_inst%symb_tau_som(4))
+    tString='symb_tau_som'
+    call ncd_io(trim(tString), params_inst%symb_tau_som(:), 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+
 
 
     end if
