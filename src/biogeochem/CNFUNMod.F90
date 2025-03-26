@@ -192,7 +192,7 @@ module CNFUNMod
   ! Start the CNFUN subroutine
   !--------------------------------------------------------------------
   !---
-  subroutine CNFUN(bounds,num_soilc, filter_soilc,num_soilp&
+  subroutine CNFUN(bounds,num_soilc, filter_soilc,num_soilp &
        &,filter_soilp,waterstatebulk_inst, &
        & waterfluxbulk_inst,temperature_inst,soilstate_inst&
        &,cnveg_state_inst,cnveg_carbonstate_inst,&

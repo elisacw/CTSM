@@ -1016,15 +1016,15 @@ contains
 
        if(use_cn .or. use_fates_bgc)then
           call t_startf('ecosysdyn')
-          call bgc_vegetation_inst%EcosystemDynamicsPreDrainage(bounds_clump,            &
-               filter(nc)%num_bgc_soilc, filter(nc)%bgc_soilc,                       &
-               filter(nc)%num_bgc_vegp, filter(nc)%bgc_vegp,                       &
-               filter(nc)%num_actfirec, filter(nc)%actfirec,                 &
-               filter(nc)%num_actfirep, filter(nc)%actfirep,                 &
-               filter(nc)%num_pcropp, filter(nc)%pcropp, &
-               filter(nc)%num_soilnopcropp, filter(nc)%soilnopcropp, &
-               filter(nc)%num_exposedvegp, filter(nc)%exposedvegp, &
-               filter(nc)%num_noexposedvegp, filter(nc)%noexposedvegp, &
+          call bgc_vegetation_inst%EcosystemDynamicsPreDrainage(bounds_clump,  &
+               filter(nc)%num_bgc_soilc, filter(nc)%bgc_soilc,                 &
+               filter(nc)%num_bgc_vegp, filter(nc)%bgc_vegp,                   &
+               filter(nc)%num_actfirec, filter(nc)%actfirec,                   &
+               filter(nc)%num_actfirep, filter(nc)%actfirep,                   &
+               filter(nc)%num_pcropp, filter(nc)%pcropp,                       &
+               filter(nc)%num_soilnopcropp, filter(nc)%soilnopcropp,         &
+               filter(nc)%num_exposedvegp, filter(nc)%exposedvegp,           &
+               filter(nc)%num_noexposedvegp, filter(nc)%noexposedvegp,       &
                soilbiogeochem_carbonflux_inst, soilbiogeochem_carbonstate_inst,         &
                c13_soilbiogeochem_carbonflux_inst, c13_soilbiogeochem_carbonstate_inst, &
                c14_soilbiogeochem_carbonflux_inst, c14_soilbiogeochem_carbonstate_inst, &
@@ -1036,7 +1036,7 @@ contains
                water_inst%wateratm2lndbulk_inst, canopystate_inst, soilstate_inst, temperature_inst, &
                soil_water_retention_curve, crop_inst, ch4_inst, &
                photosyns_inst, saturated_excess_runoff_inst, energyflux_inst,          &
-               nutrient_competition_method, fireemis_inst)
+               nutrient_competition_method, fireemis_inst, symbiont_inst)
           call t_stopf('ecosysdyn')
        end if
 

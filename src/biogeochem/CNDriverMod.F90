@@ -85,7 +85,7 @@ contains
 
   !-----------------------------------------------------------------------
   subroutine CNDriverNoLeaching(bounds,                                                    &
-       num_bgc_soilc, filter_bgc_soilc, num_bgc_vegp, filter_bgc_vegp,                     &
+       num_bgc_soilc, filter_bgc_soilc, num_bgc_vegp, filter_bgc_vegp,   &
        num_pcropp, filter_pcropp, num_soilnopcropp, filter_soilnopcropp,                   &
        num_actfirec, filter_actfirec, num_actfirep, filter_actfirep,                       &
        num_exposedvegp, filter_exposedvegp, num_noexposedvegp, filter_noexposedvegp,       &
@@ -105,7 +105,8 @@ contains
        wateratm2lndbulk_inst, canopystate_inst, soilstate_inst, temperature_inst,          &
        soil_water_retention_curve, crop_inst, ch4_inst,                                    &
        dgvs_inst, photosyns_inst, saturated_excess_runoff_inst, energyflux_inst,           &
-       nutrient_competition_method, cnfire_method, dribble_crophrv_xsmrpool_2atm)
+       nutrient_competition_method, cnfire_method, dribble_crophrv_xsmrpool_2atm,          &
+       symbiont_inst)
     !
     ! !DESCRIPTION:
     ! The core CN code is executed here. Calculates fluxes for maintenance
@@ -148,6 +149,8 @@ contains
     use SoilBiogeochemNStateUpdate1Mod    , only: SoilBiogeochemNStateUpdate1
     use NutrientCompetitionMethodMod      , only: nutrient_competition_method_type
     use CNPrecisionControlMod             , only: CNPrecisionControl
+    use CNSoilVegMIMICSplus               , only: symbiont_type
+    use WaterFluxType                     , only: waterflux_type
     !
     ! !ARGUMENTS:
     type(bounds_type)                       , intent(in)    :: bounds  
@@ -209,6 +212,8 @@ contains
     class(fire_method_type)                 , intent(inout) :: cnfire_method
     logical                                 , intent(in)    :: dribble_crophrv_xsmrpool_2atm
     type(hlm_fates_interface_type)          , intent(inout) :: clm_fates
+    type(symbiont_type)                     , intent(inout) :: symbiont_inst 
+    
     !
     ! !LOCAL VARIABLES:
     real(r8):: cn_decomp_pools(bounds%begc:bounds%endc,1:nlevdecomp,1:ndecomp_pools)
@@ -474,14 +479,15 @@ contains
  
    
      call t_startf('soilbiogeochemcompetition')
-     call SoilBiogeochemCompetition (bounds, num_bgc_soilc, filter_bgc_soilc,num_bgc_vegp, filter_bgc_vegp, &
-                                     p_decomp_cn_gain, pmnf_decomp_cascade, waterstatebulk_inst, &
-                                     waterfluxbulk_inst,temperature_inst,soilstate_inst,cnveg_state_inst,          &
-                                     cnveg_carbonstate_inst               ,&
-                                     cnveg_carbonflux_inst,cnveg_nitrogenstate_inst,cnveg_nitrogenflux_inst,   &
-                                     soilbiogeochem_carbonflux_inst,&
-                                     soilbiogeochem_state_inst,soilbiogeochem_nitrogenstate_inst,              &
-                                     soilbiogeochem_nitrogenflux_inst,canopystate_inst)
+     call SoilBiogeochemCompetition  (bounds, num_bgc_soilc, filter_bgc_soilc, num_bgc_vegp, filter_bgc_vegp, &
+                                      p_decomp_cn_gain, pmnf_decomp_cascade, waterstatebulk_inst, &
+                                      waterfluxbulk_inst, temperature_inst,soilstate_inst,                          &
+                                      cnveg_state_inst,cnveg_carbonstate_inst,                                  &
+                                      cnveg_carbonflux_inst,cnveg_nitrogenstate_inst,cnveg_nitrogenflux_inst,   &
+                                      soilbiogeochem_carbonflux_inst,                                           &              
+                                      soilbiogeochem_state_inst, soilbiogeochem_nitrogenstate_inst,             &
+                                      soilbiogeochem_nitrogenflux_inst,canopystate_inst, symbiont_inst, &
+                                      soilbiogeochem_carbonstate_inst)
      call t_stopf('soilbiogeochemcompetition')
 
     ! distribute the available N between the competing patches  on the basis of 

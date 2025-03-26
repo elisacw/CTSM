@@ -165,14 +165,15 @@ contains
   end subroutine SoilBiogeochemCompetitionInit
 
   !-----------------------------------------------------------------------
-   subroutine SoilBiogeochemCompetition (bounds, num_bgc_soilc, filter_bgc_soilc,num_bgc_vegp, filter_bgc_vegp, &
+   subroutine SoilBiogeochemCompetition (bounds, num_bgc_soilc, filter_bgc_soilc, num_bgc_vegp, filter_bgc_vegp, &
                                          p_decomp_cn_gain, pmnf_decomp_cascade, waterstatebulk_inst, &
                                          waterfluxbulk_inst, temperature_inst,soilstate_inst,                          &
                                          cnveg_state_inst,cnveg_carbonstate_inst,                                  &
                                          cnveg_carbonflux_inst,cnveg_nitrogenstate_inst,cnveg_nitrogenflux_inst,   &
                                          soilbiogeochem_carbonflux_inst,                                           &              
                                          soilbiogeochem_state_inst, soilbiogeochem_nitrogenstate_inst,             &
-                                         soilbiogeochem_nitrogenflux_inst,canopystate_inst)
+                                         soilbiogeochem_nitrogenflux_inst,canopystate_inst, symbiont_inst, &
+                                         soilbiogeochem_carbonstate_inst)
     !
     ! !USES:
     use clm_varctl       , only: cnallocate_carbon_only, iulog
@@ -184,6 +185,9 @@ contains
     use subgridAveMod    , only: p2c
     use perf_mod         , only : t_startf, t_stopf
     use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, mimics_decomp, mimicsplus_decomp, decomp_method
+    use CNSoilVegMIMICSplus, only : CN_soil_veg_exchange, symbiont_type
+    use WaterFluxType      , only: waterflux_type
+    use SoilBiogeochemCarbonStateType      , only: soilbiogeochem_carbonstate_type
     !
     ! !ARGUMENTS:
     type(bounds_type)                       , intent(in)    :: bounds
@@ -206,7 +210,11 @@ contains
     type(soilbiogeochem_state_type)         , intent(inout) :: soilbiogeochem_state_inst
     type(soilbiogeochem_nitrogenstate_type) , intent(inout) :: soilbiogeochem_nitrogenstate_inst
     type(soilbiogeochem_nitrogenflux_type)  , intent(inout) :: soilbiogeochem_nitrogenflux_inst
-    type(canopystate_type)                  , intent(inout) :: canopystate_inst   
+    type(canopystate_type)                  , intent(inout) :: canopystate_inst  
+    type(symbiont_type)                     , intent(inout) :: symbiont_inst 
+    type(soilbiogeochem_carbonstate_type)   , intent(in)    :: soilbiogeochem_carbonstate_inst
+
+
 !
     !
     ! !LOCAL VARIABLES:
@@ -551,6 +559,7 @@ contains
                c = filter_bgc_soilc(fc)
                l = col%landunit(c)
 
+
                !  first compete for nh4
                sum_nh4_demand(c,j) = plant_ndemand(c) * nuptake_prof(c,j) + potential_immob_vr(c,j) + pot_f_nit_vr(c,j)
                sum_nh4_demand_scaled(c,j) = plant_ndemand(c)* nuptake_prof(c,j) * compet_plant_nh4 + &
@@ -773,8 +782,10 @@ contains
             call t_stopf( 'CNFUN' )
 
          else if ( decomp_method == mimicsplus_decomp ) then
-           ! call !routine !ECW
-   
+            call CN_soil_veg_exchange (filter_bgc_vegp, filter_bgc_soilc, num_bgc_vegp, num_bgc_soilc, bounds, symbiont_inst, &
+            cnveg_nitrogenstate_inst, waterstatebulk_inst, temperature_inst, cnveg_carbonflux_inst, &
+            soilbiogeochem_nitrogenstate_inst, soilbiogeochem_nitrogenflux_inst, &
+            waterfluxbulk_inst, soilstate_inst, cnveg_carbonstate_inst, soilbiogeochem_carbonstate_inst)
          end if
         
 

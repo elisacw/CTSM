@@ -31,6 +31,7 @@ module CNSoilVegMIMICSplus
   use WaterStateType                      , only : waterstate_type
   use SoilStateType                       , only : soilstate_type
   use WaterStateBulkType                  , only : waterstatebulk_type
+  use WaterFluxBulkType                   , only : waterfluxbulk_type
   use TemperatureType                     , only : temperature_type
   use pftconMod                           , only : pftcon, noveg
   use abortutils                          , only : endrun
@@ -134,8 +135,10 @@ contains
         endif
       endif
    enddo 
+   allocate(this%is_active(bounds%begp:bounds%endp,1:n_symb)) ; this%is_active(bounds%begp:bounds%endp,1:n_symb)=.false.
+  
+! if decomp_method ==N mimicsplus do that
    this%is_active(bounds%begp:bounds%endp,1:n_symb)=local_active(bounds%begp:bounds%endp,1:n_symb)
-
     call this%InitAllocate (bounds)
     call this%InitHistory (bounds)
     call this%InitCold (bounds)
@@ -338,7 +341,8 @@ contains
    subroutine CN_soil_veg_exchange (filter_soilp, filter_bgc_soilc, num_soilp, num_bgc_soilc, bounds, symbiont_inst, &
       cnveg_nitrogenstate_inst, waterstatebulk_inst, temperature_inst, cnveg_carbonflux_inst, &
       soilbiogeochem_nitrogenstate_inst, soilbiogeochem_nitrogenflux_inst, &
-      waterflux_inst, soilstate_inst, cnveg_carbonstate_inst, soilbiogeochem_carbonstate_inst)
+      waterfluxbulk_inst, soilstate_inst, cnveg_carbonstate_inst, soilbiogeochem_carbonstate_inst)
+
 
    ! !DESCRIPTION:
    !
@@ -363,7 +367,7 @@ contains
    type(temperature_type)                 , intent(in)    :: temperature_inst
    type(cnveg_carbonflux_type)            , intent(in)    :: cnveg_carbonflux_inst
    type(soilbiogeochem_nitrogenstate_type), intent(in)    :: soilbiogeochem_nitrogenstate_inst
-   type(waterflux_type)                   , intent(in)    :: waterflux_inst
+   type(waterfluxbulk_type)               , intent(in)    :: waterfluxbulk_inst
    type(soilstate_type)                   , intent(in)    :: soilstate_inst
    type(cnveg_carbonstate_type)           , intent(in)    :: cnveg_carbonstate_inst
    type(soilbiogeochem_carbonstate_type)  , intent(in)    :: soilbiogeochem_carbonstate_inst
@@ -672,8 +676,8 @@ end do
       do j = 1,nlevdecomp
          t_soi_degC = t_soisno(c,j) - tfrz     ! Soil temperature in degrees Celcius
          if (t_soi_degC < 0.01 .and. h2osoi_liq(c,j) > 0.0_r8) then
-            no3_passiv_up(p,j)= waterflux_inst%qflx_tran_veg_patch(p) * (smin_no3_avail(p,j) / h2osoi_liq(c,j))
-            nh4_passiv_up(p,j) = waterflux_inst%qflx_tran_veg_patch(p) * (smin_nh4_avail(p,j) / h2osoi_liq(c,j))
+            no3_passiv_up(p,j)= waterfluxbulk_inst%qflx_tran_veg_patch(p) * (smin_no3_avail(p,j) / h2osoi_liq(c,j))
+            nh4_passiv_up(p,j) = waterfluxbulk_inst%qflx_tran_veg_patch(p) * (smin_nh4_avail(p,j) / h2osoi_liq(c,j))
          end if
       enddo 
    enddo
@@ -710,7 +714,7 @@ end do
    do j = 1, nlevdecomp
       do p = bounds%begp,bounds%endp
        smin_no3_avail(p,j) = no3_passiv_up(p,j) + no3_active_up(p,j) + no3_scav_up(p,j) !sum of uptakes smin_nh4_to_plant_vr(c,j)
-       smin_nh4_avail(p,j) = nh4_passiv_up(p,j) + nh4_active_up(p,j) + nh4_scav_up(p,j)
+       smin_nh4_avail(p,j) = nh4_passiv_up(p,j) + nh4_active_up(p,j) + nh4_scav_up(p,j) 
       end do
       ! make patch to column
       call p2c(bounds, num_bgc_soilc, filter_bgc_soilc, smin_no3_avail(bounds%begp:bounds%endp,j), smin_no3_avail_col(bounds%begc:bounds%endc,j))

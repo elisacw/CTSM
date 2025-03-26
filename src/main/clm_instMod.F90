@@ -91,7 +91,7 @@ module clm_instMod
   use LakeCon                         , only : LakeConInit 
   use SoilBiogeochemPrecisionControlMod, only: SoilBiogeochemPrecisionControlInit
   use SoilWaterMovementMod            , only : use_aquifer_layer
-  use CNSoilVegMIMICSplus             , only : symbiont_type  
+  use CNSoilVegMIMICSplus             , only : symbiont_type   
   !
   implicit none
   private  ! By default everything is private

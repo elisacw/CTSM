@@ -949,7 +949,7 @@ contains
        wateratm2lndbulk_inst, canopystate_inst, soilstate_inst, temperature_inst, &
        soil_water_retention_curve, crop_inst, ch4_inst, &
        photosyns_inst, saturated_excess_runoff_inst, energyflux_inst,          &
-       nutrient_competition_method, fireemis_inst)
+       nutrient_competition_method, fireemis_inst, symbiont_inst)
     !
     ! !DESCRIPTION:
     ! Do the main science for biogeochemistry that needs to be done before hydrology-drainage
@@ -958,7 +958,8 @@ contains
     ! Will skip most vegetation patch calls for the latter
     !
     ! !USES:
-
+    use CNSoilVegMIMICSplus, only : symbiont_type
+    use WaterFluxType      , only: waterflux_type
     !
     ! !ARGUMENTS:
     class(cn_vegetation_type)               , intent(inout) :: this
@@ -1006,6 +1007,9 @@ contains
     class(nutrient_competition_method_type) , intent(inout) :: nutrient_competition_method
     type(fireemis_type)                     , intent(inout) :: fireemis_inst
     type(hlm_fates_interface_type)          , intent(inout) :: clm_fates
+    type(symbiont_type)                     , intent(inout) :: symbiont_inst 
+
+
     !
     ! !LOCAL VARIABLES:
 
@@ -1015,7 +1019,7 @@ contains
     call crop_inst%CropIncrementYear(num_pcropp, filter_pcropp)
 
     call CNDriverNoLeaching(bounds,                                         &
-         num_bgc_soilc, filter_bgc_soilc,                       &
+         num_bgc_soilc, filter_bgc_soilc,        &
          num_bgc_vegp, filter_bgc_vegp,                       &
          num_pcropp, filter_pcropp,                     &
          num_soilnopcropp, filter_soilnopcropp,         &
@@ -1040,7 +1044,7 @@ contains
          wateratm2lndbulk_inst, canopystate_inst, soilstate_inst, temperature_inst, &
          soil_water_retention_curve, crop_inst, ch4_inst, &
          this%dgvs_inst, photosyns_inst, saturated_excess_runoff_inst, energyflux_inst,          &
-         nutrient_competition_method, this%cnfire_method, this%dribble_crophrv_xsmrpool_2atm)
+         nutrient_competition_method, this%cnfire_method, this%dribble_crophrv_xsmrpool_2atm, symbiont_inst)
 
     ! fire carbon emissions 
     call CNFireEmisUpdate(bounds, num_bgc_vegp, filter_bgc_vegp, &
