@@ -27,6 +27,8 @@ module CNVegNitrogenFluxType
   use ColumnType                         , only : col                
   use PatchType                          , only : patch                
   use SparseMatrixMultiplyMod            , only : sparse_matrix_type, diag_matrix_type, vector_type
+  use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, decomp_method, mimics_decomp, mimicsplus_decomp, use_soil_matrixcn
+  
   ! 
   ! !PUBLIC TYPES:
   implicit none
@@ -280,10 +282,15 @@ module CNVegNitrogenFluxType
      real(r8), pointer :: sminn_to_plant_fun_vr_patch               (:,:)   ! Total layer soil N uptake of FUN  (gN/m2/s)
      real(r8), pointer :: sminn_to_plant_fun_no3_vr_patch           (:,:)   ! Total layer no3 uptake of FUN     (gN/m2/s)
      real(r8), pointer :: sminn_to_plant_fun_nh4_vr_patch           (:,:)   ! Total layer nh4 uptake of FUN     (gN/m2/s)
+     real(r8), pointer :: sminn_to_plant_mimicsplus_patch           (:,:)     ! Total soil N uptake of MIMICSplus (gN/m2/s)
+     real(r8), pointer :: sminn_to_plant_mimicsplus_vr_patch        (:,:)   ! Total layer soil N uptake of MIMICSplus  (gN/m2/s)
+     real(r8), pointer :: sminn_to_plant_mimicsplus_no3_vr_patch    (:,:)   ! Total layer no3 uptake of MIMICSplus     (gN/m2/s)
+     real(r8), pointer :: sminn_to_plant_mimicsplus_nh4_vr_patch    (:,:)   ! Total layer nh4 uptake of MIMICSplus     (gN/m2/s)
      real(r8), pointer :: cost_nfix_patch                           (:)     ! Average cost of fixation          (gN/m2/s)
      real(r8), pointer :: cost_nactive_patch                        (:)     ! Average cost of active uptake     (gN/m2/s)
      real(r8), pointer :: cost_nretrans_patch                       (:)     ! Average cost of retranslocation   (gN/m2/s)
      real(r8), pointer :: nuptake_npp_fraction_patch                (:)     ! frac of npp spent on N acquisition   (gN/m2/s)
+   
 	 ! Matrix
      real(r8), pointer :: matrix_nalloc_patch                       (:,:)   ! B-matrix for nitrogen allocation
      real(r8), pointer :: matrix_Ninput_patch                       (:)     ! I-matrix for nitrogen input
@@ -1051,6 +1058,13 @@ contains
     this%sminn_to_plant_fun_no3_vr_patch      (:,:) = nan
     allocate(this%sminn_to_plant_fun_nh4_vr_patch (begp:endp,1:nlevdecomp_full))  
     this%sminn_to_plant_fun_nh4_vr_patch      (:,:) = nan
+    allocate(this%sminn_to_plant_mimicsplus_patch    (begp:endp,1:nlevdecomp_full)) ;    this%sminn_to_plant_mimicsplus_patch    (:,:) = nan
+    allocate(this%sminn_to_plant_mimicsplus_vr_patch (begp:endp,1:nlevdecomp_full)) 
+    this%sminn_to_plant_mimicsplus_vr_patch          (:,:) = nan
+    allocate(this%sminn_to_plant_mimicsplus_no3_vr_patch (begp:endp,1:nlevdecomp_full))  
+    this%sminn_to_plant_mimicsplus_no3_vr_patch      (:,:) = nan
+    allocate(this%sminn_to_plant_mimicsplus_nh4_vr_patch (begp:endp,1:nlevdecomp_full))  
+    this%sminn_to_plant_mimicsplus_nh4_vr_patch      (:,:) = nan
     allocate(this%cost_nfix_patch              (begp:endp)) ;    this%cost_nfix_patch            (:) = nan
     allocate(this%cost_nactive_patch           (begp:endp)) ;    this%cost_nactive_patch         (:) = nan
     allocate(this%cost_nretrans_patch          (begp:endp)) ;    this%cost_nretrans_patch        (:) = nan
@@ -1846,7 +1860,12 @@ contains
        this%sminn_to_plant_fun_patch(begp:endp) = spval
        call hist_addfld1d (fname='SMINN_TO_PLANT_FUN', units='gN/m^2/s',&
             avgflag='A', long_name='Total soil N uptake of FUN',        &
-            ptr_patch=this%sminn_to_plant_fun_patch)      
+            ptr_patch=this%sminn_to_plant_fun_patch)    
+            
+      ! this%sminn_to_plant_mimicsplus_patch(begp:endp,:) = spval
+      ! call hist_addfld1d (fname='SMINN_TO_PLANT_MIMICSPLUS', units='gN/m^2/s',&
+      !      avgflag='A', long_name='Total soil N uptake of MIMICSPLUS',        &
+       !     ptr_patch=this%sminn_to_plant_mimicsplus_patch)    
        
        this%cost_nfix_patch(begp:endp)     = spval
        call hist_addfld1d (fname='COST_NFIX', units='gN/gC',            &
@@ -1972,6 +1991,15 @@ contains
              end do 
           end if
        end if
+
+       if (decomp_method == mimicsplus_decomp) then
+         this%sminn_to_plant_mimicsplus_patch(p,j)   = 0._r8
+         do j = 1, nlevdecomp
+            this%sminn_to_plant_mimicsplus_vr_patch(p,j)       = 0._r8
+            this%sminn_to_plant_mimicsplus_no3_vr_patch(p,j)   = 0._r8
+            this%sminn_to_plant_mimicsplus_nh4_vr_patch(p,j)   = 0._r8
+         end do 
+      end if
     end do
 
     ! initialize fields for special filters

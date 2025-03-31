@@ -286,7 +286,10 @@ contains
          actual_immob_vr              => soilbiogeochem_nitrogenflux_inst%actual_immob_vr_col          , & ! Output: [real(r8) (:,:) ]                                        
          sminn_to_plant_fun_vr        => soilbiogeochem_nitrogenflux_inst%sminn_to_plant_fun_vr_col    , & ! Iutput: [real(r8) (:)   ]  Total layer soil N uptake of FUN (gN/m2/s) 
          sminn_to_plant_fun_no3_vr    => soilbiogeochem_nitrogenflux_inst%sminn_to_plant_fun_no3_vr_col, & ! Iutput: [real(r8) (:)   ]  Total layer no3 uptake of FUN (gN/m2/s)
-         sminn_to_plant_fun_nh4_vr    => soilbiogeochem_nitrogenflux_inst%sminn_to_plant_fun_nh4_vr_col  & ! Iutput: [real(r8) (:)   ]  Total layer nh4 uptake of FUN (gN/m2/s)
+         sminn_to_plant_fun_nh4_vr    => soilbiogeochem_nitrogenflux_inst%sminn_to_plant_fun_nh4_vr_col, & ! Iutput: [real(r8) (:)   ]  Total layer nh4 uptake of FUN (gN/m2/s)
+         sminn_to_plant_mimicsplus_no3_vr   => soilbiogeochem_nitrogenflux_inst%sminn_to_plant_mimicsplus_no3_vr_col , & ! Output:[real(r8) (:,:) ]  Total layer soil NO3 uptake of MIMICSplus (gN/m2/s) 
+         sminn_to_plant_mimicsplus_nh4_vr   => soilbiogeochem_nitrogenflux_inst%sminn_to_plant_mimicsplus_nh4_vr_col   & ! Output:[real(r8) (:,:) ]  Total layer soil NH4 uptake of MIMICSplus (gN/m2/s)
+
          )
 
       ! calcualte nitrogen uptake profile
@@ -782,10 +785,22 @@ contains
             call t_stopf( 'CNFUN' )
 
          else if ( decomp_method == mimicsplus_decomp ) then
+            !smin_no3_to_plant_tmp = smin_no3_to_plant_vr
             call CN_soil_veg_exchange (filter_bgc_vegp, filter_bgc_soilc, num_bgc_vegp, num_bgc_soilc, bounds, symbiont_inst, &
             cnveg_nitrogenstate_inst, waterstatebulk_inst, temperature_inst, cnveg_carbonflux_inst, &
             soilbiogeochem_nitrogenstate_inst, soilbiogeochem_nitrogenflux_inst, &
-            waterfluxbulk_inst, soilstate_inst, cnveg_carbonstate_inst, soilbiogeochem_carbonstate_inst)
+            waterfluxbulk_inst, soilstate_inst, cnveg_carbonstate_inst, soilbiogeochem_carbonstate_inst, cnveg_nitrogenflux_inst)
+            call p2c(bounds,nlevdecomp, &
+                       cnveg_nitrogenflux_inst%sminn_to_plant_mimicsplus_no3_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp),&
+                       soilbiogeochem_nitrogenflux_inst%sminn_to_plant_mimicsplus_no3_vr_col(bounds%begc:bounds%endc,1:nlevdecomp),&
+                       'unity')
+
+            call p2c(bounds,nlevdecomp, &
+                       cnveg_nitrogenflux_inst%sminn_to_plant_mimicsplus_nh4_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp),&
+                       soilbiogeochem_nitrogenflux_inst%sminn_to_plant_mimicsplus_nh4_vr_col(bounds%begc:bounds%endc,1:nlevdecomp),&
+                       'unity')
+            call t_stopf( 'CN_soil_veg_exchange' )
+            !smin_no3_to_plant_vr is an output of exchange routine
          end if
         
 
@@ -811,10 +826,27 @@ contains
                    call endrun("too much NH4 uptake predicted by FUN")
                end if
             end do
-         if (decomp_method == mimicsplus_decomp) then
-            !ECW add code
-         end if
-      end do
+         end do
+
+         else if(decomp_method == mimicsplus_decomp) then !ECW add code
+         do fc=1,num_bgc_soilc
+            c = filter_bgc_soilc(fc)
+            ! sum up N fluxes to plant after initial competition
+            sminn_to_plant(c) = 0._r8 !this isn't use in fun. 
+            do j = 1, nlevdecomp
+               ! compare smin_no3_to_plant_vr (updated) to smin_no3_to_plant_tmp
+               if ((sminn_to_plant_mimicsplus_no3_vr(c,j)-smin_no3_to_plant_vr(c,j)).gt.0.0000000000001_r8) then
+                   write(iulog,*) 'problem with limitations on no3 uptake', &
+                              sminn_to_plant_mimicsplus_no3_vr(c,j),smin_no3_to_plant_vr(c,j)
+                   call endrun("too much NO3 uptake predicted by MIMICSplus")
+               end if
+               if ((sminn_to_plant_mimicsplus_nh4_vr(c,j)-smin_nh4_to_plant_vr(c,j)).gt.0.0000001_r8) then
+                   write(iulog,*) 'problem with limitations on nh4 uptake', &
+                               sminn_to_plant_mimicsplus_nh4_vr(c,j),smin_nh4_to_plant_vr(c,j)
+                   call endrun("too much NH4 uptake predicted by MIMICSplus")
+               end if
+             end do
+            end do
 
          else
             do fc=1,num_bgc_soilc
@@ -829,6 +861,7 @@ contains
                end do
             end do         
          end if
+      
 
          if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
             do j = 1, nlevdecomp

@@ -17,6 +17,8 @@ module SoilBiogeochemNStateUpdate1Mod
   use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con
   use CNSharedParamsMod                  , only : use_fun
   use ColumnType                         , only : col 
+  use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, decomp_method, mimics_decomp, mimicsplus_decomp, use_soil_matrixcn
+ 
   !
   implicit none
   private
@@ -234,14 +236,20 @@ contains
                ns%smin_no3_vr_col(c,j) = ns%smin_no3_vr_col(c,j) - nf%actual_immob_no3_vr_col(c,j)*dt
 
                ! plant uptake fluxes
-               if ( .not. use_fun )then
-                  ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) - nf%smin_nh4_to_plant_vr_col(c,j)*dt
-
-                  ns%smin_no3_vr_col(c,j) = ns%smin_no3_vr_col(c,j) - nf%smin_no3_to_plant_vr_col(c,j)*dt
-               else 
+               if ( use_fun )then
                   ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) -  nf%sminn_to_plant_fun_nh4_vr_col(c,j)*dt
 
                   ns%smin_no3_vr_col(c,j) = ns%smin_no3_vr_col(c,j) -  nf%sminn_to_plant_fun_no3_vr_col(c,j)*dt
+               
+               else if ( decomp_method == mimicsplus_decomp) then
+                  ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) -  nf%sminn_to_plant_mimicsplus_nh4_vr_col(c,j)*dt
+
+                  ns%smin_no3_vr_col(c,j) = ns%smin_no3_vr_col(c,j) -  nf%sminn_to_plant_mimicsplus_no3_vr_col(c,j)*dt
+               
+               else
+                  ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) - nf%smin_nh4_to_plant_vr_col(c,j)*dt
+
+                  ns%smin_no3_vr_col(c,j) = ns%smin_no3_vr_col(c,j) - nf%smin_no3_to_plant_vr_col(c,j)*dt
                end if
              
 

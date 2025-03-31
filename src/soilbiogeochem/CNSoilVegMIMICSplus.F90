@@ -341,7 +341,7 @@ contains
    subroutine CN_soil_veg_exchange (filter_soilp, filter_bgc_soilc, num_soilp, num_bgc_soilc, bounds, symbiont_inst, &
       cnveg_nitrogenstate_inst, waterstatebulk_inst, temperature_inst, cnveg_carbonflux_inst, &
       soilbiogeochem_nitrogenstate_inst, soilbiogeochem_nitrogenflux_inst, &
-      waterfluxbulk_inst, soilstate_inst, cnveg_carbonstate_inst, soilbiogeochem_carbonstate_inst)
+      waterfluxbulk_inst, soilstate_inst, cnveg_carbonstate_inst, soilbiogeochem_carbonstate_inst, cnveg_nitrogenflux_inst)
 
 
    ! !DESCRIPTION:
@@ -357,6 +357,7 @@ contains
    use SoilBiogeochemCarbonStateType      , only: soilbiogeochem_carbonstate_type
    use SoilBiogeochemNitrogenStateType    , only: soilbiogeochem_nitrogenstate_type   
    use subgridAveMod                      , only: p2c
+   use CNVegnitrogenfluxType           , only : cnveg_nitrogenflux_type
    !
    ! !ARGUMENTS:
    type(symbiont_type)                    , intent(inout) :: symbiont_inst
@@ -371,6 +372,7 @@ contains
    type(soilstate_type)                   , intent(in)    :: soilstate_inst
    type(cnveg_carbonstate_type)           , intent(in)    :: cnveg_carbonstate_inst
    type(soilbiogeochem_carbonstate_type)  , intent(in)    :: soilbiogeochem_carbonstate_inst
+   type(cnveg_nitrogenflux_type)           , intent(inout) :: cnveg_nitrogenflux_inst
 
    integer                                , intent(in)    :: num_soilp           ! number of soil patches in filter
    integer                                , intent(in)    :: filter_soilp(:)     ! filter for soil patches
@@ -384,7 +386,7 @@ contains
    real(r8), parameter :: N_stress_max = 2.0_r8                         ! Maximum nitrogen demand of plant [-]
    real(r8) :: N_stress(bounds%begp:bounds%endp)                        ! Nitrogen demand of [-]
    real(r8) :: t_soi_degC                                               ! Soil temperature [degrees Celcius]
-   real(r8) :: C_allocation_to_N_acq(bounds%begp:bounds%endp)                      ! Carbon allocated to nitrogen acquisition [gC/m2/s)]
+   real(r8) :: C_allocation_to_N_acq(bounds%begp:bounds%endp)           ! Carbon allocated to nitrogen acquisition [gC/m2/s)]
    real(r8) :: root_dens_frac(bounds%begp:bounds%endp,1:nlevdecomp)     ! Fraction of root density [-]
    real(r8) :: root_dens_sum                                            ! sum of fraction of roots for carbon in each soil layer and fine root carbon [gC/m2]
    real(r8) :: froot_carbon(bounds%begp:bounds%endp)                    ! fine root biomass [gC/m2]
@@ -395,8 +397,8 @@ contains
    real(r8) :: smin_no3_avail_col(bounds%begc:bounds%endc, 1:nlevdecomp)    ! col no3 available for uptake per soil layer [gN/m2]
    real(r8) :: smin_nh4_avail_col(bounds%begc:bounds%endc, 1:nlevdecomp)    ! col nh4 available for uptake per soil layer [gN/m2]
       
-
-   real(r8) :: total_inorgN_uptake(bounds%begp:bounds%endp, 1:nlevdecomp) ! total uptake from inorganic Nitrogen pool [gN/m2]
+   !real(r8) :: total_inorg_no3_uptake(bounds%begp:bounds%endp, 1:nlevdecomp) ! total uptake from inorganic Nitrogen pool [gN/m2]
+   !real(r8) :: total_inorg_nh4_uptake(bounds%begp:bounds%endp, 1:nlevdecomp) ! total uptake from inorganic Nitrogen pool [gN/m2]
    real(r8) :: no3_passiv_up(bounds%begp:bounds%endp,1:nlevdecomp)   ! Passive root NO3 (nitrate) uptake [gN/m2]
    real(r8) :: nh4_passiv_up(bounds%begp:bounds%endp,1:nlevdecomp)   ! Passive root NH4 (ammonium) uptake [gN/m2]
    real(r8) :: no3_active_up(bounds%begp:bounds%endp,1:nlevdecomp)   ! Active root NO3 (nitrate) uptake [gN/m2]
@@ -496,6 +498,11 @@ contains
    smin_no3_to_plant_vr => soilbiogeochem_nitrogenflux_inst%smin_no3_to_plant_vr_col , & ! Input:  col vertically-resolved plant uptake of soil NO3 [real(r8) (:,:) ]  (gN/m3/s)
    smin_nh4_to_plant_vr => soilbiogeochem_nitrogenflux_inst%smin_nh4_to_plant_vr_col , & ! Input:  col vertically-resolved plant uptake of soil NH4 [real(r8) (:,:) ]  (gN/m3/s)
    
+   total_inorgN_uptake     => cnveg_nitrogenflux_inst%sminn_to_plant_mimicsplus_patch        , & ! Output:[real(r8) (:) ]  Total soil N uptake of MIMICSplus (gN/m2/s)
+   total_inorgN_uptake_vr  => cnveg_nitrogenflux_inst%sminn_to_plant_mimicsplus_vr_patch            , & ! Output:[real(r8) (:,:) ]  Total layer soil N uptake of MIMICSplus (gN/m2/s) 
+   total_inorg_no3_uptake  => cnveg_nitrogenflux_inst%sminn_to_plant_mimicsplus_no3_vr_patch , & ! Output:[real(r8) (:,:) ]  Total layer soil NO3 uptake of MIMICSplus (gN/m2/s) 
+   total_inorg_nh4_uptake  => cnveg_nitrogenflux_inst%sminn_to_plant_mimicsplus_nh4_vr_patch , & ! Output:[real(r8) (:,:) ]  Total layer soil NH4 uptake of MIMICSplus (gN/m2/s)
+
    decomp_cpools_vr     => soilbiogeochem_carbonstate_inst%decomp_cpools_vr_col   , &  ! Input: [real(r8) (:,:,:) ] (gC/m3)  vertically-resolved decomposing (litter, cwd, soil) C pools
    decomp_npools_vr     => soilbiogeochem_nitrogenstate_inst%decomp_npools_vr_col , &  ! Input: [real(r8) (:,:,:) ] (gN/m3)  vertically-resolved decomposing (litter, cwd, soil) N pools
          
@@ -690,27 +697,31 @@ end do
       c = patch%column(p)
 
       do j = 1, nlevdecomp
-         total_inorgN_uptake(p,j) = (no3_passiv_up(p,j) + no3_active_up(p,j) + no3_scav_up(p,j)) * dt
- 
+         !ECW do I need to divide by dz?
+         total_inorg_no3_uptake(p,j) = (no3_passiv_up(p,j) + no3_active_up(p,j) + no3_scav_up(p,j)) * dt
          ! If nitrogen uptake exceeds avaliable nitrogen, scale each uptake pathway down
-         if (total_inorgN_uptake(p,j) > smin_no3_avail(p,j)) then 
-           no3_passiv_up(p,j)  = no3_passiv_up(p,j)  * (smin_no3_avail(p,j) / total_inorgN_uptake(p,j))
-           no3_active_up(p,j)  = no3_active_up(p,j)  * (smin_no3_avail(p,j) / total_inorgN_uptake(p,j))
-           no3_scav_up(p,j)    = no3_scav_up(p,j)    * (smin_no3_avail(p,j) / total_inorgN_uptake(p,j))
+         if (total_inorg_no3_uptake(p,j) > smin_no3_avail(p,j)) then 
+           no3_passiv_up(p,j)  = no3_passiv_up(p,j)  * (smin_no3_avail(p,j) / total_inorg_no3_uptake(p,j))
+           no3_active_up(p,j)  = no3_active_up(p,j)  * (smin_no3_avail(p,j) / total_inorg_no3_uptake(p,j))
+           no3_scav_up(p,j)    = no3_scav_up(p,j)    * (smin_no3_avail(p,j) / total_inorg_no3_uptake(p,j))
          endif
-         total_inorgN_uptake(p,j) = (nh4_passiv_up(p,j) + nh4_active_up(p,j) + nh4_scav_up(p,j)) * dt
-         if (total_inorgN_uptake(p,j) > smin_nh4_avail(p,j)) then 
-            nh4_passiv_up(p,j)  = nh4_passiv_up(p,j)  * (smin_nh4_avail(p,j) / total_inorgN_uptake(p,j))
-            nh4_active_up(p,j)  = nh4_active_up(p,j)  * (smin_nh4_avail(p,j) / total_inorgN_uptake(p,j))
-            nh4_scav_up(p,j)    = nh4_scav_up(p,j)    * (smin_nh4_avail(p,j) / total_inorgN_uptake(p,j))
+
+         total_inorg_nh4_uptake(p,j) = (nh4_passiv_up(p,j) + nh4_active_up(p,j) + nh4_scav_up(p,j)) * dt
+         if (total_inorg_nh4_uptake(p,j) > smin_nh4_avail(p,j)) then 
+            nh4_passiv_up(p,j)  = nh4_passiv_up(p,j)  * (smin_nh4_avail(p,j) / total_inorg_nh4_uptake(p,j))
+            nh4_active_up(p,j)  = nh4_active_up(p,j)  * (smin_nh4_avail(p,j) / total_inorg_nh4_uptake(p,j))
+            nh4_scav_up(p,j)    = nh4_scav_up(p,j)    * (smin_nh4_avail(p,j) / total_inorg_nh4_uptake(p,j))
           endif
+         
+         total_inorgN_uptake(p,j) = total_inorg_nh4_uptake(p,j) + total_inorg_no3_uptake(p,j)
       end do
    enddo
 
+   ! smin_no3_to_plant_vr_col
 
-
-   !SUS
+   ! SUS
    ! smin_avail is the inorganic N avaliable for plant uptake and should equal the sum of all uptakes
+   !ECW why?
    do j = 1, nlevdecomp
       do p = bounds%begp,bounds%endp
        smin_no3_avail(p,j) = no3_passiv_up(p,j) + no3_active_up(p,j) + no3_scav_up(p,j) !sum of uptakes smin_nh4_to_plant_vr(c,j)
