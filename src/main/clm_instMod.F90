@@ -417,7 +417,8 @@ contains
        if (decomp_method == century_decomp ) then
           call init_decompcascade_bgc(bounds, soilbiogeochem_state_inst, &
                                       soilstate_inst )
-       else if (decomp_method == mimics_decomp) then
+       else if (decomp_method == mimics_decomp .or. &
+               decomp_method == mimicsplus_decomp) then
           call init_decompcascade_mimics(bounds, soilbiogeochem_state_inst, &
                                          soilstate_inst)
        end if

@@ -8,7 +8,8 @@ module SoilBiogeochemCompetitionMod
   use shr_kind_mod                    , only : r8 => shr_kind_r8
   use shr_log_mod                     , only : errMsg => shr_log_errMsg
   use clm_varcon                      , only : dzsoi_decomp
-  use clm_varctl                      , only : use_nitrif_denitrif
+  use clm_varctl                      , only : use_nitrif_denitrif,iulog
+  use spmdMod                         , only : masterproc
   use abortutils                      , only : endrun
   use decompMod                       , only : bounds_type
   use SoilBiogeochemStateType         , only : soilbiogeochem_state_type
@@ -30,6 +31,7 @@ module SoilBiogeochemCompetitionMod
   use TemperatureType                 , only : temperature_type
   use SoilStateType                   , only : soilstate_type
   use CanopyStateType                 , only : CanopyState_type
+  use clm_varpar                          , only : i_met_lit, i_str_lit, i_phys_som, i_chem_som
   !
   implicit none
   private
@@ -385,7 +387,7 @@ contains
             end do
          end do
 
-         if ( local_use_fun ) then
+         if ( use_fun ) then
             call t_startf( 'CNFUN' )
             call CNFUN(bounds,num_bgc_soilc,filter_bgc_soilc,num_bgc_vegp,filter_bgc_vegp,waterstatebulk_inst, &
                       waterfluxbulk_inst,temperature_inst,soilstate_inst,cnveg_state_inst,cnveg_carbonstate_inst,&
@@ -786,6 +788,10 @@ contains
 
          else if ( decomp_method == mimicsplus_decomp ) then
             !smin_no3_to_plant_tmp = smin_no3_to_plant_vr
+            if(masterproc) then
+               write(iulog,*) 'ECW before', i_chem_som,i_phys_som, i_oli_mic
+            endif
+            call t_startf( 'CN_soil_veg_exchange' )
             call CN_soil_veg_exchange (filter_bgc_vegp, filter_bgc_soilc, num_bgc_vegp, num_bgc_soilc, bounds, symbiont_inst, &
             cnveg_nitrogenstate_inst, waterstatebulk_inst, temperature_inst, cnveg_carbonflux_inst, &
             soilbiogeochem_nitrogenstate_inst, soilbiogeochem_nitrogenflux_inst, &
@@ -828,7 +834,7 @@ contains
             end do
          end do
 
-         else if(decomp_method == mimicsplus_decomp) then !ECW add code
+         else if(decomp_method == mimicsplus_decomp) then !ECW add code !ROSIE, here I followed the FUN code
          do fc=1,num_bgc_soilc
             c = filter_bgc_soilc(fc)
             ! sum up N fluxes to plant after initial competition

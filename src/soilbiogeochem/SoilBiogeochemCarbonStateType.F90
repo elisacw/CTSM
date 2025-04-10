@@ -220,6 +220,9 @@ contains
        this%decomp_cpools_col(begc:endc,:) = spval
        do l  = 1, ndecomp_pools
           if ( nlevdecomp_full > 1 ) then
+            if(masterproc) then
+               write(iulog,*),'ECW: ',l, trim(decomp_cascade_con%decomp_pool_name_history(l))
+            endif
              data2dptr => this%decomp_cpools_vr_col(:,1:nlevsoi,l)
              fieldname = trim(decomp_cascade_con%decomp_pool_name_history(l))//'_C_vr'
              longname =  trim(decomp_cascade_con%decomp_pool_name_history(l))//' C (vertically resolved)'

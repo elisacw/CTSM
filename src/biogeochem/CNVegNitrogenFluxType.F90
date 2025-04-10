@@ -282,7 +282,7 @@ module CNVegNitrogenFluxType
      real(r8), pointer :: sminn_to_plant_fun_vr_patch               (:,:)   ! Total layer soil N uptake of FUN  (gN/m2/s)
      real(r8), pointer :: sminn_to_plant_fun_no3_vr_patch           (:,:)   ! Total layer no3 uptake of FUN     (gN/m2/s)
      real(r8), pointer :: sminn_to_plant_fun_nh4_vr_patch           (:,:)   ! Total layer nh4 uptake of FUN     (gN/m2/s)
-     real(r8), pointer :: sminn_to_plant_mimicsplus_patch           (:,:)     ! Total soil N uptake of MIMICSplus (gN/m2/s)
+     real(r8), pointer :: sminn_to_plant_mimicsplus_patch           (:)     ! Total soil N uptake of MIMICSplus (gN/m2/s)
      real(r8), pointer :: sminn_to_plant_mimicsplus_vr_patch        (:,:)   ! Total layer soil N uptake of MIMICSplus  (gN/m2/s)
      real(r8), pointer :: sminn_to_plant_mimicsplus_no3_vr_patch    (:,:)   ! Total layer no3 uptake of MIMICSplus     (gN/m2/s)
      real(r8), pointer :: sminn_to_plant_mimicsplus_nh4_vr_patch    (:,:)   ! Total layer nh4 uptake of MIMICSplus     (gN/m2/s)
@@ -1058,7 +1058,7 @@ contains
     this%sminn_to_plant_fun_no3_vr_patch      (:,:) = nan
     allocate(this%sminn_to_plant_fun_nh4_vr_patch (begp:endp,1:nlevdecomp_full))  
     this%sminn_to_plant_fun_nh4_vr_patch      (:,:) = nan
-    allocate(this%sminn_to_plant_mimicsplus_patch    (begp:endp,1:nlevdecomp_full)) ;    this%sminn_to_plant_mimicsplus_patch    (:,:) = nan
+    allocate(this%sminn_to_plant_mimicsplus_patch    (begp:endp) );    this%sminn_to_plant_mimicsplus_patch    (:) = nan
     allocate(this%sminn_to_plant_mimicsplus_vr_patch (begp:endp,1:nlevdecomp_full)) 
     this%sminn_to_plant_mimicsplus_vr_patch          (:,:) = nan
     allocate(this%sminn_to_plant_mimicsplus_no3_vr_patch (begp:endp,1:nlevdecomp_full))  
@@ -1860,12 +1860,7 @@ contains
        this%sminn_to_plant_fun_patch(begp:endp) = spval
        call hist_addfld1d (fname='SMINN_TO_PLANT_FUN', units='gN/m^2/s',&
             avgflag='A', long_name='Total soil N uptake of FUN',        &
-            ptr_patch=this%sminn_to_plant_fun_patch)    
-            
-      ! this%sminn_to_plant_mimicsplus_patch(begp:endp,:) = spval
-      ! call hist_addfld1d (fname='SMINN_TO_PLANT_MIMICSPLUS', units='gN/m^2/s',&
-      !      avgflag='A', long_name='Total soil N uptake of MIMICSPLUS',        &
-       !     ptr_patch=this%sminn_to_plant_mimicsplus_patch)    
+            ptr_patch=this%sminn_to_plant_fun_patch)      
        
        this%cost_nfix_patch(begp:endp)     = spval
        call hist_addfld1d (fname='COST_NFIX', units='gN/gC',            &
@@ -1887,8 +1882,15 @@ contains
             avgflag='A', long_name='frac of NPP used in N uptake',       &
             ptr_patch=this%nuptake_npp_fraction_patch)
                   
-     
     end if
+
+    if (decomp_method == mimicsplus_decomp) then
+
+    this%sminn_to_plant_mimicsplus_patch(begp:endp) = spval
+    call hist_addfld1d (fname='SMINN_TO_PLANT_MIMICSPLUS', units='gN/m^2/s', &
+         avgflag='A', long_name='Total soil N uptake of MIMICSPLUS',        &
+         ptr_patch=this%sminn_to_plant_mimicsplus_patch)  
+    end if 
 
   end subroutine InitHistory
 
@@ -1993,7 +1995,7 @@ contains
        end if
 
        if (decomp_method == mimicsplus_decomp) then
-         this%sminn_to_plant_mimicsplus_patch(p,j)   = 0._r8
+         this%sminn_to_plant_mimicsplus_patch(p)   = 0._r8
          do j = 1, nlevdecomp
             this%sminn_to_plant_mimicsplus_vr_patch(p,j)       = 0._r8
             this%sminn_to_plant_mimicsplus_no3_vr_patch(p,j)   = 0._r8

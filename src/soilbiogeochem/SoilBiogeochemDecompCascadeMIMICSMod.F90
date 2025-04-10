@@ -11,7 +11,7 @@ module SoilBiogeochemDecompCascadeMIMICSMod
   use shr_log_mod                        , only : errMsg => shr_log_errMsg
   use clm_varpar                         , only : nlevdecomp, ndecomp_pools_max
   use clm_varpar                         , only : i_met_lit, i_cop_mic, i_oli_mic, i_cwd
-  use clm_varpar                         , only : i_litr_min, i_litr_max, i_cwdl2
+  use clm_varpar                         , only : i_litr_min, i_litr_max, i_cwdl2, i_avl_som,i_chem_som,i_phys_som
   use clm_varctl                         , only : iulog, spinup_state, anoxia, use_lch4, use_fates
   use clm_varcon                         , only : zsoi
   use decompMod                          , only : bounds_type
@@ -54,9 +54,6 @@ module SoilBiogeochemDecompCascadeMIMICSMod
 
   private :: r_moist                            ! calculates moisture modifier according to CORPSE
 
-  integer, private :: i_phys_som  ! index of physically protected Soil Organic Matter (SOM)
-  integer, private :: i_chem_som  ! index of chemically protected SOM
-  integer, private :: i_avl_som  ! index of available (aka active) SOM
   integer, private :: i_str_lit  ! index of structural litter pool
   integer, private :: i_l1m1  ! indices of transitions, eg l1m1: litter 1 -> first microbial pool
   integer, private :: i_l1m2
@@ -922,6 +919,11 @@ contains
       is_metabolic(i_phys_som) = .false.
       is_cellulose(i_phys_som) = .false.
       is_lignin(i_phys_som) = .false.
+
+
+      if(masterproc) then
+         write(iulog,*) 'ECW ISOM', i_avl_som,i_chem_som,i_phys_som
+      endif
 
       i_cop_mic = i_phys_som + 1
       floating_cn_ratio_decomp_pools(i_cop_mic) = .true.
