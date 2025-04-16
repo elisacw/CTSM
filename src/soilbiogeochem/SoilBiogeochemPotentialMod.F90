@@ -176,6 +176,9 @@ contains
             do fc = 1,num_bgc_soilc
                c = filter_bgc_soilc(fc)
 
+               !ROSIE Here calculate mortality of symbiont pools and add to SOM pools
+               !maybe do calculations for dead symbionts in mimicsplus or here
+               !pass pools size and frac in here and calculate it
                if (decomp_cpools_vr(c,j,cascade_donor_pool(k)) > 0._r8 .and. &
                     decomp_k(c,j,cascade_donor_pool(k)) > 0._r8 ) then
                   p_decomp_cpool_loss(c,j,k) = decomp_cpools_vr(c,j,cascade_donor_pool(k)) &

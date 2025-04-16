@@ -10,7 +10,7 @@ module SoilBiogeochemDecompCascadeMIMICSMod
   use shr_const_mod                      , only : SHR_CONST_TKFRZ
   use shr_log_mod                        , only : errMsg => shr_log_errMsg
   use clm_varpar                         , only : nlevdecomp, ndecomp_pools_max
-  use clm_varpar                         , only : i_met_lit, i_cop_mic, i_oli_mic, i_cwd
+  use clm_varpar                         , only : i_met_lit, i_cop_mic, i_oli_mic, i_cwd, i_str_lit
   use clm_varpar                         , only : i_litr_min, i_litr_max, i_cwdl2, i_avl_som,i_chem_som,i_phys_som
   use clm_varctl                         , only : iulog, spinup_state, anoxia, use_lch4, use_fates
   use clm_varcon                         , only : zsoi
@@ -54,7 +54,6 @@ module SoilBiogeochemDecompCascadeMIMICSMod
 
   private :: r_moist                            ! calculates moisture modifier according to CORPSE
 
-  integer, private :: i_str_lit  ! index of structural litter pool
   integer, private :: i_l1m1  ! indices of transitions, eg l1m1: litter 1 -> first microbial pool
   integer, private :: i_l1m2
   integer, private :: i_l2m1
@@ -1082,6 +1081,17 @@ contains
       cascade_donor_pool(i_m2s3) = i_oli_mic
       cascade_receiver_pool(i_m2s3) = i_phys_som
       nue_decomp_cascade(i_m2s3) = 1.0_r8
+
+    !  if (decomp_method == mimicsplus_decomp) then 
+     !    i_scavs1 = 15
+      !   decomp_cascade_con%cascade_step_name(i_scavs1) = 'SCAVS1'
+       !  cascade_donor_pool(i_scavs1) = i_scav
+        ! cascade_receiver_pool(i_scavs1) = i_avail
+        ! nue_decomp_cascade(i_scavs1) = 1.0_r8
+     ! end if
+
+      !ROSIE add option for mimicsplus
+      ! add Fixer, miner and scav pools 
 
       if (.not. use_fates) then
          i_cwdl2 = 15

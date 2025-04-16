@@ -9,7 +9,7 @@ module CNCStateUpdate1Mod
   use clm_varpar                         , only : ndecomp_cascade_transitions, nlevdecomp
   use clm_time_manager                   , only : get_step_size_real
   use clm_varpar                         , only : i_litr_min, i_litr_max, i_cwd
-  use clm_varpar                         , only : i_met_lit, i_str_lit, i_phys_som, i_chem_som
+  use clm_varpar                         , only : i_met_lit, i_str_lit, i_phys_som, i_avl_som, i_chem_som
   use pftconMod                          , only : npcropmin, nc3crop, pftcon
   use abortutils                         , only : endrun
   use decompMod                          , only : bounds_type
@@ -138,7 +138,7 @@ contains
   subroutine CStateUpdate1( num_soilc, filter_soilc, num_soilp, filter_soilp, &
        crop_inst, cnveg_carbonflux_inst, cnveg_carbonstate_inst, &
        soilbiogeochem_carbonflux_inst, dribble_crophrv_xsmrpool_2atm, &
-       clm_fates, clump_index)
+       clm_fates, clump_index, symbiont_inst)
     !
     ! !DESCRIPTION:
     ! On the radiation time step, update all the prognostic carbon state
@@ -146,6 +146,7 @@ contains
     !
     use clm_varctl    , only : carbon_resp_opt
     use CNVegMatrixMod, only : matrix_update_phc
+    use CNSoilVegMIMICSplus, only: symbiont_type, calc_enzymes
     ! !ARGUMENTS:
     integer                              , intent(in)    :: num_soilc       ! number of soil columns filter
     integer                              , intent(in)    :: filter_soilc(:) ! filter for soil columns
@@ -155,6 +156,8 @@ contains
     type(cnveg_carbonflux_type)          , intent(inout) :: cnveg_carbonflux_inst ! See note below for xsmrpool_to_atm_patch
     type(cnveg_carbonstate_type)         , intent(inout) :: cnveg_carbonstate_inst
     type(soilbiogeochem_carbonflux_type) , intent(inout) :: soilbiogeochem_carbonflux_inst
+    type(symbiont_type)                  , intent(inout) :: symbiont_inst 
+    
     logical                              , intent(in)    :: dribble_crophrv_xsmrpool_2atm
     type(hlm_fates_interface_type)       , intent(inout) :: clm_fates
     integer                              , intent(in)    :: clump_index
@@ -166,13 +169,15 @@ contains
     real(r8) :: check_cpool
     real(r8) :: cpool_delta
     real(r8), parameter :: kprod05 = 1.44e-7_r8  ! decay constant for 0.5-year product pool (1/s) (lose ~90% over a half year)
+    real(r8), parameter :: symb_tau_soma = 0.4_r8 !ECW change maybe to more going into somc & p
+    real(r8), parameter :: symb_tau_somc = 0.3_r8
+    real(r8), parameter :: symb_tau_somp = 0.3_r8
     !-----------------------------------------------------------------------
 
     associate(                                                               & 
-         ivt                   => patch%itype                                , & ! Input:  [integer  (:)     ]  patch vegetation type                                
-         mimics_fi             => pftcon%mimics_fi                     , & ! Input: MIMICSplus parameter fi        
+         ivt                   => patch%itype                              , & ! Input:  [integer  (:)     ]  patch vegetation type                                
+         mimics_fi             => pftcon%mimics_fi                         , & ! Input: MIMICSplus parameter fi        
          woody                 => pftcon%woody                             , & ! Input:  binary flag for woody lifeform (1=woody, 0=not woody)
-
          cascade_donor_pool    => decomp_cascade_con%cascade_donor_pool    , & ! Input:  [integer  (:)     ]  which pool is C taken from for a given decomposition step
          cascade_receiver_pool => decomp_cascade_con%cascade_receiver_pool , & ! Input:  [integer  (:)     ]  which pool is C added to for a given decomposition step
 
@@ -216,12 +221,24 @@ contains
                         cf_veg%phenology_c_to_litr_c_col(c,j,i_met_lit) * dt
                      cf_soil%decomp_cpools_sourcesink_col(c,j,i_chem_som) = mimics_fi(2) * &
                         cf_veg%phenology_c_to_litr_c_col(c,j,i_str_lit) * dt
+                     if (decomp_method == mimicsplus_decomp) then 
+                        ! Fraction of necromass from symbiont into each SOM pool & enzyme flux !ECW
+                        cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som) = symbiont_inst%C_mortality(c,j)*symb_tau_soma
+                        cf_soil%decomp_cpools_sourcesink_col(c,j,i_chem_som) = cf_soil%decomp_cpools_sourcesink_col(c,j,i_chem_som) &
+                                                                                 + symbiont_inst%C_mortality(c,j)*symb_tau_somc
+                        cf_soil%decomp_cpools_sourcesink_col(c,j,i_phys_som) = cf_soil%decomp_cpools_sourcesink_col(c,j,i_phys_som) &
+                                                                                 + symbiont_inst%C_mortality(c,j)*symb_tau_somp
+                     end if 
+
+                     
+                     ! add mining enzymes
                else
                   do i = i_litr_min, i_litr_max
                      cf_soil%decomp_cpools_sourcesink_col(c,j,i) = &
                           cf_veg%phenology_c_to_litr_c_col(c,j,i) * dt
                   end do
                end if
+
 
                   ! NOTE(wjs, 2017-01-02) This used to be set to a non-zero value, but the
                   ! terms have been moved to CStateUpdateDynPatch. I think this is zeroed every

@@ -58,6 +58,7 @@ module CNSoilVegMIMICSplus
   ! !FUNCTIONS:
   private :: resp_myc                     ! Respiration of mycorrhiza
   private :: Vmax_myc                     ! Michaelis Menten Kinetics for mycorrhiza
+  public  :: calc_enzymes
 
   ! ! PUBLIC DATA
   integer, public :: i_fixer = 1 
@@ -67,14 +68,16 @@ module CNSoilVegMIMICSplus
   
   type, public :: symbiont_type
 
-  real(r8), pointer           :: C_biomass             (:,:) ! Carbon biomass
-  real(r8), pointer           :: N_biomass             (:,:) ! Nitrogen biomass
-  real(r8), pointer           :: C_reservoir           (:,:) ! Carbon intermediate pool biomass
-  real(r8), pointer           :: N_reservoir           (:,:) ! Nitrogen intermediate pool biomass
-  real(r8), pointer           :: symb_eff              (:,:) ! Symbiont efficiency when its biomass is 0
-  real(r8), pointer           :: symb_growth           (:,:) ! Symbiotic biomass growth rate [gC/m2]
-  real(r8), pointer           :: C_mortality           (:,:) ! Turnover of symbionts per layer and column [gC/m2]
+  real(r8), pointer           :: C_biomass             (:,:) ! [patch,n_symb] Carbon biomass
+  real(r8), pointer           :: N_biomass             (:,:) ! [patch,n_symb] Nitrogen biomass
+  real(r8), pointer           :: C_reservoir           (:,:) ! [patch,n_symb] Carbon intermediate pool biomass
+  real(r8), pointer           :: N_reservoir           (:,:) ! [patch,n_symb] Nitrogen intermediate pool biomass
+  real(r8), pointer           :: symb_eff              (:,:) ! [patch,n_symb] Symbiont efficiency when its biomass is 0
+  real(r8), pointer           :: symb_growth           (:,:) ! [patch,n_symb] Symbiotic biomass growth rate [gC/m2]
+  real(r8), pointer           :: C_mortality           (:,:) ! [col,nlevdecomp]Turnover of symbionts per layer and column [gC/m2]
   real(r8), pointer           :: N_mortality           (:,:) ! Turnover of symbionts per layer and column [gN/m2]
+  real(r8), pointer           :: somc_nuptake_col      (:,:) ! Nitrogen uptake from SOMc pool per column  [gN/m2]
+  real(r8), pointer           :: somp_nuptake_col      (:,:) ! Nitrogen uptake from SOMp pool per column  [gN/m2]
   logical, pointer            :: is_active             (:,:) ! If the symbiont type is active
   character(len=10), pointer  :: symb_name             (:)   ! Symbiont name
   character(len=10), pointer  :: symb_hist_name        (:)   ! Symbiont name on history tapes
@@ -175,6 +178,8 @@ contains
     allocate(this%symb_growth(begp:endp,1:n_symb)) ; this%symb_growth(begp:endp,1:n_symb) = 0.0_r8
     allocate(this%C_mortality(begc:endc,1:nlevdecomp)) ; this%C_mortality(begc:endc,1:nlevdecomp) = 0.0_r8
     allocate(this%N_mortality(begc:endc,1:nlevdecomp)) ; this%N_mortality(begc:endc,1:nlevdecomp) = 0.0_r8
+    allocate(this%somc_nuptake_col(begc:endc,1:nlevdecomp)) ; this%somc_nuptake_col(begc:endc,1:nlevdecomp) = 0.0_r8
+    allocate(this%somp_nuptake_col(begc:endc,1:nlevdecomp)) ; this%somp_nuptake_col(begc:endc,1:nlevdecomp) = 0.0_r8
    
    end subroutine InitAllocate
 
@@ -273,6 +278,8 @@ contains
       enddo
       this%C_mortality(bounds%begc:bounds%endc,1:nlevdecomp) = 0.0_r8
       this%N_mortality(bounds%begc:bounds%endc,1:nlevdecomp) = 0.0_r8
+      this%somc_nuptake_col(bounds%begc:bounds%endc,1:nlevdecomp) = 0.0_r8
+      this%somp_nuptake_col(bounds%begc:bounds%endc,1:nlevdecomp) = 0.0_r8
 
     end subroutine InitCold
 
@@ -389,6 +396,7 @@ contains
    ! !LOCAL VARIABLES
    integer :: p, fp, c, fc, j, k, l, s, i
    integer :: begp, endp, begc, endc
+   real(r8), parameter :: tiny_number = 1.0e-12_r8
    
    real(r8), parameter :: N_stress_max = 2.0_r8                         ! Maximum nitrogen demand of plant [-]
    real(r8) :: N_stress(bounds%begp:bounds%endp)                        ! Nitrogen demand of [-]
@@ -422,30 +430,11 @@ contains
    real(r8) :: maint_resp                              ! Carbon from symbiont pool used for maintaining existing biomass [gC/m2]
    real(r8) :: symb_CO2_prod(bounds%begp:bounds%endp)  ! Total carbon loss of symbionts that is repired (maintainence & growth) [gC/m2]
    
-   real(r8) :: symbiont_turnover_C(bounds%begp:bounds%endp)             ! Part of symbiont turnover going into SOM [gC/m2]
-   real(r8) :: symbiont_turnover_N(bounds%begp:bounds%endp)             ! Part of symbiont turnover going into SOM [gN/m2]
+   real(r8) :: myc_biomass_layer(bounds%begp:bounds%endp, 1:nlevdecomp)                ! Mycorrhyzal biomass per soil layer [gC/m2]
+   real(r8) :: symbiont_turnover_C(bounds%begp:bounds%endp, 1:n_symb)             ! Part of symbiont turnover going into SOM [gC/m2]
+   real(r8) :: symbiont_turnover_N(bounds%begp:bounds%endp, 1:n_symb)             ! Part of symbiont turnover going into SOM [gN/m2]
    real(r8) :: symb_turnover_layer_C(bounds%begp:bounds%endp, 1:nlevdecomp)  ! Symbiotic turnover per soil layer [gC/m2]
    real(r8) :: symb_turnover_layer_N(bounds%begp:bounds%endp, 1:nlevdecomp)  ! Symbiotic turnover per soil layer [gN/m2]
-
-   ! Fluxes of symbiotic necromass into SOM pools 
-   real(r8) :: C_mine2somc
-   real(r8) :: C_mine2soma
-   real(r8) :: C_mine2somp
-   real(r8) :: N_mine2somc
-   real(r8) :: N_mine2soma
-   real(r8) :: N_mine2somp
-   real(r8) :: C_scav2somc
-   real(r8) :: C_scav2soma
-   real(r8) :: C_scav2somp
-   real(r8) :: N_scav2somc
-   real(r8) :: N_scav2soma
-   real(r8) :: N_scav2somp
-   real(r8) :: C_fix2somc
-   real(r8) :: C_fix2soma
-   real(r8) :: C_fix2somp
-   real(r8) :: N_fix2somc
-   real(r8) :: N_fix2soma
-   real(r8) :: N_fix2somp
    
    ! free_retransn_to_npool_patch = 0.0_r8 !for CNCStateUpdate
    begp = bounds%begp; endp= bounds%endp
@@ -523,7 +512,9 @@ contains
    N_biomass            => symbiont_inst%N_biomass      , & ! Nitrogen biomass of symbiont [gN/m2]
    symb_growth          => symbiont_inst%symb_growth    , & ! Symbiotic biomass growth rate [gC/m2]
    C_mortality          => symbiont_inst%C_mortality    , & ! Symbiotic turnover per soil layer and column [gC/m2]
-   N_mortality          => symbiont_inst%N_mortality      & ! Symbiotic turnover per soil layer and column [gN/m2]
+   N_mortality          => symbiont_inst%N_mortality    , & ! Symbiotic turnover per soil layer and column [gN/m2]
+   somc_nuptake_col     => symbiont_inst%somc_nuptake_col , &
+   somp_nuptake_col     => symbiont_inst%somp_nuptake_col   &
    )
 
    !-----------------------------------------------------------------------
@@ -642,6 +633,7 @@ contains
       ! symb_growth(p,i_fixer) = sulman_cn_fix * N_reservoir(p,i_fixer) * 0.9
    ! end if
 
+   !CO2 production while growth
    symb_CO2_prod(p) = symb_CO2_prod(p) + symb_growth(p,i_fixer) / sulman_growth_fix * (1.0 - sulman_growth_fix)
 
    ! NOT SURE WHAT EXACTLY N_FIXATION IS
@@ -718,19 +710,27 @@ end do
          !ECW do I need to divide by dz?
          total_inorg_no3_uptake(p,j) = (no3_passiv_up(p,j) + no3_active_up(p,j) + no3_scav_up(p,j)) * dt
          ! If nitrogen uptake exceeds avaliable nitrogen, scale each uptake pathway down
-         if (total_inorg_no3_uptake(p,j) > smin_no3_avail(p,j)) then 
+         if (total_inorg_no3_uptake(p,j) > smin_no3_avail(p,j) .and. total_inorg_no3_uptake(p,j) > tiny_number) then 
            no3_passiv_up(p,j)  = no3_passiv_up(p,j)  * (smin_no3_avail(p,j) / total_inorg_no3_uptake(p,j))
            no3_active_up(p,j)  = no3_active_up(p,j)  * (smin_no3_avail(p,j) / total_inorg_no3_uptake(p,j))
            no3_scav_up(p,j)    = no3_scav_up(p,j)    * (smin_no3_avail(p,j) / total_inorg_no3_uptake(p,j))
+         else
+            no3_passiv_up(p,j)  = 0.0_r8
+            no3_active_up(p,j)  = 0.0_r8
+            no3_scav_up(p,j)    = 0.0_r8
          endif
 
          total_inorg_nh4_uptake(p,j) = (nh4_passiv_up(p,j) + nh4_active_up(p,j) + nh4_scav_up(p,j)) * dt
-         if (total_inorg_nh4_uptake(p,j) > smin_nh4_avail(p,j)) then 
+         if (total_inorg_nh4_uptake(p,j) > smin_nh4_avail(p,j) .and. total_inorg_nh4_uptake(p,j) > tiny_number) then 
             nh4_passiv_up(p,j)  = nh4_passiv_up(p,j)  * (smin_nh4_avail(p,j) / total_inorg_nh4_uptake(p,j))
             nh4_active_up(p,j)  = nh4_active_up(p,j)  * (smin_nh4_avail(p,j) / total_inorg_nh4_uptake(p,j))
             nh4_scav_up(p,j)    = nh4_scav_up(p,j)    * (smin_nh4_avail(p,j) / total_inorg_nh4_uptake(p,j))
-          endif
-         
+         else 
+            nh4_passiv_up(p,j)  = 0.0_r8
+            nh4_active_up(p,j)  = 0.0_r8
+            nh4_scav_up(p,j)    = 0.0_r8
+         endif
+
          total_inorgN_uptake_vr(p,j) = total_inorg_nh4_uptake(p,j) + total_inorg_no3_uptake(p,j)
          total_inorgN_uptake(p) = total_inorgN_uptake(p) + total_inorgN_uptake_vr(p,j)
       end do
@@ -755,15 +755,21 @@ end do
   
   call update_symbionts(filter_soilp, filter_bgc_soilc, num_soilp, num_bgc_soilc, &
                         bounds, symbiont_inst, cnveg_nitrogenstate_inst, C_allocation_to_N_acq(bounds%begp:bounds%endp), symb_CO2_prod(bounds%begp:bounds%endp), &
-                        symbiont_turnover_C(bounds%begp:bounds%endp), symbiont_turnover_N(bounds%begp:bounds%endp))
+                        symbiont_turnover_C(bounds%begp:bounds%endp, 1:n_symb), symbiont_turnover_N(bounds%begp:bounds%endp, 1:n_symb))
 
 
    ! update the symb_turnover_C and _N to per layer variable with root_dens_frac with a patch/layer loops
    do j = 1, nlevdecomp
       do p = bounds%begp,bounds%endp
-         symb_turnover_layer_C(p,j) = symbiont_turnover_C(p) * root_dens_frac (p,j)
-         symb_turnover_layer_N(p,j) = symbiont_turnover_N(p) * root_dens_frac (p,j)
+         symb_turnover_layer_C(p,j) = (symbiont_turnover_C(p,i_miner) + symbiont_turnover_C(p,i_scav) + symbiont_turnover_C(p,i_fixer)) * root_dens_frac (p,j)
+         symb_turnover_layer_N(p,j) = (symbiont_turnover_N(p,i_miner) + symbiont_turnover_N(p,i_scav) + symbiont_turnover_N(p,i_fixer)) * root_dens_frac (p,j)
+         ! add enzymes here
+         myc_biomass_layer(p,j) = C_biomass(p,i_miner) * root_dens_frac(p,j)
+         symb_turnover_layer_C(p,j) = symb_turnover_layer_C(p,j) ! + calc_enzymes(myc_biomass_layer(p,j)) ! If this is active the enzymes will go into SOM pools
+         symb_turnover_layer_N(p,j) = symb_turnover_layer_N(p,j) ! + calc_enzymes(myc_biomass_layer(p,j)) ! instead of just being repired immediatly 
+                                                                                                          ! but I think it doesn't matter, weather they are respired now or one step later from SOM 
       end do
+      
       ! subroutine p2c_2d_filter performs patch to column averaging for multi level patch arrays
       ! symb_turnover_layer_C is the patch array, C_mortality is the column array 
       call p2c(bounds, num_bgc_soilc, filter_bgc_soilc, &
@@ -773,53 +779,21 @@ end do
       symb_turnover_layer_N(bounds%begp:bounds%endp,j), &
       N_mortality(bounds%begc:bounds%endc,j))
 
-   ! Fraction symbiont necromass into soil organic matter pools (Fluxes)
-   !ROSIE
-   ! These fluxes need to be added to the SOM pools (same as MIMICS) how and where do I do that?
-   if (C_biomass(p,i_miner) > 0.0_r8) then
-     C_mine2somc = C_mortality(c,j) * C_biomass(p,i_miner) / (C_biomass(p,i_miner) + C_biomass(p,i_scav) + C_biomass(p,i_fixer)) * symb_tau_somc
-   C_mine2soma = C_mortality(c,j) * C_biomass(p,i_miner) / (C_biomass(p,i_miner) + C_biomass(p,i_scav) + C_biomass(p,i_fixer)) * symb_tau_soma
-   C_mine2somp = C_mortality(c,j) * C_biomass(p,i_miner) / (C_biomass(p,i_miner) + C_biomass(p,i_scav) + C_biomass(p,i_fixer)) * symb_tau_somp
-   end if 
+      ! Transforming nuptake from patch,layer to column,layer
+      call p2c(bounds, num_bgc_soilc, filter_bgc_soilc, &
+      somc_nuptake(bounds%begp:bounds%endp,j), &
+      somc_nuptake_col(bounds%begc:bounds%endc,j))
+      call p2c(bounds, num_bgc_soilc, filter_bgc_soilc, &
+      somp_nuptake(bounds%begp:bounds%endp,j), &
+      somp_nuptake_col(bounds%begc:bounds%endc,j))
 
-   if (N_biomass(p,i_miner) > 0.0_r8) then
-   N_mine2somc = N_mortality(c,j) * N_biomass(p,i_miner) / (C_biomass(p,i_miner) + C_biomass(p,i_scav) + C_biomass(p,i_fixer)) * symb_tau_somc
-   N_mine2soma = N_mortality(c,j) * N_biomass(p,i_miner) / (C_biomass(p,i_miner) + C_biomass(p,i_scav) + C_biomass(p,i_fixer)) * symb_tau_soma
-   N_mine2somp = N_mortality(c,j) * N_biomass(p,i_miner) / (C_biomass(p,i_miner) + C_biomass(p,i_scav) + C_biomass(p,i_fixer)) * symb_tau_somp
-   end if
 
-   if (C_biomass(p,i_scav) > 0.0_r8) then
-   C_scav2somc = C_mortality(c,j) * C_biomass(p,i_scav) / (C_biomass(p,i_miner) + C_biomass(p,i_scav) + C_biomass(p,i_fixer)) * symb_tau_somc
-   C_scav2soma = C_mortality(c,j) * C_biomass(p,i_scav) / (C_biomass(p,i_miner) + C_biomass(p,i_scav) + C_biomass(p,i_fixer)) * symb_tau_soma
-   C_scav2somp = C_mortality(c,j) * C_biomass(p,i_scav) / (C_biomass(p,i_miner) + C_biomass(p,i_scav) + C_biomass(p,i_fixer)) * symb_tau_somp
-   end if
+      ! cuptake (CO2) can stay per patch
+      ! everything that goes into soil has to be per column per layer
 
-   if (N_biomass(p,i_scav) > 0.0_r8) then
-   N_scav2somc = N_mortality(c,j) * N_biomass(p,i_scav) / (C_biomass(p,i_miner) + C_biomass(p,i_scav) + C_biomass(p,i_fixer)) * symb_tau_somc
-   N_scav2soma = N_mortality(c,j) * N_biomass(p,i_scav) / (C_biomass(p,i_miner) + C_biomass(p,i_scav) + C_biomass(p,i_fixer)) * symb_tau_soma
-   N_scav2somp = N_mortality(c,j) * N_biomass(p,i_scav) / (C_biomass(p,i_miner) + C_biomass(p,i_scav) + C_biomass(p,i_fixer)) * symb_tau_somp
-   end if
-
-   if (C_biomass(p,i_fixer) > 0.0_r8) then
-   C_fix2somc = C_mortality(c,j) * C_biomass(p,i_fixer) / (C_biomass(p,i_miner) + C_biomass(p,i_scav) + C_biomass(p,i_fixer)) * symb_tau_somc
-   C_fix2soma = C_mortality(c,j) * C_biomass(p,i_fixer) / (C_biomass(p,i_miner) + C_biomass(p,i_scav) + C_biomass(p,i_fixer)) * symb_tau_soma
-   C_fix2somp = C_mortality(c,j) * C_biomass(p,i_fixer) / (C_biomass(p,i_miner) + C_biomass(p,i_scav) + C_biomass(p,i_fixer)) * symb_tau_somp
-   end if
-
-   if (N_biomass(p,i_fixer) > 0.0_r8) then
-   N_fix2somc = N_mortality(c,j) * N_biomass(p,i_fixer) / (C_biomass(p,i_miner) + C_biomass(p,i_scav) + C_biomass(p,i_fixer)) * symb_tau_somc
-   N_fix2soma = N_mortality(c,j) * N_biomass(p,i_fixer) / (C_biomass(p,i_miner) + C_biomass(p,i_scav) + C_biomass(p,i_fixer)) * symb_tau_soma
-   N_fix2somp = N_mortality(c,j) * N_biomass(p,i_fixer) / (C_biomass(p,i_miner) + C_biomass(p,i_scav) + C_biomass(p,i_fixer)) * symb_tau_somp
-   end if 
-
+  
   end do
-  !do i = 1, n_symb
-  !   do p = bounds%begp,bounds%endp
-   !  C_symb2som(p,i) = C_mortality * (C_biomass(p,i) / sum(C_biomass(p,:))) * params_inst%symb_tau_som(i)
-   !  N_symb2som(p,i) = N_mortality * (N_biomass(p,i) / sum(C_biomass(p,:))) * params_inst%symb_tau_som(i)
-   !  end do
-  !end do
-   
+
 
    end associate
    end subroutine CN_soil_veg_exchange
@@ -842,6 +816,15 @@ end do
       Vmax_myc = alpha * exp(-Ea / R_gas * soil_T)
    end function Vmax_myc
 
+
+   ! This function is needed to calcolate enyme flux into SOM pools in Update module
+   function calc_enzymes(myc_biomass) result(enzymes)
+      real(r8), intent(in) :: myc_biomass
+      real(r8) :: enzymes
+      real(r8), parameter :: enzyme_frac = 0.1_r8
+      enzymes = myc_biomass * enzyme_frac
+    end function calc_enzymes
+
    
    function resp_myc(soil_carbon, myc_biomass, soil_T, wliq, wair)
       ! This is the rate of C removed from soil pool as respiration(not actual respiration, rename)
@@ -858,18 +841,20 @@ end do
       real(r8), intent(in) :: wliq                             ! Fraction of liquid water-filled pore space (0.0 - 1.0) [-]  
       real(r8), intent(in) :: wair                             ! Fraction of air-filled pore space (0.0 - 1.0)          [-]
       
-      real(r8), parameter  :: enzyme_frac=1.0                  ! Relative amount of enzymes produced by microbes [-]
-      real(r8), parameter  :: substrate_diffusion_exp = 3.0    ! Exponent for theta dependence at low theta. See Davison et al DAMM model paper
-      real(r8), parameter  :: gas_diffusion_exp = 2.5          ! Exponent for gas diffusion power law dependence on theta See Meslin et al 2010, SSAJ
-      real(r8), parameter  :: min_anaerobic_resp_factor = 0.0  ! Minimum for high soil moisture Resp limitation CHECK [-]
-      real(r8), parameter  :: min_dry_resp_factor       = 0.0  ! Minimum for low soil moisture Resp limitation CHECK  [-]
+      real(r8), parameter  :: enzyme_frac=0.1_r8                  ! Relative amount of enzymes produced by microbes [-]
+      real(r8), parameter  :: substrate_diffusion_exp = 3.0_r8    ! Exponent for theta dependence at low theta. See Davison et al DAMM model paper
+      real(r8), parameter  :: gas_diffusion_exp = 2.5_r8          ! Exponent for gas diffusion power law dependence on theta See Meslin et al 2010, SSAJ
+      real(r8), parameter  :: min_anaerobic_resp_factor = 0.0_r8  ! Minimum for high soil moisture Resp limitation CHECK [-]
+      real(r8), parameter  :: min_dry_resp_factor       = 0.0_r8  ! Minimum for low soil moisture Resp limitation CHECK  [-]
+
+      real(r8) :: enzymes                                      ! Enzymes released by mycorrhiza based on biomass [gC/m2]
 
       ! LOCAL VARIABLES:
       real(r8) :: theta_resp_max                               ! 
       real(r8) :: aerobic_max                                  !
       real(r8) :: theta_func                                   !
       real(r8) :: resp_myc                                     ! Mycorrhizal respiration []
-      real(r8) :: enzymes                                      ! Enzymes released by mycorrhiza based on biomass [gC/m2]
+     
       
       
       ! From solving theta dependence for maximum:
@@ -887,6 +872,9 @@ end do
       enzymes = myc_biomass * enzyme_frac
 
       ! If there is carbon avaliable, calculate mycorrhizal repiration
+
+      ! ECW change when enzymes go into SOM pools
+      ! enzymes can be calculated in resp_myc
       if (soil_carbon > 0.0_r8 .and. wliq > 0.0_r8) then 
          resp_myc = Vmax_myc(soil_T) * soil_carbon * enzymes / (soil_carbon * params_inst%sulman_km_mine + enzymes) * theta_func
       else 
@@ -953,7 +941,7 @@ end do
          c = patch%column(p)
          do j = 1, nlevdecomp
 
-           if  (root_dens_frac(p,j) > 0) then
+           if  (root_dens_frac(p,j) > 0.0_r8) then
 
            ! Calculate Nitrogen concentration in soil layers
            ! smin_nh4_vr_col and smin_no3_vr_col should be already per layer and tell how much N is there           
@@ -965,8 +953,11 @@ end do
            root_biomass_density = max(c_to_b*1._r8,root_biomass_density)
            ! Root length density: m root per m3 soil 
            root_cross_sec_area = rpi*root_radius(ivt(p))**2
-           root_length_density = root_biomass_density / (root_density(ivt(p)) * root_cross_sec_area)
-
+           if (root_density(ivt(p)) > 0.0_r8 .and. root_cross_sec_area > 0.0_r8) then
+            root_length_density = root_biomass_density / (root_density(ivt(p)) * root_cross_sec_area)
+           else
+              root_length_density = 0.0_r8
+           endif
            rhizosphere_frac(p) = min(rpi*((params_inst%sulman_r_rhiz+root_radius(ivt(p)))**2-root_radius(ivt(p))**2)*root_length_density,1.0_r8)
            
            
@@ -1255,8 +1246,8 @@ end do
   
    real(r8), intent(in)    :: C_allocation_to_N_acq(bounds%begp:bounds%endp) ! Carbon allocated to nitrogen acquisition [gC/m2/s)]
    real(r8), intent(inout) :: symb_CO2_prod(bounds%begp:bounds%endp)       ! Total carbon loss of symbionts that is repired (maintainence & growth) [gC/m2]
-   real(r8), intent(out)   :: symbiont_turnover_C(bounds%begp:bounds%endp) ! Part of symbiont turnover not lost through repiration [gC/m2]
-   real(r8), intent(out)   :: symbiont_turnover_N(bounds%begp:bounds%endp) ! Part of symbiont turnover not lost through repiration [gN/m2]
+   real(r8), intent(out)   :: symbiont_turnover_C(bounds%begp:bounds%endp, 1:n_symb) ! Part of symbiont turnover not lost through repiration [gC/m2]
+   real(r8), intent(out)   :: symbiont_turnover_N(bounds%begp:bounds%endp, 1:n_symb) ! Part of symbiont turnover not lost through repiration [gN/m2]
    
    !
    ! ! LOCAL VARIABLES:
@@ -1330,14 +1321,25 @@ end do
       ! Symbiont turnover is calculated on the individual turnover rates of each symbiont and then scaled with tau_symb for
       ! the total turnover of symbiotic biomass (decides which part of turnover goes to repiration and which goes to growth...). 
       ! symbiont_turnover_C & N are the turnover used for decomposition, nutrient exchange, becoming part of soil organic matter
-      symbiont_turnover_C(p) = (C_biomass(p,i_miner) / params_inst%sulman_tau_mine + C_biomass(p,i_scav) / params_inst%sulman_tau_scav + &
-                              C_biomass(p,i_fixer) / params_inst%sulman_tau_fix) * dt * params_inst%sulman_tau_sym
-      symbiont_turnover_N(p) = (N_biomass(p,i_miner) / params_inst%sulman_tau_mine + N_biomass(p,i_scav) / params_inst%sulman_tau_scav + &
-                              N_biomass(p,i_fixer) / params_inst%sulman_tau_fix) * dt * params_inst%sulman_tau_sym
+     ! symbiont_turnover_C(p) = (C_biomass(p,i_miner) / params_inst%sulman_tau_mine + C_biomass(p,i_scav) / params_inst%sulman_tau_scav + &
+     !                         C_biomass(p,i_fixer) / params_inst%sulman_tau_fix) * dt * params_inst%sulman_tau_sym
+     ! symbiont_turnover_N(p) = (N_biomass(p,i_miner) / params_inst%sulman_tau_mine + N_biomass(p,i_scav) / params_inst%sulman_tau_scav + &
+     !                         N_biomass(p,i_fixer) / params_inst%sulman_tau_fix) * dt * params_inst%sulman_tau_sym
+
+      symbiont_turnover_C(p,i_miner) = (C_biomass(p,i_miner) / params_inst%sulman_tau_mine) * dt * params_inst%sulman_tau_sym
+      symbiont_turnover_C(p,i_scav)  = (C_biomass(p,i_scav)  / params_inst%sulman_tau_scav) * dt * params_inst%sulman_tau_sym
+      symbiont_turnover_C(p,i_fixer) = (C_biomass(p,i_fixer) / params_inst%sulman_tau_fix)  * dt * params_inst%sulman_tau_sym
+      
+      symbiont_turnover_N(p,i_miner) = (N_biomass(p,i_miner) / params_inst%sulman_tau_mine) * dt * params_inst%sulman_tau_sym
+      symbiont_turnover_N(p,i_scav)  = (N_biomass(p,i_scav)  / params_inst%sulman_tau_scav) * dt * params_inst%sulman_tau_sym
+      symbiont_turnover_N(p,i_fixer) = (N_biomass(p,i_fixer) / params_inst%sulman_tau_fix)  * dt * params_inst%sulman_tau_sym
+                              
 
       ! Later we need to send a fraction of the turnover to SOM pool with new created parameters: symb_tau_som
 
-      symb_CO2_prod(p) = symb_CO2_prod(p) + (1.0 - params_inst%sulman_tau_sym) * symbiont_turnover_C(p) / params_inst%sulman_tau_sym
+      symb_CO2_prod(p) = symb_CO2_prod(p) + (1.0 - params_inst%sulman_tau_sym) * &
+                        (symbiont_turnover_C(p,i_miner) + symbiont_turnover_C(p,i_scav) + symbiont_turnover_C(p,i_fixer)) / &
+                         params_inst%sulman_tau_sym
    
   
    ! RETURN OF INVESTMENT

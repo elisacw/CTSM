@@ -140,7 +140,7 @@ module CNFUNMod
   !---
 
 ! Set local pointers
-  associate(ivt                    => patch%itype                                          , & ! Input:  [integer  (:)   ]  p
+  associate(ivt                    => patch%itype                                       , & ! Input:  [integer  (:)   ]  p
          leafcn                 => pftcon%leafcn                                        , & ! Input:  leaf C:N (gC/gN)
          leafcn_offset          => cnveg_state_inst%leafcn_offset_patch                 , & ! Output:
          !  [real(r8) (:)   ]  Leaf C:N used by FUN  

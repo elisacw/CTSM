@@ -289,6 +289,7 @@ contains
          sminn_to_plant_fun_vr        => soilbiogeochem_nitrogenflux_inst%sminn_to_plant_fun_vr_col    , & ! Iutput: [real(r8) (:)   ]  Total layer soil N uptake of FUN (gN/m2/s) 
          sminn_to_plant_fun_no3_vr    => soilbiogeochem_nitrogenflux_inst%sminn_to_plant_fun_no3_vr_col, & ! Iutput: [real(r8) (:)   ]  Total layer no3 uptake of FUN (gN/m2/s)
          sminn_to_plant_fun_nh4_vr    => soilbiogeochem_nitrogenflux_inst%sminn_to_plant_fun_nh4_vr_col, & ! Iutput: [real(r8) (:)   ]  Total layer nh4 uptake of FUN (gN/m2/s)
+         sminn_to_plant_mimicsplus_vr        => soilbiogeochem_nitrogenflux_inst%sminn_to_plant_mimicsplus_vr_col    , &
          sminn_to_plant_mimicsplus_no3_vr   => soilbiogeochem_nitrogenflux_inst%sminn_to_plant_mimicsplus_no3_vr_col , & ! Output:[real(r8) (:,:) ]  Total layer soil NO3 uptake of MIMICSplus (gN/m2/s) 
          sminn_to_plant_mimicsplus_nh4_vr   => soilbiogeochem_nitrogenflux_inst%sminn_to_plant_mimicsplus_nh4_vr_col   & ! Output:[real(r8) (:,:) ]  Total layer soil NH4 uptake of MIMICSplus (gN/m2/s)
 
@@ -401,14 +402,32 @@ contains
             call t_stopf( 'CNFUN' )
          end if
 
+         if (decomp_method == mimicsplus_decomp) then
+            call t_startf('CN_soil_veg_exchange')
+            call CN_soil_veg_exchange (filter_bgc_vegp, filter_bgc_soilc, num_bgc_vegp, num_bgc_soilc, bounds, symbiont_inst, &
+                                       cnveg_nitrogenstate_inst, waterstatebulk_inst, temperature_inst, cnveg_carbonflux_inst, &
+                                       soilbiogeochem_nitrogenstate_inst, soilbiogeochem_nitrogenflux_inst, &
+                                       waterfluxbulk_inst, soilstate_inst, cnveg_carbonstate_inst, soilbiogeochem_carbonstate_inst, cnveg_nitrogenflux_inst)
+            call p2c(bounds, nlevdecomp, &
+                     cnveg_nitrogenflux_inst%sminn_to_plant_mimicsplus_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp),&
+                     soilbiogeochem_nitrogenflux_inst%sminn_to_plant_mimicsplus_vr_col(bounds%begc:bounds%endc,1:nlevdecomp), &
+                     'unity')
+            call t_stopf( 'CN_soil_veg_exchange' )
+         end if
+
          ! sum up N fluxes to plant
          do j = 1, nlevdecomp
             do fc=1,num_bgc_soilc
                c = filter_bgc_soilc(fc)    
                sminn_to_plant(c) = sminn_to_plant(c) + sminn_to_plant_vr(c,j) * dzsoi_decomp(j)
-               if ( local_use_fun ) then
+               if (use_fun) then
                   if (sminn_to_plant_fun_vr(c,j).gt.sminn_to_plant_vr(c,j)) then
                       sminn_to_plant_fun_vr(c,j)  = sminn_to_plant_vr(c,j)
+                  end if
+               end if
+               if (decomp_method == mimicsplus_decomp) then
+                  if (sminn_to_plant_mimicsplus_vr(c,j).gt.sminn_to_plant_vr(c,j)) then
+                      sminn_to_plant_mimicsplus_vr(c,j)  = sminn_to_plant_vr(c,j)
                   end if
                end if
             end do
@@ -455,15 +474,19 @@ contains
             c = filter_bgc_soilc(fc)    
             sminn_to_plant(c) = 0._r8
          end do
+         
          do j = 1, nlevdecomp
             do fc=1,num_bgc_soilc
                c = filter_bgc_soilc(fc)    
                sminn_to_plant(c) = sminn_to_plant(c) + sminn_to_plant_vr(c,j) * dzsoi_decomp(j)
-               if ( .not. local_use_fun ) then
-                  sum_ndemand_vr(c,j) = potential_immob_vr(c,j) + sminn_to_plant_vr(c,j)
-               else
+               if (use_fun ) then
                   sminn_to_plant_new(c)  = sminn_to_plant_new(c)   + sminn_to_plant_fun_vr(c,j) * dzsoi_decomp(j)
                   sum_ndemand_vr(c,j)    = potential_immob_vr(c,j) + sminn_to_plant_fun_vr(c,j)
+               else if (decomp_method == mimicsplus_decomp) then
+                  sminn_to_plant_new(c)  = sminn_to_plant_new(c)   + sminn_to_plant_mimicsplus_vr(c,j) * dzsoi_decomp(j)
+                  sum_ndemand_vr(c,j)    = potential_immob_vr(c,j) + sminn_to_plant_mimicsplus_vr(c,j)
+               else
+                  sum_ndemand_vr(c,j) = potential_immob_vr(c,j) + sminn_to_plant_vr(c,j)
                end if
             end do
          end do
@@ -474,14 +497,20 @@ contains
          do j = 1, nlevdecomp
             do fc=1,num_bgc_soilc
                c = filter_bgc_soilc(fc)    
-               if ( .not. local_use_fun ) then
-                  if ((sminn_to_plant_vr(c,j) + actual_immob_vr(c,j))*dt < sminn_vr(c,j)) then
+               if (use_fun ) then
+                  if ((sminn_to_plant_fun_vr(c,j)  + actual_immob_vr(c,j))*dt < sminn_vr(c,j))  then
+                     sminn_to_denit_excess_vr(c,j) = max(bdnr*((sminn_vr(c,j)/dt) - sum_ndemand_vr(c,j)),0._r8)
+                  else
+                     sminn_to_denit_excess_vr(c,j) = 0._r8
+                  endif
+               else if (decomp_method == mimicsplus_decomp) then
+                  if ((sminn_to_plant_mimicsplus_vr(c,j)  + actual_immob_vr(c,j))*dt < sminn_vr(c,j))  then
                      sminn_to_denit_excess_vr(c,j) = max(bdnr*((sminn_vr(c,j)/dt) - sum_ndemand_vr(c,j)),0._r8)
                   else
                      sminn_to_denit_excess_vr(c,j) = 0._r8
                   endif
                else
-                  if ((sminn_to_plant_fun_vr(c,j)  + actual_immob_vr(c,j))*dt < sminn_vr(c,j))  then
+                  if ((sminn_to_plant_vr(c,j) + actual_immob_vr(c,j))*dt < sminn_vr(c,j)) then
                      sminn_to_denit_excess_vr(c,j) = max(bdnr*((sminn_vr(c,j)/dt) - sum_ndemand_vr(c,j)),0._r8)
                   else
                      sminn_to_denit_excess_vr(c,j) = 0._r8
@@ -766,7 +795,7 @@ contains
             end do
          end do
 
-         if ( local_use_fun .and. decomp_method /= mimicsplus_decomp ) then
+         if (use_fun .and. decomp_method /= mimicsplus_decomp ) then
             call t_startf( 'CNFUN' )
             call CNFUN(bounds,num_bgc_soilc,filter_bgc_soilc,num_bgc_vegp,filter_bgc_vegp,waterstatebulk_inst,&
                       waterfluxbulk_inst,temperature_inst,soilstate_inst,cnveg_state_inst,cnveg_carbonstate_inst,&
@@ -865,7 +894,7 @@ contains
                   c = filter_bgc_soilc(fc)
                   sminn_to_plant(c) = sminn_to_plant(c) + sminn_to_plant_vr(c,j) * dzsoi_decomp(j)
                end do
-            end do         
+            end do
          end if
       
 
@@ -1003,9 +1032,13 @@ contains
              do j = 1, nlevdecomp
                 do fc=1,num_bgc_soilc
                    c = filter_bgc_soilc(fc)
+                   if (use_fun) then
                    sminn_to_plant_new(c)  = sminn_to_plant_new(c) + &
                              (sminn_to_plant_fun_no3_vr(c,j) + sminn_to_plant_fun_nh4_vr(c,j)) * dzsoi_decomp(j)
-                      
+                   else if (decomp_method == mimicsplus_decomp) then
+                   sminn_to_plant_new(c)  = sminn_to_plant_new(c) + &
+                             (sminn_to_plant_mimicsplus_no3_vr(c,j) + sminn_to_plant_mimicsplus_nh4_vr(c,j)) * dzsoi_decomp(j)
+                   end if 
                 end do
              end do
                              

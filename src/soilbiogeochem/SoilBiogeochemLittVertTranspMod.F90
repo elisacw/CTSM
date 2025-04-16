@@ -239,7 +239,7 @@ contains
 
          select case (i_type)
          case (1)  ! C
-            conc_ptr          => soilbiogeochem_carbonstate_inst%decomp_cpools_vr_col
+            conc_ptr          => soilbiogeochem_carbonstate_inst%decomp_cpools_vr_col !ECW
             source            => soilbiogeochem_carbonflux_inst%decomp_cpools_sourcesink_col
             trcr_tendency_ptr => soilbiogeochem_carbonflux_inst%decomp_cpools_transport_tendency_col
             matrix_input      => soilbiogeochem_carbonflux_inst%matrix_Cinput%V
@@ -503,7 +503,7 @@ contains
                do j = 1,nlevdecomp
                   do fc = 1, num_bgc_soilc
                      c = filter_bgc_soilc (fc)
-                     conc_ptr(c,j,s) = conc_trcr(c,j) 
+                     conc_ptr(c,j,s) = conc_trcr(c,j) !ECW where soil pools are updated
                      ! Correct for small amounts of carbon that leak into bedrock
                      if (j > col%nbedrock(c)) then 
                         conc_ptr(c,col%nbedrock(c),s) = conc_ptr(c,col%nbedrock(c),s) + &

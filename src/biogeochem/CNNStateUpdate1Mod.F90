@@ -12,9 +12,9 @@ module CNNStateUpdate1Mod
   use clm_time_manager                , only : get_step_size_real
   use clm_varpar                      , only : nlevdecomp
   use clm_varpar                      , only : i_litr_min, i_litr_max, i_cwd
-  use clm_varpar                      , only : i_met_lit, i_str_lit, i_phys_som, i_chem_som
+  use clm_varpar                      , only : i_met_lit, i_str_lit, i_avl_som, i_phys_som, i_chem_som
   use clm_varctl                      , only : iulog, use_nitrif_denitrif
-  use SoilBiogeochemDecompCascadeConType, only : decomp_method, mimicsplus_decomp, use_soil_matrixcn
+  use SoilBiogeochemDecompCascadeConType, only : decomp_method,mimics_decomp, mimicsplus_decomp, use_soil_matrixcn
   use CNSharedParamsMod               , only : use_matrixcn
   use clm_varcon                      , only : nitrif_n2o_loss_frac
   use pftconMod                       , only : npcropmin, pftcon
@@ -101,9 +101,10 @@ contains
   !-----------------------------------------------------------------------
   subroutine NStateUpdate1(num_soilc, filter_soilc, num_soilp, filter_soilp, &
        cnveg_nitrogenflux_inst, cnveg_nitrogenstate_inst, soilbiogeochem_nitrogenflux_inst, &
-       clm_fates, clump_index)
+       clm_fates, clump_index, symbiont_inst)
     
      use CNSharedParamsMod               , only : use_fun
+     use CNSoilVegMIMICSplus             , only : symbiont_type
     !
     ! !DESCRIPTION:
     ! On the radiation time step, update all the prognostic nitrogen state
@@ -118,6 +119,7 @@ contains
     type(cnveg_nitrogenstate_type)          , intent(inout) :: cnveg_nitrogenstate_inst
     type(soilbiogeochem_nitrogenflux_type)  , intent(inout) :: soilbiogeochem_nitrogenflux_inst
     type(hlm_fates_interface_type)          , intent(inout) :: clm_fates
+    type(symbiont_type)                     , intent(inout) :: symbiont_inst 
     integer                                 , intent(in)    :: clump_index
     
     !
@@ -125,13 +127,18 @@ contains
     integer :: c,p,j,l,g,k,i  ! indices
     integer :: fp,fc     ! lake filter indices
     real(r8):: dt        ! radiation time step (seconds)
+
+    real(r8), parameter :: symb_tau_soma = 0.4_r8 !ECW change maybe to more going into somc & p
+    real(r8), parameter :: symb_tau_somc = 0.3_r8
+    real(r8), parameter :: symb_tau_somp = 0.3_r8
     !-----------------------------------------------------------------------
+
+
 
     associate(                                                                   & 
          ivt                   => patch%itype                                    , & ! Input:  [integer  (:)     ]  patch vegetation type                                
          mimics_fi             => pftcon%mimics_fi                             , & ! Input:  MIMICS parameter fi
          woody                 => pftcon%woody                                 , & ! Input:  binary flag for woody lifeform (1=woody, 0=not woody)
-
          nf_veg                => cnveg_nitrogenflux_inst                      , & ! Input:
          ns_veg                => cnveg_nitrogenstate_inst                     , & ! Output:
          nf_soil               => soilbiogeochem_nitrogenflux_inst               & ! Output:
@@ -164,7 +171,7 @@ contains
             ! State update without the matrix solution
             !
             if (.not. use_soil_matrixcn) then ! to be consistent with C
-               if (decomp_method == mimicsplus_decomp) then
+               if (decomp_method == mimics_decomp .or. decomp_method == mimicsplus_decomp) then
                   do i = i_litr_min, i_litr_max  ! in MIMICS these are 1 and 2
                      nf_soil%decomp_npools_sourcesink_col(c,j,i) = (1 - mimics_fi(i)) * &
                         nf_veg%phenology_n_to_litr_n_col(c,j,i) * dt
@@ -173,12 +180,28 @@ contains
                      nf_veg%phenology_n_to_litr_n_col(c,j,i_met_lit) * dt
                   nf_soil%decomp_npools_sourcesink_col(c,j,i_chem_som) = mimics_fi(2) * &
                      nf_veg%phenology_n_to_litr_n_col(c,j,i_str_lit) * dt
+                  if (decomp_method == mimicsplus_decomp) then
+                     ! Necromass flux of symbionts into SOM pools
+                     nf_soil%decomp_npools_sourcesink_col(c,j,i_avl_som) = symbiont_inst%C_mortality(c,j)*symb_tau_soma
+                     nf_soil%decomp_npools_sourcesink_col(c,j,i_chem_som) = nf_soil%decomp_npools_sourcesink_col(c,j,i_chem_som) &
+                                                                              + symbiont_inst%C_mortality(c,j)*symb_tau_somc
+                     nf_soil%decomp_npools_sourcesink_col(c,j,i_phys_som) =  nf_soil%decomp_npools_sourcesink_col(c,j,i_phys_som) &
+                                                                              + symbiont_inst%C_mortality(c,j)*symb_tau_somp
+                    
+                     ! Nitrogen uptake by miners from SOM 
+                     nf_soil%decomp_npools_sourcesink_col(c,j,i_chem_som) = nf_soil%decomp_npools_sourcesink_col(c,j,i_chem_som) &
+                                                                              - symbiont_inst%somc_nuptake_col(c,j)
+                     nf_soil%decomp_npools_sourcesink_col(c,j,i_phys_som) =  nf_soil%decomp_npools_sourcesink_col(c,j,i_phys_som) &
+                                                                              - symbiont_inst%somp_nuptake_col(c,j)
+                  endif
                else
-               do i = i_litr_min, i_litr_max
-                  nf_soil%decomp_npools_sourcesink_col(c,j,i) = &
+                  do i = i_litr_min, i_litr_max
+                     nf_soil%decomp_npools_sourcesink_col(c,j,i) = &
                      nf_veg%phenology_n_to_litr_n_col(c,j,i) * dt
-               end do
-            end if
+                  end do
+               end if
+
+            
 
                ! NOTE(wjs, 2017-01-02) This used to be set to a non-zero value, but the
                ! terms have been moved to CStateUpdateDynPatch. I think this is zeroed every
