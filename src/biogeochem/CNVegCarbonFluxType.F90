@@ -4861,6 +4861,7 @@ contains
     use subgridAveMod                      , only: p2c, c2g
     use SoilBiogeochemDecompCascadeConType , only: decomp_cascade_con
     use CNSharedParamsMod                  , only: use_fun
+    use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, decomp_method, mimics_decomp, mimicsplus_decomp, use_soil_matrixcn
     !
     ! !ARGUMENTS:
     class(cnveg_carbonflux_type)   :: this
@@ -4978,11 +4979,18 @@ contains
           end do
        end if
 
-       ! GR is the sum of current + transfer + storage GR
+       ! GR is the sum of current + transfer + storage GR !ECW if miicsplus add CO2_prod here (or new one)
        this%gr_patch(p) = &
             this%current_gr_patch(p)  + &
             this%transfer_gr_patch(p) + &
             this%storage_gr_patch(p)
+         if (decomp_method == mimicsplus_decomp) then
+            this%gr_patch(p) = &
+            this%current_gr_patch(p)  + &
+            this%transfer_gr_patch(p) + &
+            this%storage_gr_patch(p)  + &
+            this%CO2_prod(p)
+          end if
 
        ! autotrophic respiration (AR) adn 
        if ( use_crop .and. patch%itype(p) >= npcropmin )then
@@ -5000,6 +5008,13 @@ contains
        if (use_fun) then
           this%ar_patch(p) = this%ar_patch(p) + this%soilc_change_patch(p)
        end if
+
+      if (decomp_method == mimicsplus_decomp) then !ECW add mycorrhizal repiration during mining here
+         ! add resp_myc 
+         ! somc_cuptake(p,j)
+         ! somp_cuptake(p,j)
+      end if
+      
       
        ! gross primary production (GPP)
        this%gpp_patch(p) = &

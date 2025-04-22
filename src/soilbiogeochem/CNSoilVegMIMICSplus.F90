@@ -62,7 +62,7 @@ module CNSoilVegMIMICSplus
 
   ! ! PUBLIC DATA
   integer, public :: i_fixer = 1 
-  integer, public :: i_scav  = 2
+  integer, public :: i_scav  = 2 
   integer, public :: i_miner = 3
   integer, public :: n_symb  = 3
   
@@ -581,6 +581,7 @@ contains
  
    ! Mycorrhizal scavengers
    ! maint_resp, is not going directly into CO2 flux
+      !maint_resp is temporary, no need to do sth
    symb_growth(p,i_scav) = sulman_max_symb_growth * C_reservoir(p,i_scav) / (C_reservoir(p,i_scav) + sulman_kgrowth) * sulman_growth_scav * dt
    maint_resp = min(C_biomass(p,i_scav)/sulman_tau_scav * (1.0 - sulman_tau_sym) * dt, symb_growth(p,i_scav))
    ! Nitrogen limitation
@@ -589,6 +590,7 @@ contains
       symb_growth(p,i_scav) = sulman_cn_scav * N_reservoir(p,i_scav) * 0.9 + maint_resp
    end if
 
+   ! heterotrophic resp
    symb_CO2_prod(p) = symb_CO2_prod(p) + symb_growth(p,i_scav) / sulman_growth_scav * (1.0 - sulman_growth_scav)
 
    ! Intermediate pool scavenger
@@ -710,7 +712,7 @@ end do
          !ECW do I need to divide by dz?
          total_inorg_no3_uptake(p,j) = (no3_passiv_up(p,j) + no3_active_up(p,j) + no3_scav_up(p,j)) * dt
          ! If nitrogen uptake exceeds avaliable nitrogen, scale each uptake pathway down
-         if (total_inorg_no3_uptake(p,j) > smin_no3_avail(p,j) .and. total_inorg_no3_uptake(p,j) > tiny_number) then 
+         if (total_inorg_no3_uptake(p,j) > smin_no3_avail(p,j) .and. total_inorg_no3_uptake(p,j) > tiny_number) then !ECW find actual tiny number
            no3_passiv_up(p,j)  = no3_passiv_up(p,j)  * (smin_no3_avail(p,j) / total_inorg_no3_uptake(p,j))
            no3_active_up(p,j)  = no3_active_up(p,j)  * (smin_no3_avail(p,j) / total_inorg_no3_uptake(p,j))
            no3_scav_up(p,j)    = no3_scav_up(p,j)    * (smin_no3_avail(p,j) / total_inorg_no3_uptake(p,j))
@@ -875,6 +877,8 @@ end do
 
       ! ECW change when enzymes go into SOM pools
       ! enzymes can be calculated in resp_myc
+      ! This needs to be connected to soil carbon in CNCStateUpdate
+      ! Doubel check this in Sulman code
       if (soil_carbon > 0.0_r8 .and. wliq > 0.0_r8) then 
          resp_myc = Vmax_myc(soil_T) * soil_carbon * enzymes / (soil_carbon * params_inst%sulman_km_mine + enzymes) * theta_func
       else 
@@ -962,8 +966,17 @@ end do
            
            
            ! Calculate Nitrogen uptake by roots
-           no3_uptake(p,j) = rhizosphere_frac(p) * (params_inst%sulman_root_no3 / col%dz(c,j)) * (no3_soil(c,j) / (no3_soil(c,j) + params_inst%sulman_km_no3))
-           nh4_uptake(p,j) = rhizosphere_frac(p) * (params_inst%sulman_root_nh4 / col%dz(c,j)) * (nh4_soil(c,j) / (nh4_soil(c,j) + params_inst%sulman_km_nh4))
+           if (no3_soil (c,j) > 0.0_r8) then
+            no3_uptake(p,j) = rhizosphere_frac(p) * (params_inst%sulman_root_no3 / col%dz(c,j)) * (no3_soil(c,j) / (no3_soil(c,j) + params_inst%sulman_km_no3))
+           else
+             no3_uptake(p,j) = 0.0_r8
+           end if 
+
+           if (nh4_soil (c,j) > 0.0_r8) then
+            nh4_uptake(p,j) = rhizosphere_frac(p) * (params_inst%sulman_root_nh4 / col%dz(c,j)) * (nh4_soil(c,j) / (nh4_soil(c,j) + params_inst%sulman_km_nh4))
+           else
+            nh4_uptake(p,j) = 0.0_r8
+           end if 
 
            ! NO3 and NH4 uptake depends on how much N is available in soil
            no3_uptake(p,j) = min(no3_uptake(p,j), no3_soil(p,j))

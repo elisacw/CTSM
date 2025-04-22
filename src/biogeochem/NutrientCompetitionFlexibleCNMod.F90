@@ -209,6 +209,7 @@ contains
     use CNSharedParamsMod     , only : use_fun
     use CNPrecisionControlMod , only : n_min
     use clm_varcon            , only : spval
+    use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, mimicsplus_decomp, decomp_method
     !index for matrixcn
     use clm_varpar            , only : ileaf,ileaf_st,ileaf_xf,ifroot,ifroot_st,ifroot_xf,&
                                        ilivestem,ilivestem_st,ilivestem_xf,&
@@ -355,7 +356,8 @@ contains
          Nnonmyc                      => cnveg_nitrogenflux_inst%Nnonmyc_patch                     , & ! Output:  [real(r8) (:) ] Non-mycorrhizal N uptake (gN/m2/s)
          Nam                          => cnveg_nitrogenflux_inst%Nam_patch                         , & ! Output:  [real(r8) (:) ]  AM uptake (gN/m2/s)
          Necm                         => cnveg_nitrogenflux_inst%Necm_patch                        , & ! Output:  [real(r8) (:) ]  ECM uptake (gN/m2/s)
-         sminn_to_plant_fun           => cnveg_nitrogenflux_inst%sminn_to_plant_fun_patch          , & ! Output:  [real(r8) (:) ]  Total soil N uptake of FUN (gN/m2/s)
+         sminn_to_plant_fun           => cnveg_nitrogenflux_inst%sminn_to_plant_fun_patch          , & ! Output:  [real(r8) (:) ]  Total soil N uptake of FUN (gN/m2/s)        => cnveg_nitrogenflux_inst%sminn_to_plant_fun_patch          , & ! Output:  [real(r8) (:) ]  Total soil N uptake of FUN (gN/m2/s)
+         sminn_to_plant_mimicsplus    => cnveg_nitrogenflux_inst%sminn_to_plant_mimicsplus_patch   , & ! Output:  [real(r8) (:) ]  Total soil N uptake of MIMICSplus (gN/m2/s)        
 
          iretransn_to_ileaf           => cnveg_nitrogenflux_inst%iretransn_to_ileaf_ph             , & ! Transfer index (from retranslocation pool to leaf pool)
          iretransn_to_ileafst         => cnveg_nitrogenflux_inst%iretransn_to_ileafst_ph           , & ! Transfer index (from retranslocation pool to leaf storage pool)
@@ -438,6 +440,8 @@ contains
 
          if(use_fun)then ! if we are using FUN, we get the N available from there.
            sminn_to_npool(p) = sminn_to_plant_fun(p)
+         else if (decomp_method == mimicsplus_decomp) then 
+           sminn_to_npool(p) = sminn_to_plant_mimicsplus(p) !ECW
          else ! no FUN. :( we get N available from the FPG calculation in soilbiogeochemistry competition.
            sminn_to_npool(p) = plant_ndemand(p) * fpg(c)
          endif
@@ -456,6 +460,8 @@ contains
             if(use_matrixcn)then
                cnveg_carbonflux_inst%matrix_Cinput_patch(p) = npp_growth(p)
             end if
+         else if (decomp_method == mimicsplus_decomp) then 
+            plant_calloc(p)  = ! C to plant !ECW
          else
             plant_calloc(p)  = availc(p)
             if(use_matrixcn)then

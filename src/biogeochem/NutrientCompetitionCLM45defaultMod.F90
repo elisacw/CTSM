@@ -303,7 +303,8 @@ contains
          else ! no FUN. :( we get N available from the FPG calculation in soilbiogeochemistry competition.
             sminn_to_npool(p) = plant_ndemand(p) * fpg(c)
          endif
-
+         !ECW this is where N is taken up by plant follow this
+         ! if mimicsc plant_nalloc = n flux to plant 
          plant_nalloc(p) = sminn_to_npool(p) + retransn_to_npool(p)
          plant_calloc(p) = plant_nalloc(p) * (c_allometry(p)/n_allometry(p))
 
