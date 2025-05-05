@@ -230,6 +230,8 @@ module CNVegCarbonFluxType
      real(r8), pointer :: cpool_deadcroot_gr_patch                  (:)     ! dead coarse root growth respiration (gC/m2/s)
      real(r8), pointer :: cpool_deadcroot_storage_gr_patch          (:)     ! dead coarse root growth respiration to storage (gC/m2/s)
      real(r8), pointer :: transfer_deadcroot_gr_patch               (:)     ! dead coarse root growth respiration from storage (gC/m2/s)
+     real(r8), pointer :: symbiont_gr_patch                         (:)     ! symbiont respiration 
+     real(r8), pointer :: miner_gr_patch                            (:)     ! miner respiration during mining (gC/m2/s) !ECW rename?
 
      ! growth respiration for prognostic crop model
      real(r8), pointer :: cpool_reproductive_gr_patch               (:,:)   ! reproductive (e.g., grain) growth respiration (gC/m2/s)
@@ -406,7 +408,7 @@ module CNVegCarbonFluxType
      real(r8), pointer :: npp_Nfix_patch                            (:)     ! C used by Symbiotic BNF         (gC/m2/s)
      real(r8), pointer :: npp_Nretrans_patch                        (:)     ! C used by retranslocation       (gC/m2/s)
      real(r8), pointer :: npp_Nuptake_patch                         (:)     ! Total C used by N uptake in FUN (gC/m2/s)
-     real(r8), pointer :: npp_growth_patch                          (:)     ! Total C u for growth in FUN      (gC/m2/s)   
+     real(r8), pointer :: npp_growth_patch                          (:)     ! Total C u for growth in FUN / MIMICSplus (gC/m2/s)   
      real(r8), pointer :: leafc_change_patch                        (:)     ! Total used C from leaves        (gC/m2/s)
      real(r8), pointer :: soilc_change_patch                        (:)     ! Total used C from soil          (gC/m2/s)
 
@@ -976,6 +978,8 @@ contains
     allocate(this%cpool_deadcroot_gr_patch                  (begp:endp)) ; this%cpool_deadcroot_gr_patch                  (:) = nan
     allocate(this%cpool_deadcroot_storage_gr_patch          (begp:endp)) ; this%cpool_deadcroot_storage_gr_patch          (:) = nan
     allocate(this%transfer_deadcroot_gr_patch               (begp:endp)) ; this%transfer_deadcroot_gr_patch               (:) = nan
+    allocate(this%symbiont_gr_patch                         (begp:endp)) ; this%symbiont_gr_patch                         (:) = nan
+    allocate(this%miner_gr_patch                            (begp:endp)) ; this%miner_gr_patch                            (:) = nan
     allocate(this%leafc_storage_to_xfer_patch               (begp:endp)) ; this%leafc_storage_to_xfer_patch               (:) = nan
     allocate(this%frootc_storage_to_xfer_patch              (begp:endp)) ; this%frootc_storage_to_xfer_patch              (:) = nan
     allocate(this%livestemc_storage_to_xfer_patch           (begp:endp)) ; this%livestemc_storage_to_xfer_patch           (:) = nan
@@ -2004,6 +2008,16 @@ contains
             avgflag='A', long_name='dead coarse root growth respiration to storage', &
             ptr_patch=this%cpool_deadcroot_storage_gr_patch, default='inactive')
 
+       this%symbiont_gr_patch(begp:endp) = spval
+       call hist_addfld1d (fname='SYMBIONT_GR', units='gC/m^2/s', &
+            avgflag='A', long_name='symbiont respiration during growth', &
+            ptr_patch=this%symbiont_gr_patch, default='inactive')
+
+       this%miner_gr_patch(begp:endp) = spval
+       call hist_addfld1d (fname='SYMBIONT_GR', units='gC/m^2/s', &
+            avgflag='A', long_name='symbiont respiration during growth', &
+            ptr_patch=this%miner_gr_patch, default='inactive')
+
        this%transfer_deadcroot_gr_patch(begp:endp) = spval
        call hist_addfld1d (fname='TRANSFER_DEADCROOT_GR', units='gC/m^2/s', &
             avgflag='A', long_name='dead coarse root growth respiration from storage', &
@@ -2251,7 +2265,7 @@ contains
 
           this%npp_growth_patch(begp:endp) = spval
           call hist_addfld1d (fname='NPP_GROWTH', units='gC/m^2/s',      &
-               avgflag='A', long_name='Total C used for growth in FUN',  &
+               avgflag='A', long_name='Total C used for growth in FUN/MIMICSplus',  &
                ptr_patch=this%npp_growth_patch)
 
           this%leafc_change_patch(begp:endp) = spval
@@ -2753,6 +2767,8 @@ contains
        call hist_addfld1d (fname='C13_CPOOL_DEADCROOT_STORAGE_GR', units='gC13/m^2/s', &
             avgflag='A', long_name='C13 dead coarse root growth respiration to storage', &
             ptr_patch=this%cpool_deadcroot_storage_gr_patch, default='inactive')
+
+      !ECW add symbiont
 
        this%transfer_deadcroot_gr_patch(begp:endp) = spval
        call hist_addfld1d (fname='C13_TRANSFER_DEADCROOT_GR', units='gC13/m^2/s', &
@@ -3261,6 +3277,8 @@ contains
        call hist_addfld1d (fname='C14_CPOOL_DEADCROOT_STORAGE_GR', units='gC14/m^2/s', &
             avgflag='A', long_name='C14 dead coarse root growth respiration to storage', &
             ptr_patch=this%cpool_deadcroot_storage_gr_patch, default='inactive')
+
+      !ECW andd symb
 
        this%transfer_deadcroot_gr_patch(begp:endp) = spval
        call hist_addfld1d (fname='C14_TRANSFER_DEADCROOT_GR', units='gC14/m^2/s', &
@@ -4561,6 +4579,8 @@ contains
        this%transfer_livecroot_gr_patch(i)               = value_patch
        this%cpool_deadcroot_gr_patch(i)                  = value_patch
        this%cpool_deadcroot_storage_gr_patch(i)          = value_patch
+       this%symbiont_gr_patch(i)                         = value_patch
+       this%miner_gr_patch(i)                            = value_patch
        this%transfer_deadcroot_gr_patch(i)               = value_patch
        this%leafc_storage_to_xfer_patch(i)               = value_patch
        this%frootc_storage_to_xfer_patch(i)              = value_patch
@@ -4979,17 +4999,15 @@ contains
           end do
        end if
 
-       ! GR is the sum of current + transfer + storage GR !ECW if miicsplus add CO2_prod here (or new one)
+       ! GR is the sum of current + transfer + storage GR 
+       !ECW Necromass of symbionts is transferred into SOM pools, but is partly repiered here: symbiont_gr_patch
        this%gr_patch(p) = &
             this%current_gr_patch(p)  + &
             this%transfer_gr_patch(p) + &
             this%storage_gr_patch(p)
          if (decomp_method == mimicsplus_decomp) then
-            this%gr_patch(p) = &
-            this%current_gr_patch(p)  + &
-            this%transfer_gr_patch(p) + &
-            this%storage_gr_patch(p)  + &
-            this%CO2_prod(p)
+            this%gr_patch(p) =  this%gr_patch(p)   + &
+            this%symbiont_gr_patch(p)
           end if
 
        ! autotrophic respiration (AR) adn 
@@ -5010,6 +5028,8 @@ contains
        end if
 
       if (decomp_method == mimicsplus_decomp) then !ECW add mycorrhizal repiration during mining here
+         this%gr_patch(p) =  this%gr_patch(p)   + &
+         this%miner_gr_patch(p)
          ! add resp_myc 
          ! somc_cuptake(p,j)
          ! somp_cuptake(p,j)

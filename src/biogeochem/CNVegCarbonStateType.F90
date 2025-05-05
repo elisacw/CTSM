@@ -2434,7 +2434,7 @@ contains
                             this%matrix_cap_frootc_patch(i)            = 0._r8            
                             this%matrix_cap_frootc_storage_patch(i)    = 0._r8    
                          end if
-                      else
+                      else !ECW
                          if (pftcon%evergreen(patch%itype(i)) == 1._r8) then
                             this%leafc_patch(i)                        = cnvegcstate_const%initial_vegC * ratio     
                             this%leafc_storage_patch(i)                = 0._r8

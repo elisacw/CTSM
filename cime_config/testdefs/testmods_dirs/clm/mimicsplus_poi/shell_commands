@@ -1,0 +1,2 @@
+./xmlchange CLM_FORCE_COLDSTART="on"
+./xmlchange PTS_LAT=37.9,PTS_LON=110.7

@@ -376,7 +376,9 @@ contains
          iretransn_to_iout            => cnveg_nitrogenflux_inst%iretransn_to_iout_ph              , & ! Transfer index (from retranslocation pool to external)
          ileaf_to_iretransn           => cnveg_nitrogenflux_inst%ileaf_to_iretransn_ph             , & ! Transfer index (from leaf pool to retranslocation pools)
          ifroot_to_iretransn          => cnveg_nitrogenflux_inst%ifroot_to_iretransn_ph            , & ! Transfer index (from fine root pool to retranslocation pools)
-         ilivestem_to_iretransn       => cnveg_nitrogenflux_inst%ilivestem_to_iretransn_ph           & ! Transfer index (from live stem pool to retranslocation pools)
+         ilivestem_to_iretransn       => cnveg_nitrogenflux_inst%ilivestem_to_iretransn_ph         , & ! Transfer index (from live stem pool to retranslocation pools)
+         plantCN                      => cnveg_state_inst%plantCN_patch                              & ! Output:  [real(r8)  (:)]  Plant
+        
          )
 
       ! set time steps
@@ -446,7 +448,13 @@ contains
            sminn_to_npool(p) = plant_ndemand(p) * fpg(c)
          endif
 
-         plant_nalloc(p) = sminn_to_npool(p) + retransn_to_npool(p)
+         !ECW I don't hace retranslocation, maybe if statement here, to avoid it
+         ! Write a warning for if retransn_to_npool(p) is more than 0 and mimicsplus is active
+         if (decomp_method == mimicsplus_decomp) then
+            plant_nalloc(p) = sminn_to_npool(p)
+         else
+            plant_nalloc(p) = sminn_to_npool(p) + retransn_to_npool(p)
+         endif
          if(use_matrixcn)then
             associate( &
               matrix_Ninput => cnveg_nitrogenflux_inst%matrix_Ninput_patch & ! N input of matrix
@@ -455,13 +463,12 @@ contains
             end associate
          end if
 
-         if(use_fun)then
+         if(use_fun .or. &
+            decomp_method == mimicsplus_decomp)then
             plant_calloc(p)  = npp_growth(p)
             if(use_matrixcn)then
                cnveg_carbonflux_inst%matrix_Cinput_patch(p) = npp_growth(p)
             end if
-         else if (decomp_method == mimicsplus_decomp) then 
-            plant_calloc(p)  = ! C to plant !ECW
          else
             plant_calloc(p)  = availc(p)
             if(use_matrixcn)then
@@ -1406,6 +1413,7 @@ contains
                                        ideadcroot,ideadcroot_st,ideadcroot_xf,&
                                        igrain,igrain_st,igrain_xf,iretransn,ioutc,ioutn
     use CNVegMatrixMod         , only : matrix_update_phn
+    use SoilBiogeochemDecompCascadeConType, only : mimicsplus_decomp, decomp_method
     ! !ARGUMENTS:
     class(nutrient_competition_FlexibleCN_type), intent(inout) :: this
     type(bounds_type)               , intent(in)    :: bounds
@@ -1534,7 +1542,8 @@ contains
 
          nscalar = (this%actual_leafcn(p) - leafcn_min ) / (leafcn_max - leafcn_min)  ! Nitrogen scaler factor
          nscalar = min( max(0.0_r8, nscalar), 1.0_r8 )
-
+         
+         !ECW 
          c = patch%column(p)
          sminn_total = 0.0_r8
          do j = 1, nlevdecomp
@@ -1547,7 +1556,7 @@ contains
          temp_scalar=t_scalar(c,1)
          temp_scalar = min( max(0.0_r8, temp_scalar), 1.0_r8 )
 
-         if(use_fun)then ! in FUN, plant_ndemand is just used as a maximum draw on soil N pools. !ECWS
+         if(use_fun .or. decomp_method == mimicsplus_decomp)then ! in FUN, plant_ndemand is just used as a maximum draw on soil N pools. !ECWS
              plant_ndemand(p) = availc(p)*(n_allometry(p)/c_allometry(p))
          else !FUN
             if (laisun(p)+laisha(p) > 0.0_r8) then

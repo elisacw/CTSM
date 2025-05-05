@@ -169,9 +169,9 @@ contains
     real(r8) :: check_cpool
     real(r8) :: cpool_delta
     real(r8), parameter :: kprod05 = 1.44e-7_r8  ! decay constant for 0.5-year product pool (1/s) (lose ~90% over a half year)
-    real(r8), parameter :: symb_tau_soma = 0.4_r8 !ECW change maybe to more going into somc & p
-    real(r8), parameter :: symb_tau_somc = 0.3_r8
-    real(r8), parameter :: symb_tau_somp = 0.3_r8
+    real(r8), parameter :: symb_tau_soma = 0.2_r8 !ECW Flux in SOMc & SOMp pools is higher, as mycorrhizal necromass is harder to decompose
+    real(r8), parameter :: symb_tau_somc = 0.4_r8
+    real(r8), parameter :: symb_tau_somp = 0.4_r8
     !-----------------------------------------------------------------------
 
     associate(                                                               & 
@@ -223,11 +223,15 @@ contains
                         cf_veg%phenology_c_to_litr_c_col(c,j,i_str_lit) * dt
                      if (decomp_method == mimicsplus_decomp) then 
                         ! Fraction of necromass from symbiont into each SOM pool & enzyme flux !ECW
-                        cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som) = symbiont_inst%C_mortality(c,j)*symb_tau_soma
+                        !ECW increase necromass flux from myc to SOMc&p
+                        !ECW add leftover root C into SOMa
+                        cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som) = symbiont_inst%C_mortality(c,j)*symb_tau_soma &
+                                                                                 + symbiont_inst%root_exudate_C_col(c)
                         cf_soil%decomp_cpools_sourcesink_col(c,j,i_chem_som) = cf_soil%decomp_cpools_sourcesink_col(c,j,i_chem_som) &
-                                                                                 + symbiont_inst%C_mortality(c,j)*symb_tau_somc
+                                                                                 + symbiont_inst%C_mortality(c,j)*symb_tau_somc 
                         cf_soil%decomp_cpools_sourcesink_col(c,j,i_phys_som) = cf_soil%decomp_cpools_sourcesink_col(c,j,i_phys_som) &
                                                                                  + symbiont_inst%C_mortality(c,j)*symb_tau_somp
+
                      end if 
 
                      

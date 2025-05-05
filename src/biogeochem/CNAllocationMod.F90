@@ -169,7 +169,7 @@ contains
        ! since they are not always allocated AND nag compiler will complain if you try to
        ! to have an associate statement with unallocated memory
 
-       psnsun_to_cpool(p)   = psnsun(p) * laisun(p) * 12.011e-6_r8
+       psnsun_to_cpool(p)   = psnsun(p) * laisun(p) * 12.011e-6_r8 !ECW goes into c pool
        psnshade_to_cpool(p) = psnsha(p) * laisha(p) * 12.011e-6_r8
 
        if ( use_c13 ) then

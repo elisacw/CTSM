@@ -406,7 +406,7 @@ contains
             call t_startf('CN_soil_veg_exchange')
             call CN_soil_veg_exchange (filter_bgc_vegp, filter_bgc_soilc, num_bgc_vegp, num_bgc_soilc, bounds, symbiont_inst, &
                                        cnveg_nitrogenstate_inst, waterstatebulk_inst, temperature_inst, cnveg_carbonflux_inst, &
-                                       soilbiogeochem_nitrogenstate_inst, soilbiogeochem_nitrogenflux_inst, &
+                                       soilbiogeochem_nitrogenstate_inst, soilbiogeochem_nitrogenflux_inst, cnveg_state_inst, &
                                        waterfluxbulk_inst, soilstate_inst, cnveg_carbonstate_inst, soilbiogeochem_carbonstate_inst, cnveg_nitrogenflux_inst)
             call p2c(bounds, nlevdecomp, &
                      cnveg_nitrogenflux_inst%sminn_to_plant_mimicsplus_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp),&
@@ -823,7 +823,7 @@ contains
             call t_startf( 'CN_soil_veg_exchange' )
             call CN_soil_veg_exchange (filter_bgc_vegp, filter_bgc_soilc, num_bgc_vegp, num_bgc_soilc, bounds, symbiont_inst, &
             cnveg_nitrogenstate_inst, waterstatebulk_inst, temperature_inst, cnveg_carbonflux_inst, &
-            soilbiogeochem_nitrogenstate_inst, soilbiogeochem_nitrogenflux_inst, &
+            soilbiogeochem_nitrogenstate_inst, soilbiogeochem_nitrogenflux_inst, cnveg_state_inst, &
             waterfluxbulk_inst, soilstate_inst, cnveg_carbonstate_inst, soilbiogeochem_carbonstate_inst, cnveg_nitrogenflux_inst)
             call p2c(bounds,nlevdecomp, &
                        cnveg_nitrogenflux_inst%sminn_to_plant_mimicsplus_no3_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp),&
