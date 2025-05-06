@@ -507,7 +507,7 @@ contains
     allocate( this%wood_density  (0:mxpft) )
     allocate( this%crit_onset_gdd_sf (0:mxpft) )
     allocate( this%ndays_on      (0:mxpft) )
-    allocate(this%mimics_fi(2))
+    allocate( this%mimics_fi(2))
  
   end subroutine InitAllocate
 

@@ -125,7 +125,7 @@ module SoilBiogeochemDecompCascadeMIMICSMod
      real(r8) :: mimics_cn_mod_num  ! adjusts microbial CN based on fmet
      real(r8) :: mimics_t_soi_ref  ! reference soil temperature (degC)
      real(r8) :: mimics_initial_Cstocks_depth  ! Soil depth for initial C stocks for a cold-start (m)
-     real(r8) :: mimics_fi
+     real(r8), allocatable :: mimics_fi(:)
      real(r8), allocatable :: mimics_initial_Cstocks(:)  ! Initial C stocks for a cold-start (gC/m3)
 
      real(r8) :: mimicsplus_k_myc_som
@@ -399,10 +399,16 @@ contains
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%mimics_cn_k = tempr
 
+    !tString= trim(param_pref) // '_fi'
+    !call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    !if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    !params_inst%mimics_fi = tempr
+
+    allocate(params_inst%mimics_fi(2))
     tString= trim(param_pref) // '_fi'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    call ncd_io(trim(tString), params_inst%mimics_fi(:), 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%mimics_fi = tempr
+
 
    ! Parameters specific for mimicsplus / mimics parameters that have updated values in mimicsplus
    !ECW currently the normal mimics parameters are in use (even if they are edited in mimicsplus)
