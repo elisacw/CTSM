@@ -128,9 +128,9 @@ contains
     integer :: fp,fc     ! lake filter indices
     real(r8):: dt        ! radiation time step (seconds)
 
-    real(r8), parameter :: symb_tau_soma = 0.4_r8 !ECW change maybe to more going into somc & p
-    real(r8), parameter :: symb_tau_somc = 0.3_r8
-    real(r8), parameter :: symb_tau_somp = 0.3_r8
+    real(r8), parameter :: symb_tau_soma = 0.2_r8 !ECW Flux in SOMc & SOMp pools is higher, as mycorrhizal necromass is harder to decompose
+    real(r8), parameter :: symb_tau_somc = 0.4_r8
+    real(r8), parameter :: symb_tau_somp = 0.4_r8
     !-----------------------------------------------------------------------
 
 

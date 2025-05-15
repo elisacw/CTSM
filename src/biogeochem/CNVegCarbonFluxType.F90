@@ -5027,13 +5027,13 @@ contains
           this%ar_patch(p) = this%ar_patch(p) + this%soilc_change_patch(p)
        end if
 
-      if (decomp_method == mimicsplus_decomp) then !ECW add mycorrhizal repiration during mining here
-         this%gr_patch(p) =  this%gr_patch(p)   + &
-         this%miner_n_patch(p)
+      !if (decomp_method == mimicsplus_decomp) then !ECW add mycorrhizal repiration during mining here
+     !    this%gr_patch(p) =  this%gr_patch(p)   + &
+      !   this%miner_n_patch(p)
          ! add resp_myc 
          ! somc_cuptake(p,j)
          ! somp_cuptake(p,j)
-      end if
+      !end if
       
       
        ! gross primary production (GPP)

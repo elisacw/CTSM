@@ -125,8 +125,7 @@ module SoilBiogeochemDecompCascadeMIMICSMod
      real(r8) :: mimics_cn_mod_num  ! adjusts microbial CN based on fmet
      real(r8) :: mimics_t_soi_ref  ! reference soil temperature (degC)
      real(r8) :: mimics_initial_Cstocks_depth  ! Soil depth for initial C stocks for a cold-start (m)
-     real(r8), allocatable :: mimics_fi(:)
-     real(r8), allocatable :: mimics_initial_Cstocks(:)  ! Initial C stocks for a cold-start (gC/m3)
+     real(r8) :: mimics_fi
 
      real(r8) :: mimicsplus_k_myc_som
      real(r8) :: mimicsplus_k_mo
@@ -172,6 +171,7 @@ module SoilBiogeochemDecompCascadeMIMICSMod
      real(r8), allocatable :: sulman_cn_symbionts(:)     !C:N ratio of fixers, miners, scavengers as an array
      real(r8), allocatable :: sulman_initial_C_stocks(:) !Initial carbon stocks of fixers, miners, scavengers as an array
      real(r8), allocatable :: symb_tau_som(:)            !Fraction symbiont necromass into soil organic matter pools
+     real(r8), allocatable :: mimics_initial_Cstocks(:)  ! Initial C stocks for a cold-start (gC/m3)
      
      ! Sulman parameter
      real(r8) :: sulman_cn_m          !Soil microbial C:N ratio
@@ -399,17 +399,13 @@ contains
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%mimics_cn_k = tempr
 
-    !tString= trim(param_pref) // '_fi'
-    !call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    !if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    !params_inst%mimics_fi = tempr
-
-    allocate(params_inst%mimics_fi(2))
     tString= trim(param_pref) // '_fi'
-    call ncd_io(trim(tString), params_inst%mimics_fi(:), 'read', ncid, readvar=readv)
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%mimics_fi = tempr
 
-
+   
+    
    ! Parameters specific for mimicsplus / mimics parameters that have updated values in mimicsplus
    !ECW currently the normal mimics parameters are in use (even if they are edited in mimicsplus)
     
@@ -479,6 +475,8 @@ contains
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%mimicsplus_cn_myc = tempr
+
+    end if
 
     
     ! Sulman et al. Parameters
@@ -683,10 +681,6 @@ contains
     tString='symb_tau_som'
     call ncd_io(trim(tString), params_inst%symb_tau_som(:), 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-
-
-
-    end if
 
   end subroutine readParams
 
