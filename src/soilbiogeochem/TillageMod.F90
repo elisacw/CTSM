@@ -111,7 +111,7 @@ contains
     ! !USES
     use ncdio_pio , only : file_desc_t, ncd_io
     use clm_varpar, only : ndecomp_pools_max
-    use SoilBiogeochemDecompCascadeConType, only : no_soil_decomp, century_decomp, mimics_decomp, decomp_method
+    use SoilBiogeochemDecompCascadeConType, only : no_soil_decomp, century_decomp, mimics_decomp, mimicsplus_decomp, decomp_method
     !
     ! !ARGUMENTS:
     type(file_desc_t),intent(inout) :: ncid   ! pio netCDF file id
@@ -139,6 +139,8 @@ contains
         tString = 'bgc_till_decompk_multipliers'
     case( mimics_decomp )
         tString = 'mimics_till_decompk_multipliers'
+    case( mimicsplus_decomp )
+        tString = 'mimicsplus_till_decompk_multipliers'
     case default
        write(decomp_method_str, '(I3)') decomp_method
        call endrun('Bad decomp_method = '//decomp_method_str )

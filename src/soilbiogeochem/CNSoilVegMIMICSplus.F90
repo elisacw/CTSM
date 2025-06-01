@@ -8,13 +8,14 @@ module CNSoilVegMIMICSplus
   
   ! !USES:
   use shr_kind_mod                        , only : r8 => shr_kind_r8
+  use shr_infnan_mod                      , only :  isnan => shr_infnan_isnan
   use clm_time_manager                    , only : get_step_size_real
   use clm_varpar                          , only : nlevdecomp
   use spmdMod                             , only : masterproc
   use abortutils                          , only : endrun
   use clm_varctl                          , only : iulog
   use clm_varpar                          , only : i_litr_min, i_litr_max, i_cwd
-  use clm_varpar                          , only : i_met_lit, i_str_lit, i_phys_som, i_chem_som
+  use clm_varpar                          , only : i_met_lit, i_str_lit, i_phys_som, i_chem_som, i_avl_som
   use clm_time_manager                    , only : get_average_days_per_year, get_step_size
   use clm_varcon                          , only : secspday, secsphr, tfrz, spval
   use SoilBiogeochemDecompCascadeConType  , only : mimicsplus_decomp, decomp_method
@@ -40,6 +41,7 @@ module CNSoilVegMIMICSplus
   use abortutils                          , only : endrun
   use shr_log_mod                         , only : errMsg => shr_log_errMsg
   use ColumnType                          , only : col
+  use GridcellType                        , only : grc
  
   implicit none
   !
@@ -80,7 +82,7 @@ module CNSoilVegMIMICSplus
   real(r8), pointer           :: somp_nuptake_col      (:,:) ! Nitrogen uptake from SOMp pool per column  [gN/m2]
   real(r8), pointer           :: somc_cuptake_col      (:,:) ! Nitrogen uptake from SOMc pool per column  [gC/m2]
   real(r8), pointer           :: somp_cuptake_col      (:,:) ! Nitrogen uptake from SOMp pool per column  [gC/m2]
-  real(r8), pointer           :: root_exudate_C_col    (:)   ! Leftover C from allocation to symbionts    [gC/m2]
+  real(r8), pointer           :: root_exudate_C_col    (:,:)   ! Leftover C from allocation to symbionts    [gC/m2]
   logical, pointer            :: is_active             (:,:) ! If the symbiont type is active
   character(len=10), pointer  :: symb_name             (:)   ! Symbiont name
   character(len=10), pointer  :: symb_hist_name        (:)   ! Symbiont name on history tapes
@@ -183,7 +185,7 @@ contains
     allocate(this%somp_nuptake_col(begc:endc,1:nlevdecomp)) ; this%somp_nuptake_col(begc:endc,1:nlevdecomp) = 0.0_r8
     allocate(this%somc_cuptake_col(begc:endc,1:nlevdecomp)) ; this%somc_cuptake_col(begc:endc,1:nlevdecomp) = 0.0_r8
     allocate(this%somp_cuptake_col(begc:endc,1:nlevdecomp)) ; this%somp_cuptake_col(begc:endc,1:nlevdecomp) = 0.0_r8
-    allocate(this%root_exudate_C_col(begc:endc)) ; this%root_exudate_C_col(begc:endc) = 0.0_r8
+    allocate(this%root_exudate_C_col(begc:endc,1:nlevdecomp)) ; this%root_exudate_C_col(begc:endc,1:nlevdecomp) = 0.0_r8
    
    end subroutine InitAllocate
 
@@ -286,7 +288,7 @@ contains
       this%somp_nuptake_col(bounds%begc:bounds%endc,1:nlevdecomp) = 0.0_r8
       this%somc_cuptake_col(bounds%begc:bounds%endc,1:nlevdecomp) = 0.0_r8
       this%somp_cuptake_col(bounds%begc:bounds%endc,1:nlevdecomp) = 0.0_r8
-      this%root_exudate_C_col(bounds%begc:bounds%endc) = 0.0_r8
+      this%root_exudate_C_col(bounds%begc:bounds%endc,1:nlevdecomp) = 0.0_r8
 
     end subroutine InitCold
 
@@ -403,7 +405,7 @@ contains
    integer                                , intent(in)    :: filter_bgc_soilc(:) ! filter for soil columns
    
    ! !LOCAL VARIABLES
-   integer :: p, fp, c, fc, j, k, l, s, i
+   integer :: p, fp, c, fc, j, k, l, s, i, g
    integer :: begp, endp, begc, endc
    
    real(r8) :: root_dens_sum                                            ! Fine root C per layer [gC/m2]
@@ -442,6 +444,7 @@ contains
    real(r8) :: symb_turnover_layer_N(bounds%begp:bounds%endp, 1:nlevdecomp)       ! Symbiotic turnover per soil layer        [gN/m2]
 
    real(r8) :: root_exudate_C(bounds%begp:bounds%endp)                            ! Leftover C from allocation to symbionts    [gC/m2]
+   real(r8) :: root_exudate_C_layer(bounds%begp:bounds%endp,1:nlevdecomp)                            ! Leftover C from allocation to symbionts    [gC/m2]
    
    ! free_retransn_to_npool_patch = 0.0_r8 !for CNCStateUpdate
    begp = bounds%begp; endp= bounds%endp
@@ -497,7 +500,7 @@ contains
    availc               => cnveg_carbonflux_inst%availc_patch                , & ! Output:  (:) (gC/m2/s) C flux available for allocation 
    npp_growth           => cnveg_carbonflux_inst%npp_growth_patch            , & ! Output:  (:) (gC/m2/s) Total C u for growth in FUN / MIMICSplus
    symbiont_gr_patch    => cnveg_carbonflux_inst%symbiont_gr_patch           , & ! Output:  (:) (gC/m2/s) Total C loss of symbionts that is repired (maintainence & growth)
-   miner_n_patch       => cnveg_carbonflux_inst%miner_n_patch              , & ! Output:  (:) (gC/m2/s) Total C loss of SOM that is repired through mining
+   miner_n_patch       => cnveg_carbonflux_inst%miner_n_patch                , &  ! Output:  (:) (gC/m2/s) Total C loss of SOM that is repired through mining
 
    smin_nh4_vr          => soilbiogeochem_nitrogenstate_inst%smin_nh4_vr_col         , & ! Input:  (:,:) (gN/m3) col soil mineral NH4              
    smin_no3_vr          => soilbiogeochem_nitrogenstate_inst%smin_no3_vr_col         , & ! Input:  (:,:) (gN/m3) col soil mineral NO3              
@@ -539,15 +542,23 @@ contains
    C_allocation_to_N_acq(bounds%begp:bounds%endp)         = 0.0_r8
    smin_nh4_avail(bounds%begp:bounds%endp, 1:nlevdecomp)  = 0.0_r8
    smin_no3_avail(bounds%begp:bounds%endp, 1:nlevdecomp)  = 0.0_r8
+   symb_turnover_layer_C(bounds%begp:bounds%endp, 1:nlevdecomp)  = 0.0_r8 
+   symb_turnover_layer_N(bounds%begp:bounds%endp, 1:nlevdecomp)  = 0.0_r8 
+   myc_biomass_layer(bounds%begp:bounds%endp, 1:nlevdecomp)  = 0.0_r8
+   root_exudate_C(bounds%begp:bounds%endp) = 0.0_r8
+   root_exudate_C_layer(bounds%begp:bounds%endp,1:nlevdecomp) = 0.0_r8
 
    do fp = 1,num_soilp        
       p = filter_soilp(fp)
       c = patch%column(p)
-
+      g = patch%gridcell(p)
       root_dens_sum = 0.0_r8
 
       do j = 1, nlevdecomp
          root_dens_sum = root_dens_sum + crootfr(p,j) * frootc(p)
+         if (isnan(decomp_cpools_vr(c,j,i_avl_som))) then
+            write(iulog,*)'ECW, AVL IS NAN ', grc%latdeg(g),grc%londeg(g)
+         endif
       end do
       do j = 1, nlevdecomp
          if (root_dens_sum > 0.0_r8) then
@@ -814,7 +825,8 @@ contains
   call update_symbionts(filter_soilp, filter_bgc_soilc, num_soilp, num_bgc_soilc, &
                         bounds, symbiont_inst, cnveg_nitrogenstate_inst, cnveg_nitrogenflux_inst, cnveg_carbonflux_inst, &
                         cnveg_state_inst, C_allocation_to_N_acq(bounds%begp:bounds%endp), symb_CO2_prod(bounds%begp:bounds%endp), &
-                        symbiont_turnover_C(bounds%begp:bounds%endp, 1:n_symb), symbiont_turnover_N(bounds%begp:bounds%endp, 1:n_symb))
+                        symbiont_turnover_C(bounds%begp:bounds%endp, 1:n_symb), symbiont_turnover_N(bounds%begp:bounds%endp, 1:n_symb),&
+                        root_exudate_C(bounds%begp:bounds%endp))
 
    npp_growth(bounds%begp:bounds%endp) = C_allocation_to_N_acq(bounds%begp:bounds%endp)
    ! update the symb_turnover_C and _N to per layer variable with root_dens_frac with a patch/layer loops
@@ -822,6 +834,7 @@ contains
       do p = bounds%begp,bounds%endp
          symb_turnover_layer_C(p,j) = (symbiont_turnover_C(p,i_miner) + symbiont_turnover_C(p,i_scav) + symbiont_turnover_C(p,i_fixer)) * root_dens_frac (p,j)
          symb_turnover_layer_N(p,j) = (symbiont_turnover_N(p,i_miner) + symbiont_turnover_N(p,i_scav) + symbiont_turnover_N(p,i_fixer)) * root_dens_frac (p,j)
+         root_exudate_C_layer(p,j) = root_exudate_C(p) * root_dens_frac(p,j)
          ! add enzymes here
          myc_biomass_layer(p,j) = C_biomass(p,i_miner) * root_dens_frac(p,j)
          symb_turnover_layer_C(p,j) = symb_turnover_layer_C(p,j) ! + calc_enzymes(myc_biomass_layer(p,j)) ! If this is active the enzymes will go into SOM pools
@@ -854,15 +867,13 @@ contains
       call p2c(bounds, num_bgc_soilc, filter_bgc_soilc, &
       somp_cuptake(bounds%begp:bounds%endp,j), &
       somp_cuptake_col(bounds%begc:bounds%endc,j))
-
       call p2c(bounds, num_bgc_soilc, filter_bgc_soilc, &
-      root_exudate_C(bounds%begp:bounds%endp), &
-      root_exudate_C_col(bounds%begc:bounds%endc))
-
-
+      root_exudate_C_layer(bounds%begp:bounds%endp,j), &
+      root_exudate_C_col(bounds%begc:bounds%endc,j))
       ! cuptake (CO2) can stay per patch
       ! everything that goes into soil has to be per column per layer
   end do
+
    end associate
    end subroutine CN_soil_veg_exchange
 
@@ -1311,7 +1322,7 @@ contains
   subroutine update_symbionts(filter_soilp, filter_bgc_soilc, num_soilp, num_bgc_soilc, &
                               bounds, symbiont_inst, cnveg_nitrogenstate_inst, cnveg_nitrogenflux_inst, &
                               cnveg_carbonflux_inst, cnveg_state_inst, C_allocation_to_N_acq, &
-                              symb_CO2_prod, symbiont_turnover_C, symbiont_turnover_N)
+                              symb_CO2_prod, symbiont_turnover_C, symbiont_turnover_N,root_exudate_C)
 
    ! ! USES:
    use CNVegNitrogenStateType          , only: cnveg_nitrogenstate_type
@@ -1335,7 +1346,8 @@ contains
    real(r8), intent(in)    :: C_allocation_to_N_acq(bounds%begp:bounds%endp) ! Carbon allocated to nitrogen acquisition [gC/m2/s)]
    real(r8), intent(inout) :: symb_CO2_prod(bounds%begp:bounds%endp)         ! Total carbon loss of symbionts that is repired (maintainence & growth) [gC/m2/s]
    real(r8), intent(out)   :: symbiont_turnover_C(bounds%begp:bounds%endp, 1:n_symb) ! Part of symbiont turnover not lost through repiration [gC/m2]
-   real(r8), intent(out)   :: symbiont_turnover_N(bounds%begp:bounds%endp, 1:n_symb) ! Part of symbiont turnover not lost through repiration [gN/m2]
+   real(r8), intent(out)   :: symbiont_turnover_N(bounds%begp:bounds%endp, 1:n_symb) ! Part of symbiont turnover not lost through repiration [gN/m2
+   real(r8), intent(out)   :: root_exudate_C(bounds%begp:bounds%endp)           ! Leftover C from allocation to symbionts    [gC/m2]
    
    !
    ! ! LOCAL VARIABLES:
@@ -1368,7 +1380,6 @@ contains
    real(r8) :: scav_alloc_accum(bounds%begp:bounds%endp)         ! Accumulated carbon allocation from plant to miner pool     [gC/m2]
   
    real(r8),parameter :: root_exudate_frac = 0.05                ! Fraction of NPP that goes into root exudates, same as sulman_fn_alloc
-   real(r8) :: root_exudate_C(bounds%begp:bounds%endp)           ! Leftover C from allocation to symbionts    [gC/m2]
    real(r8) :: root_N_uptake(bounds%begp:bounds%endp)            !
    
    associate(                                                                    &
@@ -1387,7 +1398,7 @@ contains
    symb_eff               => symbiont_inst%symb_eff                            , & ! Symbiont efficiency N uptake per unit of mycorrhizal C biomass
    C_mortality            => symbiont_inst%C_mortality                         , & ! Symbiotic turnover per soil layer and column [gC/m2]
    N_mortality            => symbiont_inst%N_mortality                         , & ! Symbiotic turnover per soil layer and column [gN/m2]
-   root_exudate_C_col     => symbiont_inst%root_exudate_C_col                  , & ! Leftover carbon from plant C allocation      [gC/m2]
+   !root_exudate_C_col     => symbiont_inst%root_exudate_C_col                  , & ! Leftover carbon from plant C allocation      [gC/m2]
    sminn_to_plant_mimicsplus => cnveg_nitrogenflux_inst%sminn_to_plant_mimicsplus_patch & ! Output:[real(r8) (:) ]  nitrogen sent to plant (gN/m2/s)
    
    )

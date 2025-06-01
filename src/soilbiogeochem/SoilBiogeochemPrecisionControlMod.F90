@@ -6,9 +6,12 @@ module SoilBiogeochemPrecisionControlMod
   ! 
   ! !USES:
   use shr_kind_mod                    , only : r8 => shr_kind_r8
+  use shr_infnan_mod                  , only :  isnan => shr_infnan_isnan
   use clm_varpar                      , only : ndecomp_pools
   use SoilBiogeochemCarbonStateType   , only : soilbiogeochem_carbonstate_type
   use SoilBiogeochemNitrogenStateType , only : soilbiogeochem_nitrogenstate_type
+  use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con
+  use clm_time_manager       , only : get_nstep
   use ColumnType                      , only : col
   !
   implicit none
@@ -123,6 +126,12 @@ contains
 
             ! all decomposing pools C and N
             do k = 1, ndecomp_pools
+
+               !write(iulog,*) 'cs =', cs
+               if (isnan(cs%decomp_cpools_vr_col(c,j,k))) then
+                  write(iulog,*) 'ECW ',decomp_cascade_con%decomp_pool_name_short(k),' =', abs(cs%decomp_cpools_vr_col(c,j,k))
+                  write(iulog,*) 'at timestep : ', get_nstep(), col%dz(c,j)
+               endif
 
                if (abs(cs%decomp_cpools_vr_col(c,j,k)) < ccrit) then
 

@@ -5,9 +5,11 @@ module CNCStateUpdate1Mod
   !
   ! !USES:
   use shr_kind_mod                       , only : r8 => shr_kind_r8
+  use shr_infnan_mod                      , only :  isnan => shr_infnan_isnan
   use shr_log_mod                        , only : errMsg => shr_log_errMsg
   use clm_varpar                         , only : ndecomp_cascade_transitions, nlevdecomp
   use clm_time_manager                   , only : get_step_size_real
+  use clm_varctl                         , only : iulog
   use clm_varpar                         , only : i_litr_min, i_litr_max, i_cwd
   use clm_varpar                         , only : i_met_lit, i_str_lit, i_phys_som, i_avl_som, i_chem_som
   use pftconMod                          , only : npcropmin, nc3crop, pftcon
@@ -35,6 +37,8 @@ module CNCStateUpdate1Mod
   public :: CStateUpdate0
   public :: CStateUpdate1
   !-----------------------------------------------------------------------
+  character(len=*), parameter, private :: sourcefile = &
+  __FILE__
 
 contains
 
@@ -226,7 +230,7 @@ contains
                         !ECW increase necromass flux from myc to SOMc&p
                         !ECW add leftover root C into SOMa
                         cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som) = symbiont_inst%C_mortality(c,j)*symb_tau_soma &
-                                                                                 + symbiont_inst%root_exudate_C_col(c)
+                                                                                 + symbiont_inst%root_exudate_C_col(c,j)
                         cf_soil%decomp_cpools_sourcesink_col(c,j,i_chem_som) = cf_soil%decomp_cpools_sourcesink_col(c,j,i_chem_som) &
                                                                                  + symbiont_inst%C_mortality(c,j)*symb_tau_somc 
                         cf_soil%decomp_cpools_sourcesink_col(c,j,i_phys_som) = cf_soil%decomp_cpools_sourcesink_col(c,j,i_phys_som) &
@@ -237,6 +241,14 @@ contains
                                                                                  + symbiont_inst%somc_cuptake_col(c,j) &
                                                                                  + symbiont_inst%somp_cuptake_col(c,j)
 
+                         !ECW ERROR MESSAGE HERE NEXT
+
+                        if(isnan(cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som))) then
+                           write(iulog,*) 'symb_cup ', symbiont_inst%somc_cuptake_col(c,j), symbiont_inst%somp_cuptake_col(c,j)
+                           write(iulog,*),'symb mort', symbiont_inst%C_mortality(c,j)
+                           write(iulog,*), 'symb excu ', symbiont_inst%root_exudate_C_col(c,j)
+                           call endrun(msg=errmsg(sourcefile, __LINE__))
+                        endif
                      end if 
 
                      
