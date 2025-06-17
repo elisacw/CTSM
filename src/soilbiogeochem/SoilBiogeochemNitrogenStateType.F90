@@ -53,6 +53,7 @@ module SoilBiogeochemNitrogenStateType
      real(r8), pointer :: totlitn_col                  (:)     ! col (gN/m2) total litter nitrogen
      real(r8), pointer :: totmicn_col                  (:)     ! col (gN/m2) total microbial nitrogen
      real(r8), pointer :: totsomn_col                  (:)     ! col (gN/m2) total soil organic matter nitrogen
+     real(r8), pointer :: totsymbn_col                 (:)     ! col (gN/m2) total nitrogen from symbionts
      real(r8), pointer :: totlitn_1m_col               (:)     ! col (gN/m2) total litter nitrogen to 1 meter
      real(r8), pointer :: totsomn_1m_col               (:)     ! col (gN/m2) total soil organic matter nitrogen to 1 meter
      real(r8), pointer :: dyn_nbal_adjustments_col (:) ! (gN/m2) adjustments to each column made in this timestep via dynamic column adjustments (note: this variable only makes sense at the column-level: it is meaningless if averaged to the gridcell-level)
@@ -145,6 +146,7 @@ contains
     allocate(this%totlitn_col          (begc:endc))                   ; this%totlitn_col          (:)   = nan
     allocate(this%totmicn_col          (begc:endc))                   ; this%totmicn_col          (:)   = nan
     allocate(this%totsomn_col          (begc:endc))                   ; this%totsomn_col          (:)   = nan
+    allocate(this%totsymbn_col         (begc:endc))                   ; this%totsymbn_col         (:)   = nan
     allocate(this%totlitn_1m_col       (begc:endc))                   ; this%totlitn_1m_col       (:)   = nan
     allocate(this%totsomn_1m_col       (begc:endc))                   ; this%totsomn_1m_col       (:)   = nan
     allocate(this%dyn_nbal_adjustments_col (begc:endc)) ; this%dyn_nbal_adjustments_col (:) = nan
@@ -369,6 +371,11 @@ contains
     call hist_addfld1d (fname='TOTSOMN', units='gN/m^2', &
          avgflag='A', long_name='total soil organic matter N', &
          ptr_col=this%totsomn_col)
+      
+    this%totsymbn_col(begc:endc) = spval
+    call hist_addfld1d (fname='TOTSYMBN', units='gN/m^2', &
+         avgflag='A', long_name='total symbiont organic matter N', &
+         ptr_col=this%totsymbn_col)
 
     this%dyn_nbal_adjustments_col(begc:endc) = spval
     call hist_addfld1d (fname='DYN_COL_SOIL_ADJUSTMENTS_N', units='gN/m^2', &
@@ -512,6 +519,7 @@ contains
           this%totlitn_col(c)    = 0._r8
           this%totmicn_col(c)    = 0._r8
           this%totsomn_col(c)    = 0._r8
+          this%totsymbn_col(c)   = 0._r8
           this%totlitn_1m_col(c) = 0._r8
           this%totsomn_1m_col(c) = 0._r8
           this%cwdn_col(c)       = 0._r8
@@ -944,6 +952,7 @@ contains
        this%totlitn_col(i)     = value_column
        this%totmicn_col(i)     = value_column
        this%totsomn_col(i)     = value_column
+       this%totsymbn_col(i)    = value_column
        this%totsomn_1m_col(i)  = value_column
        this%totlitn_1m_col(i)  = value_column
     end do
@@ -1048,6 +1057,7 @@ contains
     real(r8) :: maxdepth    ! depth to integrate soil variables
     real(r8) :: totvegn_col ! local total ecosys veg N, allows 0 for fates
     real(r8) :: ecovegn_col ! local total veg N, allows 0 for fates
+    real(r8) :: symbn_col   ! local total N from symbiotic uptake from mimicsplus
     !-----------------------------------------------------------------------
 
    ! vertically integrate NO3 NH4 N2O pools
@@ -1309,6 +1319,12 @@ contains
            totvegn_col
       
    end do
+
+   ! Adding symbiotic biomass to total ecosystem & column nitrogen for mimicsplus
+   if (decomp_method == mimicsplus_decomp) then
+      this%totecosysn_col(c) = this%totecosysn_col(c) + this%totsymbn_col(c)
+      this%totn_col(c) = this%totn_col(c) + this%totsymbn_col(c)
+   endif
    
  end subroutine Summary
 

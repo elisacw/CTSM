@@ -243,12 +243,24 @@ contains
 
                          !ECW ERROR MESSAGE HERE NEXT
 
-                        if(isnan(cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som))) then
-                           write(iulog,*) 'symb_cup ', symbiont_inst%somc_cuptake_col(c,j), symbiont_inst%somp_cuptake_col(c,j)
-                           write(iulog,*),'symb mort', symbiont_inst%C_mortality(c,j)
-                           write(iulog,*), 'symb excu ', symbiont_inst%root_exudate_C_col(c,j)
+                        if(isnan(cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som)) .or. &
+                            abs(cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som)) > 100000._r8) then
+                           write(iulog,*) 'avl_symb_cup ', symbiont_inst%somc_cuptake_col(c,j), symbiont_inst%somp_cuptake_col(c,j)
+                           write(iulog,*),'avl_symb mort', symbiont_inst%C_mortality(c,j)
+                           write(iulog,*), 'avl_symb excu ', symbiont_inst%root_exudate_C_col(c,j)
+                        elseif (isnan(cf_soil%decomp_cpools_sourcesink_col(c,j,i_chem_som)) .or. &
+                           abs(cf_soil%decomp_cpools_sourcesink_col(c,j,i_chem_som)) > 100000._r8) then
+                          write(iulog,*) 'chem_symb_cup ', symbiont_inst%somc_cuptake_col(c,j), symbiont_inst%somp_cuptake_col(c,j)
+                          write(iulog,*),'chem_symb mort', symbiont_inst%C_mortality(c,j)
+                          write(iulog,*), 'chem_symb excu ', symbiont_inst%root_exudate_C_col(c,j)
+                        elseif (isnan(cf_soil%decomp_cpools_sourcesink_col(c,j,i_phys_som)) .or. &
+                           abs(cf_soil%decomp_cpools_sourcesink_col(c,j,i_phys_som)) > 100000._r8) then
+                          write(iulog,*) 'phys_symb_cup ', symbiont_inst%somc_cuptake_col(c,j), symbiont_inst%somp_cuptake_col(c,j)
+                          write(iulog,*),'phys_symb mort', symbiont_inst%C_mortality(c,j)
+                          write(iulog,*), 'phys_symb excu ', symbiont_inst%root_exudate_C_col(c,j)
                            call endrun(msg=errmsg(sourcefile, __LINE__))
                         endif
+                        
                      end if 
 
                      

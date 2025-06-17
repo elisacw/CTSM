@@ -38,6 +38,7 @@ module SoilBiogeochemCarbonStateType
      real(r8), pointer :: totlitc_col             (:)   ! (gC/m2) total litter carbon
      real(r8), pointer :: totlitc_1m_col          (:)   ! (gC/m2) total litter carbon to 1 meter
      real(r8), pointer :: totsomc_col             (:)   ! (gC/m2) total soil organic matter carbon
+     real(r8), pointer :: totsymbc_col            (:)   ! (gC/m2) total carbon from symbionts
      real(r8), pointer :: totsomc_1m_col          (:)   ! (gC/m2) total soil organic matter carbon to 1 meter
      real(r8), pointer :: cwdc_col                (:)   ! (gC/m2) coarse woody debris C (diagnostic)
      real(r8), pointer :: decomp_cpools_1m_col    (:,:) ! (gC/m2)  Diagnostic: decomposing (litter, cwd, soil) c pools to 1 meter
@@ -170,6 +171,7 @@ contains
     allocate(this%totmicc_col    (begc :endc)) ; this%totmicc_col    (:) = nan
     allocate(this%totlitc_col    (begc :endc)) ; this%totlitc_col    (:) = nan
     allocate(this%totsomc_col    (begc :endc)) ; this%totsomc_col    (:) = nan
+    allocate(this%totsymbc_col    (begc :endc)) ; this%totsymbc_col    (:) = nan
     allocate(this%totlitc_1m_col (begc :endc)) ; this%totlitc_1m_col (:) = nan
     allocate(this%totsomc_1m_col (begc :endc)) ; this%totsomc_1m_col (:) = nan
     allocate(this%dyn_cbal_adjustments_col (begc:endc)) ; this%dyn_cbal_adjustments_col (:) = nan
@@ -290,6 +292,11 @@ contains
        call hist_addfld1d (fname='TOTSOMC', units='gC/m^2', &
             avgflag='A', long_name='total soil organic matter carbon', &
             ptr_col=this%totsomc_col)
+      
+       this%totsymbc_col(begc:endc) = spval
+       call hist_addfld1d (fname='TOTSYMBC', units='gC/m^2', &
+            avgflag='A', long_name='total symbiont organic matter carbon', &
+            ptr_col=this%totsymbc_col)
 
        if ( nlevdecomp_full > 1 ) then
           this%totlitc_1m_col(begc:endc) = spval
@@ -683,6 +690,7 @@ contains
           this%totmicc_col(c)    = 0._r8
           this%totlitc_col(c)    = 0._r8
           this%totsomc_col(c)    = 0._r8
+          this%totsymbc_col(c)   = 0._r8
           this%totlitc_1m_col(c) = 0._r8
           this%totsomc_1m_col(c) = 0._r8
 
@@ -1339,6 +1347,7 @@ contains
        this%totlitc_col(i)    = value_column
        this%totlitc_1m_col(i) = value_column
        this%totsomc_col(i)    = value_column
+       this%totsymbc_col(i)   = value_column
        this%totsomc_1m_col(i) = value_column
        this%totc_col(i)       = value_column
        this%totecosysc_col(i) = value_column
@@ -1646,6 +1655,12 @@ contains
             this%totsomc_col(c) + &
             this%ctrunc_col(c)  + &
             totvegc_col
+
+       ! Adding symbiotic biomass to total ecosystem & column nitrogen for mimicsplus
+         if (decomp_method == mimicsplus_decomp) then
+            this%totecosysc_col(c) = this%totecosysc_col(c) + this%totsymbc_col(c)
+            this%totc_col(c) = this%totc_col(c) + this%totsymbc_col(c)
+         endif
     end do
        
   end subroutine Summary
