@@ -5006,8 +5006,8 @@ contains
             this%transfer_gr_patch(p) + &
             this%storage_gr_patch(p)
          if (decomp_method == mimicsplus_decomp) then
-            this%gr_patch(p) =  this%gr_patch(p)   + &
-            this%symbiont_gr_patch(p)
+            this%gr_patch(p) =  this%gr_patch(p)   !+ &
+            !this%symbiont_gr_patch(p)
           end if
 
        ! autotrophic respiration (AR) adn 

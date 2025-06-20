@@ -174,7 +174,6 @@ module SoilBiogeochemDecompCascadeMIMICSMod
      real(r8), allocatable :: mimics_initial_Cstocks(:)  ! Initial C stocks for a cold-start (gC/m3)
      
      ! Sulman parameter
-     real(r8) :: sulman_cn_m          !Soil microbial C:N ratio
      real(r8) :: sulman_v_nh4         !Maximum NH4+ immobilization rate [s-1]
      real(r8) :: sulman_v_no3         !Maximum NO3- immobilization rate [s-1]
      real(r8) :: sulman_vmax_denit    !Maximum denitrification decomposition rate at reference temperature [s-1]
@@ -480,12 +479,6 @@ contains
 
     
     ! Sulman et al. Parameters
-
-    tString='sulman_cn_m'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%sulman_cn_m=tempr
-
     tString='sulman_v_nh4'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))

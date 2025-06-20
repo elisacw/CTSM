@@ -172,7 +172,7 @@ contains
     real(r8) :: dt        ! radiation time step (seconds)
     real(r8) :: check_cpool
     real(r8) :: cpool_delta
-    real(r8), parameter :: kprod05 = 1.44e-7_r8  ! decay constant for 0.5-year product pool (1/s) (lose ~90% over a half year)
+    real(r8), parameter :: kprod05 = 1.44e-7_r8   ! decay constant for 0.5-year product pool (1/s) (lose ~90% over a half year)
     real(r8), parameter :: symb_tau_soma = 0.2_r8 !ECW Flux in SOMc & SOMp pools is higher, as mycorrhizal necromass is harder to decompose
     real(r8), parameter :: symb_tau_somc = 0.4_r8
     real(r8), parameter :: symb_tau_somp = 0.4_r8
@@ -232,14 +232,17 @@ contains
                         cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som) = symbiont_inst%C_mortality(c,j)*symb_tau_soma &
                                                                                  + symbiont_inst%root_exudate_C_col(c,j)
                         cf_soil%decomp_cpools_sourcesink_col(c,j,i_chem_som) = cf_soil%decomp_cpools_sourcesink_col(c,j,i_chem_som) &
-                                                                                 + symbiont_inst%C_mortality(c,j)*symb_tau_somc 
+                                                                                 + symbiont_inst%C_mortality(c,j)*symb_tau_somc &
+                                                                                 - symbiont_inst%somc_cuptake_col(c,j)
                         cf_soil%decomp_cpools_sourcesink_col(c,j,i_phys_som) = cf_soil%decomp_cpools_sourcesink_col(c,j,i_phys_som) &
-                                                                                 + symbiont_inst%C_mortality(c,j)*symb_tau_somp
+                                                                                 + symbiont_inst%C_mortality(c,j)*symb_tau_somp &
+                                                                                 - symbiont_inst%somp_cuptake_col(c,j) 
 
                         ! Carbon send to SOMa due to mining
                         cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som) = cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som) &
                                                                                  + symbiont_inst%somc_cuptake_col(c,j) &
-                                                                                 + symbiont_inst%somp_cuptake_col(c,j)
+                                                                                 + symbiont_inst%somp_cuptake_col(c,j) &
+                                                                                 + symbiont_inst%C_enz_mine2soma_col(c,j)
 
                          !ECW ERROR MESSAGE HERE NEXT
 
