@@ -824,7 +824,8 @@ contains
       p = filter_soilp(fp)
       c = patch%column(p)
 
-       ! GROWTH AND TURNOVER
+      ! GROWTH AND TURNOVER
+      !TKB
      
        ! Mycorrhizal scavengers
        ! maint_resp, is not going directly into CO2 flux
@@ -869,7 +870,6 @@ contains
        C_biomass(p,i_miner) = (C_biomass(p,i_miner) + symb_growth(p,i_miner)) - C_biomass(p,i_miner) * sulman_tau_mine * dt 
        ! N_biomass(p,i_miner) = N_biomass(p,i_miner) + (symb_growth(p,i_miner) - maint_resp) / sulman_cn_mine - N_biomass(p,i_miner) / sulman_tau_mine * sulman_tau_sym * dt
        N_biomass(p,i_miner) = C_biomass(p,i_miner) / sulman_cn_mine
-
 
        C_reservoir(p,i_miner) = ((C_reservoir(p,i_miner) - symb_growth(p,i_miner) / sulman_growth_mine)) !- C_enz_mine2soma(p,j)±
         N_reservoir(p,i_miner) = N_reservoir(p,i_miner) - (symb_growth(p,i_miner) - maint_resp) / sulman_cn_mine
