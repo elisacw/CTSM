@@ -946,7 +946,7 @@ contains
           if (.not. use_nitrif_denitrif) then
              this%sminn_to_denit_excess_vr_col(i,j)      = value_column
              this%sminn_leached_vr_col(i,j)              = value_column
-             this%sminn_to_plant_mimicsplus_vr_col(i,j)         = value_column
+             this%sminn_to_plant_mimicsplus_vr_col(i,j)  = value_column
              this%sminn_to_plant_fun_vr_col(i,j)         = value_column
           else
              this%f_nit_vr_col(i,j)                      = value_column

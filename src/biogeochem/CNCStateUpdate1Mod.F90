@@ -241,8 +241,8 @@ contains
                         ! Carbon send to SOMa due to mining
                         cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som) = cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som) &
                                                                                  + symbiont_inst%somc_cuptake_col(c,j) &
-                                                                                 + symbiont_inst%somp_cuptake_col(c,j) &
-                                                                                 + symbiont_inst%C_enz_mine2soma_col(c,j)
+                                                                                 + symbiont_inst%somp_cuptake_col(c,j) ! &
+                                                                                 !+ symbiont_inst%C_enz_mine2soma_col(c,j)
 
                          !ECW ERROR MESSAGE HERE NEXT
 

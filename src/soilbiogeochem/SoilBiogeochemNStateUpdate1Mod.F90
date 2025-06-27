@@ -242,7 +242,7 @@ contains
                   ns%smin_no3_vr_col(c,j) = ns%smin_no3_vr_col(c,j) -  nf%sminn_to_plant_fun_no3_vr_col(c,j)*dt
                
                else if ( decomp_method == mimicsplus_decomp) then
-                  ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) -  nf%sminn_to_plant_mimicsplus_nh4_vr_col(c,j)*dt
+                  ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) -  nf%sminn_to_plant_mimicsplus_nh4_vr_col(c,j)*dt !ECW consider renaming
 
                   ns%smin_no3_vr_col(c,j) = ns%smin_no3_vr_col(c,j) -  nf%sminn_to_plant_mimicsplus_no3_vr_col(c,j)*dt
                
