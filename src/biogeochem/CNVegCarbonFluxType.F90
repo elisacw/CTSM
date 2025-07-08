@@ -231,7 +231,7 @@ module CNVegCarbonFluxType
      real(r8), pointer :: cpool_deadcroot_storage_gr_patch          (:)     ! dead coarse root growth respiration to storage (gC/m2/s)
      real(r8), pointer :: transfer_deadcroot_gr_patch               (:)     ! dead coarse root growth respiration from storage (gC/m2/s)
      real(r8), pointer :: symbiont_gr_patch                         (:)     ! symbiont respiration 
-     real(r8), pointer :: miner_n_patch                            (:)     ! miner respiration during mining (gC/m2/s) !ECW rename?
+     real(r8), pointer :: miner_n_patch                            (:)      ! miner respiration during mining (gC/m2/s) !ECW rename?
 
      ! growth respiration for prognostic crop model
      real(r8), pointer :: cpool_reproductive_gr_patch               (:,:)   ! reproductive (e.g., grain) growth respiration (gC/m2/s)
@@ -4580,7 +4580,7 @@ contains
        this%cpool_deadcroot_gr_patch(i)                  = value_patch
        this%cpool_deadcroot_storage_gr_patch(i)          = value_patch
        this%symbiont_gr_patch(i)                         = value_patch
-       this%miner_n_patch(i)                            = value_patch
+       this%miner_n_patch(i)                             = value_patch
        this%transfer_deadcroot_gr_patch(i)               = value_patch
        this%leafc_storage_to_xfer_patch(i)               = value_patch
        this%frootc_storage_to_xfer_patch(i)              = value_patch
@@ -5000,14 +5000,14 @@ contains
        end if
 
        ! GR is the sum of current + transfer + storage GR 
-       !ECW Necromass of symbionts is transferred into SOM pools, but is partly repiered here: symbiont_gr_patch
+       ! ECW symbiont respiration during growth and maintainace respiration
        this%gr_patch(p) = &
             this%current_gr_patch(p)  + &
             this%transfer_gr_patch(p) + &
             this%storage_gr_patch(p)
          if (decomp_method == mimicsplus_decomp) then
             this%gr_patch(p) =  this%gr_patch(p)   + &
-            this%symbiont_gr_patch(p)
+            this%symbiont_gr_patch(p) ! + this%miner_n_patch(p) 
           end if
 
        ! autotrophic respiration (AR) adn 
@@ -5026,15 +5026,7 @@ contains
        if (use_fun) then
           this%ar_patch(p) = this%ar_patch(p) + this%soilc_change_patch(p)
        end if
-
-      !if (decomp_method == mimicsplus_decomp) then !ECW add mycorrhizal repiration during mining here
-     !    this%gr_patch(p) =  this%gr_patch(p)   + &
-      !   this%miner_n_patch(p)
-         ! add resp_myc 
-         ! somc_cuptake(p,j)
-         ! somp_cuptake(p,j)
-      !end if
-      
+     
       
        ! gross primary production (GPP)
        this%gpp_patch(p) = &

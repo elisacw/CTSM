@@ -282,10 +282,10 @@ module CNVegNitrogenFluxType
      real(r8), pointer :: sminn_to_plant_fun_vr_patch               (:,:)   ! Total layer soil N uptake of FUN  (gN/m2/s)
      real(r8), pointer :: sminn_to_plant_fun_no3_vr_patch           (:,:)   ! Total layer no3 uptake of FUN     (gN/m2/s)
      real(r8), pointer :: sminn_to_plant_fun_nh4_vr_patch           (:,:)   ! Total layer nh4 uptake of FUN     (gN/m2/s)
-     real(r8), pointer :: sminn_to_plant_mimicsplus_patch           (:)     ! Total soil N uptake of MIMICSplus (gN/m2/s)
-     real(r8), pointer :: sminn_to_plant_mimicsplus_vr_patch        (:,:)   ! Total layer soil N uptake of MIMICSplus  (gN/m2/s)
-     real(r8), pointer :: sminn_to_plant_mimicsplus_no3_vr_patch    (:,:)   ! Total layer no3 uptake of MIMICSplus     (gN/m2/s)
-     real(r8), pointer :: sminn_to_plant_mimicsplus_nh4_vr_patch    (:,:)   ! Total layer nh4 uptake of MIMICSplus     (gN/m2/s)
+     real(r8), pointer :: sminn_to_plant_mimicsplus_patch           (:)     ! N send to plants from symbionts MIMICSplus (gN/m2/s)
+     real(r8), pointer :: sminn_to_symbiont_mimicsplus_vr_patch     (:,:)   ! Total layer soil N uptake of MIMICSplus  (gN/m2/s)
+     real(r8), pointer :: sminn_to_symbiont_mimicsplus_no3_vr_patch (:,:)   ! Total layer no3 uptake of MIMICSplus     (gN/m2/s)
+     real(r8), pointer :: sminn_to_symbiont_mimicsplus_nh4_vr_patch (:,:)   ! Total layer nh4 uptake of MIMICSplus     (gN/m2/s)
      real(r8), pointer :: cost_nfix_patch                           (:)     ! Average cost of fixation          (gN/m2/s)
      real(r8), pointer :: cost_nactive_patch                        (:)     ! Average cost of active uptake     (gN/m2/s)
      real(r8), pointer :: cost_nretrans_patch                       (:)     ! Average cost of retranslocation   (gN/m2/s)
@@ -1058,17 +1058,14 @@ contains
     this%sminn_to_plant_fun_no3_vr_patch      (:,:) = nan
     allocate(this%sminn_to_plant_fun_nh4_vr_patch (begp:endp,1:nlevdecomp_full))  
     this%sminn_to_plant_fun_nh4_vr_patch      (:,:) = nan
-    allocate(this%sminn_to_plant_mimicsplus_patch    (begp:endp) );    this%sminn_to_plant_mimicsplus_patch    (:) = nan
-    allocate(this%sminn_to_plant_mimicsplus_vr_patch (begp:endp,1:nlevdecomp_full)) 
-    this%sminn_to_plant_mimicsplus_vr_patch          (:,:) = nan
-    allocate(this%sminn_to_plant_mimicsplus_no3_vr_patch (begp:endp,1:nlevdecomp_full))  
-    this%sminn_to_plant_mimicsplus_no3_vr_patch      (:,:) = nan
-    allocate(this%sminn_to_plant_mimicsplus_nh4_vr_patch (begp:endp,1:nlevdecomp_full))  
-    this%sminn_to_plant_mimicsplus_nh4_vr_patch      (:,:) = nan
+    allocate(this%sminn_to_plant_mimicsplus_patch    (begp:endp)); this%sminn_to_plant_mimicsplus_patch(:) = nan
+    allocate(this%sminn_to_symbiont_mimicsplus_vr_patch (begp:endp,1:nlevdecomp_full)); this%sminn_to_symbiont_mimicsplus_vr_patch(:,:) = nan
+    allocate(this%sminn_to_symbiont_mimicsplus_no3_vr_patch (begp:endp,1:nlevdecomp_full)); this%sminn_to_symbiont_mimicsplus_no3_vr_patch(:,:) = nan
+    allocate(this%sminn_to_symbiont_mimicsplus_nh4_vr_patch (begp:endp,1:nlevdecomp_full)); this%sminn_to_symbiont_mimicsplus_nh4_vr_patch(:,:) = nan
     allocate(this%cost_nfix_patch              (begp:endp)) ;    this%cost_nfix_patch            (:) = nan
     allocate(this%cost_nactive_patch           (begp:endp)) ;    this%cost_nactive_patch         (:) = nan
     allocate(this%cost_nretrans_patch          (begp:endp)) ;    this%cost_nretrans_patch        (:) = nan
-    allocate(this%nuptake_npp_fraction_patch   (begp:endp)) ;    this%nuptake_npp_fraction_patch            (:) = nan
+    allocate(this%nuptake_npp_fraction_patch   (begp:endp)) ;    this%nuptake_npp_fraction_patch (:) = nan
 	! Matrix
     if(use_matrixcn)then
        allocate(this%matrix_Ninput_patch               (begp:endp))               ; this%matrix_Ninput_patch              (:)   =  nan
@@ -1996,9 +1993,9 @@ contains
 
        this%sminn_to_plant_mimicsplus_patch(p)   = 0._r8
        do j = 1, nlevdecomp
-          this%sminn_to_plant_mimicsplus_vr_patch(p,j)       = 0._r8
-          this%sminn_to_plant_mimicsplus_no3_vr_patch(p,j)   = 0._r8
-          this%sminn_to_plant_mimicsplus_nh4_vr_patch(p,j)   = 0._r8
+          this%sminn_to_symbiont_mimicsplus_vr_patch(p,j)       = 0._r8
+          this%sminn_to_symbiont_mimicsplus_no3_vr_patch(p,j)   = 0._r8
+          this%sminn_to_symbiont_mimicsplus_nh4_vr_patch(p,j)   = 0._r8
        end do 
     end do
 

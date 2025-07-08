@@ -289,9 +289,9 @@ contains
          sminn_to_plant_fun_vr        => soilbiogeochem_nitrogenflux_inst%sminn_to_plant_fun_vr_col    , & ! Iutput: [real(r8) (:)   ]  Total layer soil N uptake of FUN (gN/m2/s) 
          sminn_to_plant_fun_no3_vr    => soilbiogeochem_nitrogenflux_inst%sminn_to_plant_fun_no3_vr_col, & ! Iutput: [real(r8) (:)   ]  Total layer no3 uptake of FUN (gN/m2/s)
          sminn_to_plant_fun_nh4_vr    => soilbiogeochem_nitrogenflux_inst%sminn_to_plant_fun_nh4_vr_col, & ! Iutput: [real(r8) (:)   ]  Total layer nh4 uptake of FUN (gN/m2/s)
-         sminn_to_plant_mimicsplus_vr        => soilbiogeochem_nitrogenflux_inst%sminn_to_plant_mimicsplus_vr_col    , &
-         sminn_to_plant_mimicsplus_no3_vr   => soilbiogeochem_nitrogenflux_inst%sminn_to_plant_mimicsplus_no3_vr_col , & ! Output:[real(r8) (:,:) ]  Total layer soil NO3 uptake of MIMICSplus (gN/m2/s) 
-         sminn_to_plant_mimicsplus_nh4_vr   => soilbiogeochem_nitrogenflux_inst%sminn_to_plant_mimicsplus_nh4_vr_col   & ! Output:[real(r8) (:,:) ]  Total layer soil NH4 uptake of MIMICSplus (gN/m2/s)
+         sminn_to_symbiont_mimicsplus_vr        => soilbiogeochem_nitrogenflux_inst%sminn_to_symbiont_mimicsplus_vr_col    , &
+         sminn_to_symbiont_mimicsplus_no3_vr   => soilbiogeochem_nitrogenflux_inst%sminn_to_symbiont_mimicsplus_no3_vr_col , & ! Output:[real(r8) (:,:) ]  Total layer soil NO3 uptake of MIMICSplus (gN/m2/s) 
+         sminn_to_symbiont_mimicsplus_nh4_vr   => soilbiogeochem_nitrogenflux_inst%sminn_to_symbiont_mimicsplus_nh4_vr_col   & ! Output:[real(r8) (:,:) ]  Total layer soil NH4 uptake of MIMICSplus (gN/m2/s)
 
          )
 
@@ -409,8 +409,8 @@ contains
                                        soilbiogeochem_nitrogenstate_inst, soilbiogeochem_nitrogenflux_inst, cnveg_state_inst, &
                                        waterfluxbulk_inst, soilstate_inst, cnveg_carbonstate_inst, soilbiogeochem_carbonstate_inst, cnveg_nitrogenflux_inst)
             call p2c(bounds, nlevdecomp, &
-                     cnveg_nitrogenflux_inst%sminn_to_plant_mimicsplus_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp),&
-                     soilbiogeochem_nitrogenflux_inst%sminn_to_plant_mimicsplus_vr_col(bounds%begc:bounds%endc,1:nlevdecomp), &
+                     cnveg_nitrogenflux_inst%sminn_to_symbiont_mimicsplus_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp),&
+                     soilbiogeochem_nitrogenflux_inst%sminn_to_symbiont_mimicsplus_vr_col(bounds%begc:bounds%endc,1:nlevdecomp), &
                      'unity')
             call t_stopf( 'CN_soil_veg_exchange' )
          end if
@@ -426,8 +426,8 @@ contains
                   end if
                end if
                if (decomp_method == mimicsplus_decomp) then
-                  if (sminn_to_plant_mimicsplus_vr(c,j).gt.sminn_to_plant_vr(c,j)) then
-                      sminn_to_plant_mimicsplus_vr(c,j)  = sminn_to_plant_vr(c,j)
+                  if (sminn_to_symbiont_mimicsplus_vr(c,j).gt.sminn_to_plant_vr(c,j)) then
+                      sminn_to_symbiont_mimicsplus_vr(c,j)  = sminn_to_plant_vr(c,j)
                   end if
                end if
             end do
@@ -483,8 +483,8 @@ contains
                   sminn_to_plant_new(c)  = sminn_to_plant_new(c)   + sminn_to_plant_fun_vr(c,j) * dzsoi_decomp(j)
                   sum_ndemand_vr(c,j)    = potential_immob_vr(c,j) + sminn_to_plant_fun_vr(c,j)
                else if (decomp_method == mimicsplus_decomp) then
-                  sminn_to_plant_new(c)  = sminn_to_plant_new(c)   + sminn_to_plant_mimicsplus_vr(c,j) * dzsoi_decomp(j)
-                  sum_ndemand_vr(c,j)    = potential_immob_vr(c,j) + sminn_to_plant_mimicsplus_vr(c,j)
+                  sminn_to_plant_new(c)  = sminn_to_plant_new(c)   + sminn_to_symbiont_mimicsplus_vr(c,j) * dzsoi_decomp(j)
+                  sum_ndemand_vr(c,j)    = potential_immob_vr(c,j) + sminn_to_symbiont_mimicsplus_vr(c,j)
                else
                   sum_ndemand_vr(c,j) = potential_immob_vr(c,j) + sminn_to_plant_vr(c,j)
                end if
@@ -504,7 +504,7 @@ contains
                      sminn_to_denit_excess_vr(c,j) = 0._r8
                   endif
                else if (decomp_method == mimicsplus_decomp) then
-                  if ((sminn_to_plant_mimicsplus_vr(c,j)  + actual_immob_vr(c,j))*dt < sminn_vr(c,j))  then
+                  if ((sminn_to_symbiont_mimicsplus_vr(c,j)  + actual_immob_vr(c,j))*dt < sminn_vr(c,j))  then
                      sminn_to_denit_excess_vr(c,j) = max(bdnr*((sminn_vr(c,j)/dt) - sum_ndemand_vr(c,j)),0._r8)
                   else
                      sminn_to_denit_excess_vr(c,j) = 0._r8
@@ -826,13 +826,13 @@ contains
             soilbiogeochem_nitrogenstate_inst, soilbiogeochem_nitrogenflux_inst, cnveg_state_inst, &
             waterfluxbulk_inst, soilstate_inst, cnveg_carbonstate_inst, soilbiogeochem_carbonstate_inst, cnveg_nitrogenflux_inst)
             call p2c(bounds,nlevdecomp, &
-                       cnveg_nitrogenflux_inst%sminn_to_plant_mimicsplus_no3_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp),&
-                       soilbiogeochem_nitrogenflux_inst%sminn_to_plant_mimicsplus_no3_vr_col(bounds%begc:bounds%endc,1:nlevdecomp),&
+                       cnveg_nitrogenflux_inst%sminn_to_symbiont_mimicsplus_no3_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp),&
+                       soilbiogeochem_nitrogenflux_inst%sminn_to_symbiont_mimicsplus_no3_vr_col(bounds%begc:bounds%endc,1:nlevdecomp),&
                        'unity')
 
             call p2c(bounds,nlevdecomp, &
-                       cnveg_nitrogenflux_inst%sminn_to_plant_mimicsplus_nh4_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp),&
-                       soilbiogeochem_nitrogenflux_inst%sminn_to_plant_mimicsplus_nh4_vr_col(bounds%begc:bounds%endc,1:nlevdecomp),&
+                       cnveg_nitrogenflux_inst%sminn_to_symbiont_mimicsplus_nh4_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp),&
+                       soilbiogeochem_nitrogenflux_inst%sminn_to_symbiont_mimicsplus_nh4_vr_col(bounds%begc:bounds%endc,1:nlevdecomp),&
                        'unity')
             call t_stopf( 'CN_soil_veg_exchange' )
             !smin_no3_to_plant_vr is an output of exchange routine
@@ -870,14 +870,14 @@ contains
             sminn_to_plant(c) = 0._r8 !this isn't use in fun. 
             do j = 1, nlevdecomp
                ! compare smin_no3_to_plant_vr (updated) to smin_no3_to_plant_tmp
-               if ((sminn_to_plant_mimicsplus_no3_vr(c,j)-smin_no3_to_plant_vr(c,j)).gt.0.0000000000001_r8) then
+               if ((sminn_to_symbiont_mimicsplus_no3_vr(c,j)-smin_no3_to_plant_vr(c,j)).gt.0.0000000000001_r8) then
                    write(iulog,*) 'problem with limitations on no3 uptake', &
-                              sminn_to_plant_mimicsplus_no3_vr(c,j),smin_no3_to_plant_vr(c,j)
+                              sminn_to_symbiont_mimicsplus_no3_vr(c,j),smin_no3_to_plant_vr(c,j)
                    call endrun("too much NO3 uptake predicted by MIMICSplus")
                end if
-               if ((sminn_to_plant_mimicsplus_nh4_vr(c,j)-smin_nh4_to_plant_vr(c,j)).gt.0.0000001_r8) then
+               if ((sminn_to_symbiont_mimicsplus_nh4_vr(c,j)-smin_nh4_to_plant_vr(c,j)).gt.0.0000001_r8) then
                    write(iulog,*) 'problem with limitations on nh4 uptake', &
-                               sminn_to_plant_mimicsplus_nh4_vr(c,j),smin_nh4_to_plant_vr(c,j)
+                               sminn_to_symbiont_mimicsplus_nh4_vr(c,j),smin_nh4_to_plant_vr(c,j)
                    call endrun("too much NH4 uptake predicted by MIMICSplus")
                end if
              end do
@@ -1037,7 +1037,7 @@ contains
                              (sminn_to_plant_fun_no3_vr(c,j) + sminn_to_plant_fun_nh4_vr(c,j)) * dzsoi_decomp(j)
                    else if (decomp_method == mimicsplus_decomp) then
                    sminn_to_plant_new(c)  = sminn_to_plant_new(c) + &
-                             (sminn_to_plant_mimicsplus_no3_vr(c,j) + sminn_to_plant_mimicsplus_nh4_vr(c,j)) * dzsoi_decomp(j)
+                             (sminn_to_symbiont_mimicsplus_no3_vr(c,j) + sminn_to_symbiont_mimicsplus_nh4_vr(c,j)) * dzsoi_decomp(j)
                    end if 
                 end do
              end do

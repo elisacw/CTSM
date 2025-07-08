@@ -448,7 +448,7 @@ contains
            sminn_to_npool(p) = plant_ndemand(p) * fpg(c)
          endif
 
-         !ECW I don't hace retranslocation, maybe if statement here, to avoid it
+         !ECW I don't have retranslocation, maybe if statement here, to avoid it
          ! Write a warning for if retransn_to_npool(p) is more than 0 and mimicsplus is active
          if (decomp_method == mimicsplus_decomp) then
             plant_nalloc(p) = sminn_to_npool(p)

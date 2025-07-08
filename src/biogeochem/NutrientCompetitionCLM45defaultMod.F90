@@ -135,6 +135,8 @@ contains
     use CNVegNitrogenFluxType , only : cnveg_nitrogenflux_type
     use CNSharedParamsMod     , only : use_fun
     use shr_infnan_mod        , only : shr_infnan_isnan
+    use SoilBiogeochemDecompCascadeConType , only : decomp_method, mimicsplus_decomp, use_soil_matrixcn
+    
 
     !
     ! !ARGUMENTS:
@@ -244,7 +246,8 @@ contains
          Nnonmyc                      => cnveg_nitrogenflux_inst%Nnonmyc_patch                     , & ! Output:  [real(r8) (:) ]  Non-mycorrhizal N uptake (gN/m2/s)
          Nam                          => cnveg_nitrogenflux_inst%Nam_patch                         , & ! Output:  [real(r8) (:) ]  AM uptake (gN/m2/s)
          Necm                         => cnveg_nitrogenflux_inst%Necm_patch                        , & ! Output:  [real(r8) (:) ]  ECM uptake (gN/m2/s)
-         sminn_to_plant_fun           => cnveg_nitrogenflux_inst%sminn_to_plant_fun_patch            & ! Output:  [real(r8) (:) ]  Total N uptake of FUN (gN/m2/s)
+         sminn_to_plant_fun           => cnveg_nitrogenflux_inst%sminn_to_plant_fun_patch          , & ! Output:  [real(r8) (:) ]  Total N uptake of FUN (gN/m2/s)
+         sminn_to_plant_mimicsplus    => cnveg_nitrogenflux_inst%sminn_to_plant_mimicsplus_patch     & ! Output:  [real(r8) (:) ]  Total N uptake of MIMICSplus (gN/m2/s)
          )
 
       ! patch loop to distribute the available N between the competing patches
@@ -299,12 +302,18 @@ contains
          end if
 
          if(use_fun)then ! if we are using FUN, we get the N available from there.
-            sminn_to_npool(p) = sminn_to_plant_fun(p)
+            sminn_to_npool(p) = sminn_to_plant_fun(p) 
+         else if (decomp_method == mimicsplus_decomp) then 
+               sminn_to_npool(p) = sminn_to_plant_mimicsplus(p) !ECW
          else ! no FUN. :( we get N available from the FPG calculation in soilbiogeochemistry competition.
             sminn_to_npool(p) = plant_ndemand(p) * fpg(c)
          endif
-         !ECW this is where N is taken up by plant follow this
-         ! if mimicsc plant_nalloc = n flux to plant 
+         !ECW this needs to be here because MIMICsplus doesn't have retranslocation atm
+         if (decomp_method == mimicsplus_decomp) then
+         plant_nalloc(p) = sminn_to_plant_mimicsplus(p)
+         plant_calloc(p) = plant_nalloc(p) * (c_allometry(p)/n_allometry(p))
+         end if
+         
          plant_nalloc(p) = sminn_to_npool(p) + retransn_to_npool(p)
          plant_calloc(p) = plant_nalloc(p) * (c_allometry(p)/n_allometry(p))
 

@@ -104,8 +104,8 @@ module SoilBiogeochemNitrogenFluxType
      real(r8), pointer :: anaerobic_frac_col                        (:,:)
      real(r8), pointer :: sminn_to_plant_fun_no3_vr_col             (:,:)   ! col total layer no3 uptake of FUN     (gN/m2/s)
      real(r8), pointer :: sminn_to_plant_fun_nh4_vr_col             (:,:)   ! col total layer nh4 uptake of FUN     (gN/m2/s)
-     real(r8), pointer :: sminn_to_plant_mimicsplus_no3_vr_col      (:,:)   ! col total layer no3 uptake of MIMICSplus     (gN/m2/s)
-     real(r8), pointer :: sminn_to_plant_mimicsplus_nh4_vr_col      (:,:)   ! col total layer nh4 uptake of MIMICSplus     (gN/m2/s)
+     real(r8), pointer :: sminn_to_symbiont_mimicsplus_no3_vr_col      (:,:)   ! col total layer no3 uptake of MIMICSplus     (gN/m2/s)
+     real(r8), pointer :: sminn_to_symbiont_mimicsplus_nh4_vr_col      (:,:)   ! col total layer nh4 uptake of MIMICSplus     (gN/m2/s)
      !----------- no NITRIF_DENITRIF--------------
 
      ! denitrification fluxes
@@ -130,7 +130,7 @@ module SoilBiogeochemNitrogenFluxType
      real(r8), pointer :: decomp_npools_sourcesink_col              (:,:,:) ! col (gN/m3) change in decomposing n pools 
                                                                             ! (sum of all additions and subtractions from stateupdate1).  
      
-     real(r8), pointer :: sminn_to_plant_mimicsplus_vr_col          (:,:)   ! col total layer soil N uptake of MIMICSplus  (gN/m2/s)
+     real(r8), pointer :: sminn_to_symbiont_mimicsplus_vr_col          (:,:)   ! col total layer soil N uptake of MIMICSplus  (gN/m2/s)
      real(r8), pointer :: sminn_to_plant_fun_vr_col                 (:,:)   ! col total layer soil N uptake of FUN  (gN/m2/s)
      real(r8), pointer :: fates_litter_flux                         (:)     ! (gN/m2/s) A summary of the total litter
                                                                             ! flux passed in from FATES.
@@ -218,9 +218,9 @@ contains
     allocate(this%sminn_to_plant_fun_vr_col         (begc:endc,1:nlevdecomp_full)) ; this%sminn_to_plant_fun_vr_col  (:,:)   = nan
     allocate(this%sminn_to_plant_fun_no3_vr_col     (begc:endc,1:nlevdecomp_full)) ; this%sminn_to_plant_fun_no3_vr_col(:,:) = nan
     allocate(this%sminn_to_plant_fun_nh4_vr_col     (begc:endc,1:nlevdecomp_full)) ; this%sminn_to_plant_fun_nh4_vr_col(:,:) = nan
-    allocate(this%sminn_to_plant_mimicsplus_vr_col         (begc:endc,1:nlevdecomp_full)) ; this%sminn_to_plant_mimicsplus_vr_col  (:,:)   = nan
-    allocate(this%sminn_to_plant_mimicsplus_no3_vr_col     (begc:endc,1:nlevdecomp_full)) ; this%sminn_to_plant_mimicsplus_no3_vr_col(:,:) = nan
-    allocate(this%sminn_to_plant_mimicsplus_nh4_vr_col     (begc:endc,1:nlevdecomp_full)) ; this%sminn_to_plant_mimicsplus_nh4_vr_col(:,:) = nan
+    allocate(this%sminn_to_symbiont_mimicsplus_vr_col         (begc:endc,1:nlevdecomp_full)) ; this%sminn_to_symbiont_mimicsplus_vr_col  (:,:)   = nan
+    allocate(this%sminn_to_symbiont_mimicsplus_no3_vr_col     (begc:endc,1:nlevdecomp_full)) ; this%sminn_to_symbiont_mimicsplus_no3_vr_col(:,:) = nan
+    allocate(this%sminn_to_symbiont_mimicsplus_nh4_vr_col     (begc:endc,1:nlevdecomp_full)) ; this%sminn_to_symbiont_mimicsplus_nh4_vr_col(:,:) = nan
     allocate(this%f_nit_vr_col                      (begc:endc,1:nlevdecomp_full)) ; this%f_nit_vr_col               (:,:) = nan
     allocate(this%f_denit_vr_col                    (begc:endc,1:nlevdecomp_full)) ; this%f_denit_vr_col             (:,:) = nan
     allocate(this%smin_no3_leached_vr_col           (begc:endc,1:nlevdecomp_full)) ; this%smin_no3_leached_vr_col    (:,:) = nan
@@ -946,7 +946,7 @@ contains
           if (.not. use_nitrif_denitrif) then
              this%sminn_to_denit_excess_vr_col(i,j)      = value_column
              this%sminn_leached_vr_col(i,j)              = value_column
-             this%sminn_to_plant_mimicsplus_vr_col(i,j)  = value_column
+             this%sminn_to_symbiont_mimicsplus_vr_col(i,j)  = value_column
              this%sminn_to_plant_fun_vr_col(i,j)         = value_column
           else
              this%f_nit_vr_col(i,j)                      = value_column
@@ -991,8 +991,8 @@ contains
           this%net_nmin_vr_col(i,j)                      = value_column
           this%sminn_to_plant_fun_no3_vr_col(i,j)        = value_column
           this%sminn_to_plant_fun_nh4_vr_col(i,j)        = value_column
-          this%sminn_to_plant_mimicsplus_no3_vr_col(i,j) = value_column
-          this%sminn_to_plant_mimicsplus_nh4_vr_col(i,j) = value_column
+          this%sminn_to_symbiont_mimicsplus_no3_vr_col(i,j) = value_column
+          this%sminn_to_symbiont_mimicsplus_nh4_vr_col(i,j) = value_column
        end do
     end do
 
