@@ -303,9 +303,9 @@ contains
 
       ! column loops to resolve plant/heterotroph competition for mineral N
 
-      sminn_to_plant_new(bounds%begc:bounds%endc)  =  0._r8
+      sminn_to_plant_new(bounds%begc:bounds%endc)  =  0.0_r8
 
-      local_use_fun = use_fun .or. decomp_method == mimicsplus_decomp
+      local_use_fun = use_fun .or. (decomp_method == mimicsplus_decomp)
 
       if_nitrif: if (.not. use_nitrif_denitrif) then
 

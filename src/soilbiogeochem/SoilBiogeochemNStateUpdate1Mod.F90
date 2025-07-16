@@ -68,7 +68,7 @@ contains
       do j = 1, nlevdecomp
          do fc = 1,num_bgc_soilc
             c = filter_bgc_soilc(fc)
-            if(use_fun)then !RF in FUN logic, the fixed N goes straight into the plant, and not into the SMINN pool. 
+            if(use_fun .or. decomp_method == mimicsplus_decomp)then !RF in FUN logic, the fixed N goes straight into the plant, and not into the SMINN pool. 
  	               ! N deposition and fixation (put all into NH4 pool)
 	               ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) + nf%ndep_to_sminn_col(c)*dt * ndep_prof(c,j)
 	               ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) + nf%ffix_to_sminn_col(c)*dt * nfixation_prof(c,j)
@@ -206,10 +206,12 @@ contains
                ns%sminn_vr_col(c,j) = ns%sminn_vr_col(c,j) - nf%sminn_to_denit_excess_vr_col(c,j) * dt
 
                ! total plant uptake from mineral N
-               if ( .not. use_fun ) then
-                  ns%sminn_vr_col(c,j) = ns%sminn_vr_col(c,j) - nf%sminn_to_plant_vr_col(c,j)*dt
-               else
+               if (use_fun ) then
                   ns%sminn_vr_col(c,j) = ns%sminn_vr_col(c,j) - nf%sminn_to_plant_fun_vr_col(c,j)*dt
+               elseif (decomp_method == mimicsplus_decomp) then 
+                  ns%sminn_vr_col(c,j) = ns%sminn_vr_col(c,j) - nf%sminn_to_symbiont_mimicsplus_vr_col(c,j)*dt
+               else
+                  ns%sminn_vr_col(c,j) = ns%sminn_vr_col(c,j) - nf%sminn_to_plant_vr_col(c,j)*dt                 
                end if
                ! flux that prevents N limitation (when Carbon_only is set)
                ns%sminn_vr_col(c,j) = ns%sminn_vr_col(c,j) + nf%supplement_to_sminn_vr_col(c,j)*dt
@@ -242,7 +244,7 @@ contains
                   ns%smin_no3_vr_col(c,j) = ns%smin_no3_vr_col(c,j) -  nf%sminn_to_plant_fun_no3_vr_col(c,j)*dt
                
                else if ( decomp_method == mimicsplus_decomp) then
-                  ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) -  nf%sminn_to_symbiont_mimicsplus_nh4_vr_col(c,j)*dt !ECW consider renaming
+                  ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) -  nf%sminn_to_symbiont_mimicsplus_nh4_vr_col(c,j)*dt
 
                   ns%smin_no3_vr_col(c,j) = ns%smin_no3_vr_col(c,j) -  nf%sminn_to_symbiont_mimicsplus_no3_vr_col(c,j)*dt
                
