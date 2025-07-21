@@ -5001,14 +5001,25 @@ contains
 
        ! GR is the sum of current + transfer + storage GR 
        ! ECW symbiont respiration during growth and maintainace respiration
+       write(iulog,*), 'gr_patch before summing up  = ', this%gr_patch(p)
+       
        this%gr_patch(p) = &
             this%current_gr_patch(p)  + &
             this%transfer_gr_patch(p) + &
             this%storage_gr_patch(p)
+            
+            write(iulog,*), 'gr_patch before mimics  = ', this%gr_patch(p)
+
          if (decomp_method == mimicsplus_decomp) then
             this%gr_patch(p) =  this%gr_patch(p)   + &
             this%symbiont_gr_patch(p) ! + this%miner_n_patch(p) 
           end if
+
+          write(iulog,*), 'gr_patch after mimics  = ', this%gr_patch(p)
+          write(iulog,*), 'current_gr_patch(p)   = ', this%current_gr_patch(p) 
+          write(iulog,*), 'transfer_gr_patch(p)  = ', this%transfer_gr_patch(p)
+          write(iulog,*), 'storage_gr_patch(p)  = ', this%storage_gr_patch(p)
+          write(iulog,*), 'symbiont_gr_patch(p)  = ', this%symbiont_gr_patch(p)
 
        ! autotrophic respiration (AR) adn 
        if ( use_crop .and. patch%itype(p) >= npcropmin )then
@@ -5457,6 +5468,7 @@ contains
        this%er_col(c) = &
             this%ar_col(c) + &
             soilbiogeochem_hr_col(c)
+      !ECW respiration from symbionts should rather go to hr
        
        ! net ecosystem production, excludes fire flux, landcover change, 
        ! and loss from wood products, positive for sink (NEP)

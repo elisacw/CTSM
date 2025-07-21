@@ -130,7 +130,7 @@ module SoilBiogeochemNitrogenFluxType
      real(r8), pointer :: decomp_npools_sourcesink_col              (:,:,:) ! col (gN/m3) change in decomposing n pools 
                                                                             ! (sum of all additions and subtractions from stateupdate1).  
      
-     real(r8), pointer :: sminn_to_symbiont_mimicsplus_vr_col          (:,:)   ! col total layer soil N uptake of MIMICSplus  (gN/m2/s)
+     real(r8), pointer :: sminn_to_symbiont_mimicsplus_vr_col       (:,:)   ! col total layer soil N uptake of MIMICSplus  (gN/m2/s)
      real(r8), pointer :: sminn_to_plant_fun_vr_col                 (:,:)   ! col total layer soil N uptake of FUN  (gN/m2/s)
      real(r8), pointer :: fates_litter_flux                         (:)     ! (gN/m2/s) A summary of the total litter
                                                                             ! flux passed in from FATES.

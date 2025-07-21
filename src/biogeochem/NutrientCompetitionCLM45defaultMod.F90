@@ -304,7 +304,7 @@ contains
          if(use_fun)then ! if we are using FUN, we get the N available from there.
             sminn_to_npool(p) = sminn_to_plant_fun(p) 
          else if (decomp_method == mimicsplus_decomp) then 
-               sminn_to_npool(p) = sminn_to_plant_mimicsplus(p) !ECW
+               sminn_to_npool(p) = sminn_to_plant_mimicsplus(p) !ECW inorganic N that was taken up by symbionts and then send to plant
          else ! no FUN. :( we get N available from the FPG calculation in soilbiogeochemistry competition.
             sminn_to_npool(p) = plant_ndemand(p) * fpg(c)
          endif

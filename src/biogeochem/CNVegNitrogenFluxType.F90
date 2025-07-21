@@ -1991,7 +1991,7 @@ contains
           end if
        end if
 
-       this%sminn_to_plant_mimicsplus_patch(p)   = 0._r8
+       this%sminn_to_plant_mimicsplus_patch(p)   = 0._r8 !ECW suspicious
        do j = 1, nlevdecomp
           this%sminn_to_symbiont_mimicsplus_vr_patch(p,j)       = 0._r8
           this%sminn_to_symbiont_mimicsplus_no3_vr_patch(p,j)   = 0._r8

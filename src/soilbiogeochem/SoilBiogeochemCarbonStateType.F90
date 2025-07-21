@@ -1655,7 +1655,7 @@ contains
             this%totsomc_col(c) + &
             this%ctrunc_col(c)  + &
             totvegc_col
-
+     
        ! Adding symbiotic biomass to total ecosystem & column nitrogen for mimicsplus
          if (decomp_method == mimicsplus_decomp) then
             this%totecosysc_col(c) = this%totecosysc_col(c) + this%totsymbc_col(c)

@@ -391,7 +391,9 @@ contains
 
    
    subroutine Summary(this, filter_soilp, filter_bgc_soilc, num_soilp, num_bgc_soilc, bounds, comp, total)
-      !
+      ! This routine sums up all symbiont and intermediate pool
+      ! necessary for CN Balance check
+
       ! !USES:
       use subgridAveMod                      , only: p2c
       !
@@ -620,7 +622,7 @@ contains
    !C_enz_mine2soma_col    => symbiont_inst%C_enz_mine2soma_col, &   ! Enzyme flux during mycorrhizal mining    [gC/m2/s]
 
    plant_ndemand                => cnveg_nitrogenflux_inst%plant_ndemand_patch               , & ! Output: [real(r8) (:)   ]  N flux required to support initial GPP (gN/m2/s)
-   sminn_to_plant_mimicsplus => cnveg_nitrogenflux_inst%sminn_to_plant_mimicsplus_patch, & ! Output:[real(r8) (:) ]  nitrogen sent to plant (gN/m2/s)
+   sminn_to_plant_mimicsplus => cnveg_nitrogenflux_inst%sminn_to_plant_mimicsplus_patch, & ! Output:[real(r8) (:) ]  nitrogen sent to plant from symbionts (gN/m2/s)
    
    somc_cuptake_col     => symbiont_inst%somc_cuptake_col , &   ! Nitrogen uptake from SOMc via mining       [gC/m2/s]
    somp_cuptake_col     => symbiont_inst%somp_cuptake_col , &   ! Nitrogen uptake from SOMp via mining       [gC/m2/s]
@@ -683,9 +685,6 @@ contains
 
          smin_nh4_avail(p,j) = smin_nh4_to_plant_vr(c,j) !* col%dz(c,j) !* dt 
          smin_no3_avail(p,j) = smin_no3_to_plant_vr(c,j) !* col%dz(c,j) !* dt
-
-         write(iulog,*), 'smin_nh4_avail  = ', smin_nh4_avail(p,j)
-         write(iulog,*), 'smin_no3_avail  = ', smin_no3_avail(p,j)
       end do
    end do
 
@@ -723,8 +722,6 @@ contains
 
       C_allocation_to_N_acq(p)  = availc_alloc(p)
 
-      write(iulog,*), 'C_allocation_to_N_acq  = ', C_allocation_to_N_acq(p)
-      write(iulog,*), 'availc  = ', availc(p)
 
      ! C_allocation_to_N_acq(p) = max(C_allocation_to_N_acq(p), 0.0_r8) * 0.05_r8 * plant_ndemand(p)
 
@@ -939,6 +936,7 @@ contains
        end if
     
        ! heterotrophic resp
+       !SOMETHING IS WRONG HERE
        symb_CO2_prod(p) = symb_CO2_prod(p) + symb_growth(p,i_scav) / sulman_growth_scav * (1.0 - sulman_growth_scav)
     
        ! Intermediate pool scavenger
@@ -965,6 +963,7 @@ contains
        ! C loss during transfer from C reservoir to C biomass pool, due to CUE efficiency
        symb_CO2_prod(p) = symb_CO2_prod(p) + symb_growth(p,i_miner) / sulman_growth_mine * (1.0 - sulman_growth_mine)
     
+
        ! N reservoir + fraction of the N from maintainace respiration staying in N reservoir whil C is respiered
        N_reservoir(p,i_miner) = N_reservoir(p,i_miner) + N_biomass(p,i_miner) * ((1.0_r8 - sulman_tau_sym) * sulman_tau_mine * dt)
 
@@ -990,6 +989,7 @@ contains
     
        !CO2 production while growth
        symb_CO2_prod(p) = symb_CO2_prod(p) + symb_growth(p,i_fixer) / sulman_growth_fix * (1.0 - sulman_growth_fix)
+    
        
        ! Fixation has to be done at the biomas update, since it is reduced by the growth
        ! will use later N_fixation=N_fixation*exp(-0.5*0.27*25.15 + 0.27*(soilT-273.15)*(1.0-0.5*(soilT-273.15)/25.15))
@@ -1009,45 +1009,64 @@ contains
        N_fixation(p) = N_fixation(p) + N_biomass(p,i_fixer) - N_biomass_old(p)
 
       !----------------------------------------------------------------------------------------------------------------------------
+
+      ! MAINTAINACE RESPIRATION AND GROWTH RESPIRATION
+
+      total_symbiont_turnover_C(p,i_miner) = C_biomass(p,i_miner) * params_inst%sulman_tau_mine * dt
+      total_symbiont_turnover_C(p,i_scav) = C_biomass(p,i_scav)  * params_inst%sulman_tau_scav * dt
+      total_symbiont_turnover_C(p,i_fixer) = C_biomass(p,i_fixer) * params_inst%sulman_tau_fix * dt
+
+      symbiont_turnover_C(p,i_miner) = total_symbiont_turnover_C(p,i_miner) * params_inst%sulman_tau_sym  
+      symbiont_turnover_C(p,i_scav)  = total_symbiont_turnover_C(p,i_scav) * params_inst%sulman_tau_sym 
+      symbiont_turnover_C(p,i_fixer) = total_symbiont_turnover_C(p,i_fixer) * params_inst%sulman_tau_sym 
+
+      symbiont_turnover_N(p,i_miner) = (N_biomass(p,i_miner) * params_inst%sulman_tau_mine * dt) * params_inst%sulman_tau_sym
+      symbiont_turnover_N(p,i_scav)  = (N_biomass(p,i_scav)  * params_inst%sulman_tau_scav * dt) * params_inst%sulman_tau_sym 
+      symbiont_turnover_N(p,i_fixer) = (N_biomass(p,i_fixer) * params_inst%sulman_tau_fix * dt)  * params_inst%sulman_tau_sym 
+                              
+      ! Respiration during symbiont growth + maintainance respiration
+      symb_CO2_prod(p) = symb_CO2_prod(p) + (1.0 - params_inst%sulman_tau_sym) * &
+                       (total_symbiont_turnover_C(p,i_miner) + total_symbiont_turnover_C(p,i_scav) + total_symbiont_turnover_C(p,i_fixer))
    
+      symbiont_gr_patch(p) = symb_CO2_prod(p)                     ! Respiration during transfer symbiont necromass to SOM   
      
+      !----------------------------------------------------------------------------------------------------------------------------
+
   call update_symbionts(filter_soilp, filter_bgc_soilc, num_soilp, num_bgc_soilc, &
                         bounds, symbiont_inst, cnveg_nitrogenstate_inst, cnveg_nitrogenflux_inst, cnveg_carbonflux_inst, &
-                        cnveg_state_inst, C_allocation_to_N_acq(bounds%begp:bounds%endp), symb_CO2_prod(bounds%begp:bounds%endp), &
-                        symbiont_turnover_C(bounds%begp:bounds%endp, 1:n_symb), symbiont_turnover_N(bounds%begp:bounds%endp, 1:n_symb),&
+                        cnveg_state_inst, C_allocation_to_N_acq(bounds%begp:bounds%endp), & !symb_CO2_prod(bounds%begp:bounds%endp), &
+                        !symbiont_turnover_C(bounds%begp:bounds%endp, 1:n_symb), symbiont_turnover_N(bounds%begp:bounds%endp, 1:n_symb),&
                         root_exudate_C(bounds%begp:bounds%endp))
 
 
                           
      
 
-      !if (C_reservoir(p,i_miner) <= 0._r8 .or. N_reservoir(p,i_miner) <= 0._r8) then 
-       !  write(iulog,*), 'C_reservoir_miner =', C_reservoir(p,i_miner), 'N_reservoir_miner =', N_reservoir(p,i_miner)
-        ! write(iulog,*), &
-         !   ' somc_nuptake =', somc_nuptake(begp:endp,1:nlevdecomp), &
-          ! ' somp_nuptake =', somp_nuptake(begp:endp,1:nlevdecomp), &
-          ! ' somc_cuptake =', somc_cuptake(begp:endp,1:nlevdecomp), &
-          ! ' somp_cuptake =', somp_cuptake(begp:endp,1:nlevdecomp), &
-          ! ' N_mine_somc2soma =', N_mine_somc2soma(begp:endp,1:nlevdecomp), &
-          ! ' N_mine_somp2soma =', N_mine_somp2soma(begp:endp,1:nlevdecomp)
+     ! if (C_reservoir(p,i_miner) <= 0._r8 .or. N_reservoir(p,i_miner) <= 0._r8) then 
+      !   write(iulog,*), 'C_reservoir_miner =', C_reservoir(p,i_miner)ke(begp:endp,1:nlevdecomp) 
+      !   write(iulog,*), ' somp_nuptake =', somp_nuptake(begp:endp,1:nlevdecomp)
+      !   write(iulog,*), ' somc_cuptake =', somc_cuptake(begp:endp,1:nlevdecomp)
+      !   write(iulog,*), ' somp_cuptake =', somp_cuptake(begp:endp,1:nlevdecomp)
+      !   write(iulog,*), ' N_mine_somc2soma =', N_mine_somc2soma(begp:endp,1:nlevdecomp)
+      !   write(iulog,*), ' N_mine_somp2soma =', N_mine_somp2soma(begp:endp,1:nlevdecomp)
         
-     ! call endrun(msg = "ERROR: Miner symbiont C or N reservoirs are zero or negative." // &
-     !    errMsg(sourcefile, __LINE__))
-     ! end if
+      !call endrun(msg = "ERROR: Miner symbiont C or N reservoirs are zero or negative." // &
+      !   errMsg(sourcefile, __LINE__))
+      !end if
 
         
-       ! Check if reservoirs are not zero
+      ! Check if reservoirs are not zero
       !if (C_reservoir(p,i_scav) <= 0._r8 .or. N_reservoir(p,i_scav) <= 0._r8) then 
       !   write(iulog,*), 'C_reservoir_scav =', C_reservoir(p,i_scav), 'N_reservoir_scav =', N_reservoir(p,i_scav)
       !   write(iulog,*), 'no3_scav_up=', no3_scav_up(begp:endp,1:nlevdecomp), 'nh4_scav_up=', nh4_scav_up(begp:endp,1:nlevdecomp)
    
-     ! call endrun(msg = "ERROR: Scavenger symbiont C or N reservoirs are zero or negative." // &
-      !   errMsg(sourcefile, __LINE__))
-     ! end if
+      !call endrun(msg = "ERROR: Scavenger symbiont C or N reservoirs are zero or negative." // &
+      !  errMsg(sourcefile, __LINE__))
+      !end if
 
-      !if (C_reservoir(p,i_fixer) <= 0._r8 .or. N_reservoir(p,i_fixer) <= 0._r8) then 
-       !  write(iulog,*), 'C_reservoir_fixer =', C_reservoir(p,i_fixer), 'N_reservoir_fixer =', N_reservoir(p,i_fixer)
-    !  call endrun(msg = "ERROR: Fixer symbiont C or N reservoirs are zero or negative." // &
+     !if (C_reservoir(p,i_fixer) <= 0._r8 .or. N_reservoir(p,i_fixer) <= 0._r8) then 
+      !   write(iulog,*), 'C_reservoir_fixer =', C_reservoir(p,i_fixer), 'N_reservoir_fixer =', N_reservoir(p,i_fixer)
+     ! call endrun(msg = "ERROR: Fixer symbiont C or N reservoirs are zero or negative." // &
      !    errMsg(sourcefile, __LINE__))
      ! end if
       
@@ -1055,7 +1074,7 @@ contains
   end do
    
 
-   !npp_growth(bounds%begp:bounds%endp) = sminn_to_plant_mimicsplus(p) * plantCN + root_exudate_C(p)
+   npp_growth(bounds%begp:bounds%endp) = sminn_to_plant_mimicsplus(p) * plantCN + root_exudate_C(p)
    ! C_allocation_to_N_acq(bounds%begp:bounds%endp)
    !ECW might be wrong
 
@@ -1637,8 +1656,8 @@ contains
    
   subroutine update_symbionts(filter_soilp, filter_bgc_soilc, num_soilp, num_bgc_soilc, &
                               bounds, symbiont_inst, cnveg_nitrogenstate_inst, cnveg_nitrogenflux_inst, &
-                              cnveg_carbonflux_inst, cnveg_state_inst, C_allocation_to_N_acq, &
-                              symb_CO2_prod, symbiont_turnover_C, symbiont_turnover_N, root_exudate_C)
+                              cnveg_carbonflux_inst, cnveg_state_inst, C_allocation_to_N_acq, root_exudate_C)
+                             ! symb_CO2_prod, symbiont_turnover_C, symbiont_turnover_N, root_exudate_C)
 
    ! ! USES:
    use CNVegNitrogenStateType          , only: cnveg_nitrogenstate_type
@@ -1660,9 +1679,9 @@ contains
    integer :: begp, endp, begc, endc
   
    real(r8), intent(in)    :: C_allocation_to_N_acq(bounds%begp:bounds%endp) ! Carbon allocated to nitrogen acquisition [gC/m2/s)]
-   real(r8), intent(inout) :: symb_CO2_prod(bounds%begp:bounds%endp)         ! Total carbon loss of symbionts that is repired (maintainence & growth) [gC/m2/s]
-   real(r8), intent(out)   :: symbiont_turnover_C(bounds%begp:bounds%endp, 1:n_symb) ! Part of symbiont turnover not lost through repiration [gC/m2]
-   real(r8), intent(out)   :: symbiont_turnover_N(bounds%begp:bounds%endp, 1:n_symb) ! Part of symbiont turnover not lost through repiration [gN/m2
+   !real(r8), intent(inout) :: symb_CO2_prod(bounds%begp:bounds%endp)         ! Total carbon loss of symbionts that is repired (maintainence & growth) [gC/m2/s]
+   !real(r8), intent(out)   :: symbiont_turnover_C(bounds%begp:bounds%endp, 1:n_symb) ! Part of symbiont turnover not lost through repiration [gC/m2]
+   !real(r8), intent(out)   :: symbiont_turnover_N(bounds%begp:bounds%endp, 1:n_symb) ! Part of symbiont turnover not lost through repiration [gN/m2
    real(r8), intent(out)   :: root_exudate_C(bounds%begp:bounds%endp)           ! Leftover C from allocation to symbionts    [gC/m2]
    
    !
@@ -1722,36 +1741,7 @@ contains
    
    )
 
-   do fp = 1,num_soilp
-      p = filter_soilp(fp)
-      c = patch%column(p)
-
-   ! Add mycorrhizal and fixer turnover (necromass) in SOM pools: !ECW CHECK
-     
-      total_symbiont_turnover_C(p,i_miner) = C_biomass(p,i_miner) * params_inst%sulman_tau_mine * dt
-      total_symbiont_turnover_C(p,i_scav) = C_biomass(p,i_scav)  * params_inst%sulman_tau_scav * dt
-      total_symbiont_turnover_C(p,i_fixer) = C_biomass(p,i_fixer) * params_inst%sulman_tau_fix * dt
-
-      symbiont_turnover_C(p,i_miner) = total_symbiont_turnover_C(p,i_miner) * params_inst%sulman_tau_sym 
-      symbiont_turnover_C(p,i_scav)  = total_symbiont_turnover_C(p,i_scav) * params_inst%sulman_tau_sym 
-      symbiont_turnover_C(p,i_fixer) = total_symbiont_turnover_C(p,i_fixer) * params_inst%sulman_tau_sym 
-
-      symbiont_turnover_N(p,i_miner) = (N_biomass(p,i_miner) * params_inst%sulman_tau_mine * dt) * params_inst%sulman_tau_sym
-      symbiont_turnover_N(p,i_scav)  = (N_biomass(p,i_scav)  * params_inst%sulman_tau_scav * dt) * params_inst%sulman_tau_sym 
-      symbiont_turnover_N(p,i_fixer) = (N_biomass(p,i_fixer) * params_inst%sulman_tau_fix * dt)  * params_inst%sulman_tau_sym 
-                              
-      ! Respiration during symbiont growth + maintainance respiration
-      symb_CO2_prod(p) = symb_CO2_prod(p) + (1.0 - params_inst%sulman_tau_sym) * &
-                       (total_symbiont_turnover_C(p,i_miner) + total_symbiont_turnover_C(p,i_scav) + total_symbiont_turnover_C(p,i_fixer))
    
-     ! end if
-
-      symbiont_gr_patch(p) = symb_CO2_prod(p)                     ! Respiration during transfer symbiont necromass to SOM
-
-     ! write(iulog,*) , 'symbiont_gr_patch =', symbiont_gr_patch(p), 'symb_CO2_prod', symb_CO2_prod(p)  
-
-     ! write(iulog,*) ,  'scav =', symbiont_turnover_C(p, i_scav) ,  'mine =', symbiont_turnover_C(p, i_miner) ,  'fix =', symbiont_turnover_C(p, i_fixer)
-
 
    !--------------------------------------------------------------------------------------------------------------------------------
 
@@ -1761,6 +1751,11 @@ contains
    ! multiplied with secspday * days_per_year to get values per second (parameter is in per year)
 
    days_per_year = get_average_days_per_year()     ! to get average number of days per year 
+
+  
+  do fp = 1,num_soilp
+      p = filter_soilp(fp)
+      c = patch%column(p)
 
    ! Scavengers
    if (is_active(p,i_scav)) then 
@@ -1850,10 +1845,10 @@ contains
       root_roi_frac = 0.3_r8
    endif 
 
-   write(iulog,*), 'scav_roi=', scav_roi(p)
-   write(iulog,*), 'mine_roi=', mine_roi(p)
-   write(iulog,*), 'fix_roi=', fix_roi(p)
-   write(iulog,*), 'root_roi=', root_roi(p)
+  ! write(iulog,*), 'scav_roi=', scav_roi(p)
+  ! write(iulog,*), 'mine_roi=', mine_roi(p)
+  ! write(iulog,*), 'fix_roi=', fix_roi(p)
+  ! write(iulog,*), 'root_roi=', root_roi(p)
 
    !ECW reservoir updates should happen after planti stuff
 
@@ -1875,13 +1870,13 @@ contains
     C_reservoir(p,i_miner) = C_reservoir(p,i_miner) + mine_C_alloc(p) 
     C_reservoir(p,i_fixer) = C_reservoir(p,i_fixer) + fix_C_alloc(p)
 
-    write(iulog,*), 'C_reservoir(p,i_scav)=',  C_reservoir(p,i_scav) 
-    write(iulog,*), 'C_reservoir(p,i_miner)=', C_reservoir(p,i_miner)
-    write(iulog,*), 'C_reservoir(p,i_fixer)=', C_reservoir(p,i_fixer)
+    !write(iulog,*), 'C_reservoir(p,i_scav)=',  C_reservoir(p,i_scav) 
+    !write(iulog,*), 'C_reservoir(p,i_miner)=', C_reservoir(p,i_miner)
+    !write(iulog,*), 'C_reservoir(p,i_fixer)=', C_reservoir(p,i_fixer)
 
-    write(iulog,*), 'scav_C_alloc=', scav_C_alloc(p)
-    write(iulog,*), 'mine_C_alloc=', mine_C_alloc(p)
-    write(iulog,*), 'fix_C_alloc=', fix_C_alloc(p)
+    !write(iulog,*), 'scav_C_alloc=', scav_C_alloc(p)
+    !write(iulog,*), 'mine_C_alloc=', mine_C_alloc(p)
+    !write(iulog,*), 'fix_C_alloc=', fix_C_alloc(p)
   
     ! Carbon that wasn't spend on scav, miner or fixer (including root)
     root_exudate_C(p) = C_allocation_to_N_acq(p) * dt - scav_C_alloc(p) - mine_C_alloc(p) -  fix_C_alloc(p)
