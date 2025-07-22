@@ -673,8 +673,8 @@ contains
 
       
          ! Temporary fix:
-        ! smin_no3_to_plant_vr(c,j) = 0.1_r8
-        ! smin_nh4_to_plant_vr(c,j) = 0.1_r8
+          !smin_no3_to_plant_vr(c,j) = 0.1_r8
+          !smin_nh4_to_plant_vr(c,j) = 0.1_r8
 
          !write(iulog,*), 'smin_nh4_to_plant_vr  = ', smin_nh4_to_plant_vr(c,j), &
                          !'smin_no3_to_plant_vr  = ', smin_no3_to_plant_vr(c,j)
@@ -993,15 +993,22 @@ contains
        
        ! Fixation has to be done at the biomas update, since it is reduced by the growth
        ! will use later N_fixation=N_fixation*exp(-0.5*0.27*25.15 + 0.27*(soilT-273.15)*(1.0-0.5*(soilT-273.15)/25.15))
+
        ! Amount of nitrogen fixed by fixer biomass
        N_fixation(p) = C_biomass(p,i_fixer) * sulman_rfix * dt
+
+       ! N reservoir grows by the amount of N that was fixed
        N_reservoir(p,i_fixer) = N_reservoir(p,i_fixer) + N_fixation(p)
-       ! Substract the maintainence respiration and turnouver from Nfixation
+
+       ! Substract the maintainence respiration and turnover from N fixation
        !N_fixation(p) = N_fixation(p) - N_biomass(p,i_fixer) * sulman_tau_fix * dt * sulman_tau_sym ! (1 - sulman_tau_sym)
+
        C_biomass(p,i_fixer) = (C_biomass(p,i_fixer) + symb_growth(p,i_fixer)) - C_biomass(p,i_fixer) * sulman_tau_fix * dt
        ! C_biomass(p,i_fixer) = max(C_biomass(p,i_fixer), 0.0)
        N_biomass_old(p) = N_biomass(p,i_fixer)
        !N_biomass(p,i_fixer) = N_biomass(p,i_fixer) + (symb_growth(p,i_fixer) - maint_resp) / sulman_cn_fix - N_biomass(p,i_fixer) / sulman_tau_fix * sulman_tau_sym * dt
+       
+       ! N biomass of fixer is probortional to C biomass of fixer
        N_biomass(p,i_fixer) = C_biomass(p,i_fixer) / sulman_cn_fix
        C_reservoir(p,i_fixer) = C_reservoir(p,i_fixer) - (symb_growth(p,i_fixer)) / sulman_growth_fix
        
@@ -1040,35 +1047,36 @@ contains
 
 
                           
-     
-
-     ! if (C_reservoir(p,i_miner) <= 0._r8 .or. N_reservoir(p,i_miner) <= 0._r8) then 
-      !   write(iulog,*), 'C_reservoir_miner =', C_reservoir(p,i_miner)ke(begp:endp,1:nlevdecomp) 
-      !   write(iulog,*), ' somp_nuptake =', somp_nuptake(begp:endp,1:nlevdecomp)
-      !   write(iulog,*), ' somc_cuptake =', somc_cuptake(begp:endp,1:nlevdecomp)
-      !   write(iulog,*), ' somp_cuptake =', somp_cuptake(begp:endp,1:nlevdecomp)
-      !   write(iulog,*), ' N_mine_somc2soma =', N_mine_somc2soma(begp:endp,1:nlevdecomp)
-      !   write(iulog,*), ' N_mine_somp2soma =', N_mine_somp2soma(begp:endp,1:nlevdecomp)
-        
-      !call endrun(msg = "ERROR: Miner symbiont C or N reservoirs are zero or negative." // &
-      !   errMsg(sourcefile, __LINE__))
-      !end if
-
-        
-      ! Check if reservoirs are not zero
-      !if (C_reservoir(p,i_scav) <= 0._r8 .or. N_reservoir(p,i_scav) <= 0._r8) then 
-      !   write(iulog,*), 'C_reservoir_scav =', C_reservoir(p,i_scav), 'N_reservoir_scav =', N_reservoir(p,i_scav)
-      !   write(iulog,*), 'no3_scav_up=', no3_scav_up(begp:endp,1:nlevdecomp), 'nh4_scav_up=', nh4_scav_up(begp:endp,1:nlevdecomp)
+      !Check if reservoirs are not zero
+      if (C_reservoir(p,i_scav) <= 0._r8 .or. N_reservoir(p,i_scav) <= 0._r8) then 
+         write(iulog,*), 'C_reservoir_scav =', C_reservoir(p,i_scav), 'N_reservoir_scav =', N_reservoir(p,i_scav)
+         write(iulog,*), 'no3_scav_up=', no3_scav_up(begp:endp,1:nlevdecomp), 'nh4_scav_up=', nh4_scav_up(begp:endp,1:nlevdecomp)
    
-      !call endrun(msg = "ERROR: Scavenger symbiont C or N reservoirs are zero or negative." // &
-      !  errMsg(sourcefile, __LINE__))
-      !end if
+      call endrun(msg = "ERROR: Scavenger symbiont C or N reservoirs are zero or negative." // &
+        errMsg(sourcefile, __LINE__))
+      end if
 
-     !if (C_reservoir(p,i_fixer) <= 0._r8 .or. N_reservoir(p,i_fixer) <= 0._r8) then 
-      !   write(iulog,*), 'C_reservoir_fixer =', C_reservoir(p,i_fixer), 'N_reservoir_fixer =', N_reservoir(p,i_fixer)
-     ! call endrun(msg = "ERROR: Fixer symbiont C or N reservoirs are zero or negative." // &
-     !    errMsg(sourcefile, __LINE__))
-     ! end if
+
+      if (C_reservoir(p,i_miner) <= 0._r8 .or. N_reservoir(p,i_miner) <= 0._r8) then 
+        write(iulog,*), 'C_reservoir_miner =', C_reservoir(p,i_miner)
+        write(iulog,*), 'N_reservoir_miner =', N_reservoir(p,i_miner) 
+        write(iulog,*), ' somp_nuptake =', somp_nuptake(begp:endp,1:nlevdecomp)
+        write(iulog,*), ' somc_cuptake =', somc_cuptake(begp:endp,1:nlevdecomp)
+        write(iulog,*), ' somp_cuptake =', somp_cuptake(begp:endp,1:nlevdecomp)
+        write(iulog,*), ' N_mine_somc2soma =', N_mine_somc2soma(begp:endp,1:nlevdecomp)
+        write(iulog,*), ' N_mine_somp2soma =', N_mine_somp2soma(begp:endp,1:nlevdecomp)
+        
+      call endrun(msg = "ERROR: Miner symbiont C or N reservoirs are zero or negative." // &
+         errMsg(sourcefile, __LINE__))
+      end if
+
+        
+     
+     if (C_reservoir(p,i_fixer) <= 0._r8 .or. N_reservoir(p,i_fixer) <= 0._r8) then 
+        write(iulog,*), 'C_reservoir_fixer =', C_reservoir(p,i_fixer), 'N_reservoir_fixer =', N_reservoir(p,i_fixer)
+      call endrun(msg = "ERROR: Fixer symbiont C or N reservoirs are zero or negative." // &
+         errMsg(sourcefile, __LINE__))
+      end if
       
       
   end do
