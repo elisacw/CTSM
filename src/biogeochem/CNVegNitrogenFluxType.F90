@@ -1052,12 +1052,9 @@ contains
     allocate(this%Nretrans_stress_patch       (begp:endp)) ;    this%Nretrans_stress_patch       (:) = nan 
     allocate(this%Nuptake_patch               (begp:endp)) ;    this%Nuptake_patch               (:) = nan
     allocate(this%sminn_to_plant_fun_patch    (begp:endp)) ;    this%sminn_to_plant_fun_patch    (:) = nan
-    allocate(this%sminn_to_plant_fun_vr_patch (begp:endp,1:nlevdecomp_full)) 
-    this%sminn_to_plant_fun_vr_patch          (:,:) = nan
-    allocate(this%sminn_to_plant_fun_no3_vr_patch (begp:endp,1:nlevdecomp_full))  
-    this%sminn_to_plant_fun_no3_vr_patch      (:,:) = nan
-    allocate(this%sminn_to_plant_fun_nh4_vr_patch (begp:endp,1:nlevdecomp_full))  
-    this%sminn_to_plant_fun_nh4_vr_patch      (:,:) = nan
+    allocate(this%sminn_to_plant_fun_vr_patch (begp:endp,1:nlevdecomp_full)); this%sminn_to_plant_fun_vr_patch          (:,:) = nan
+    allocate(this%sminn_to_plant_fun_no3_vr_patch (begp:endp,1:nlevdecomp_full));  this%sminn_to_plant_fun_no3_vr_patch      (:,:) = nan
+    allocate(this%sminn_to_plant_fun_nh4_vr_patch (begp:endp,1:nlevdecomp_full)); this%sminn_to_plant_fun_nh4_vr_patch      (:,:) = nan
     allocate(this%sminn_to_plant_mimicsplus_patch    (begp:endp)); this%sminn_to_plant_mimicsplus_patch(:) = nan
     allocate(this%sminn_to_symbiont_mimicsplus_vr_patch (begp:endp,1:nlevdecomp_full)); this%sminn_to_symbiont_mimicsplus_vr_patch(:,:) = nan
     allocate(this%sminn_to_symbiont_mimicsplus_no3_vr_patch (begp:endp,1:nlevdecomp_full)); this%sminn_to_symbiont_mimicsplus_no3_vr_patch(:,:) = nan
@@ -1885,8 +1882,24 @@ contains
 
     this%sminn_to_plant_mimicsplus_patch(begp:endp) = spval
     call hist_addfld1d (fname='SMINN_TO_PLANT_MIMICSPLUS', units='gN/m^2/s', &
-         avgflag='A', long_name='Total soil N uptake of MIMICSPLUS',        &
-         ptr_patch=this%sminn_to_plant_mimicsplus_patch)  
+         avgflag='A', long_name='Total soil N uptake of MIMICSPLUS to plant',        &
+         ptr_patch=this%sminn_to_plant_mimicsplus_patch) 
+         
+    this%sminn_to_symbiont_mimicsplus_vr_patch(begp:endp,1:nlevdecomp_full) = spval
+    call hist_addfld2d (fname='SMINN_TO_SYMB_MIMICSPLUS', units='gN/m^2/s', type2d='levsoi',&
+         avgflag='A', long_name='Total soil symbiont N uptake', &
+         ptr_patch=this%sminn_to_symbiont_mimicsplus_vr_patch)
+ 
+    this%sminn_to_symbiont_mimicsplus_no3_vr_patch(begp:endp,1:nlevdecomp_full) = spval
+    call hist_addfld2d (fname='SMINN_TO_SYMB_MIMICSPLUS_NO3', units='gN/m^2/s', type2d='levsoi',&
+         avgflag='A', long_name='Symbiont soil nitrate N uptake', &
+         ptr_patch=this%sminn_to_symbiont_mimicsplus_no3_vr_patch)
+   
+   this%sminn_to_symbiont_mimicsplus_nh4_vr_patch(begp:endp,1:nlevdecomp_full) = spval
+    call hist_addfld2d (fname='SMINN_TO_SYMB_MIMICSPLUS_NH4', units='gN/m^2/s', type2d='levsoi', &
+         avgflag='A', long_name='Symbiont soil ammonium N uptake', &
+         ptr_patch=this%sminn_to_symbiont_mimicsplus_nh4_vr_patch)
+
     end if 
 
   end subroutine InitHistory

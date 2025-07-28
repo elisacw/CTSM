@@ -582,6 +582,11 @@ contains
          ! calculate the total column-level nitrogen storage, for mass conservation check
          col_endnb(c) = totcoln(c)
 
+         write(iulog,*), 'ndep_to_sminn=', ndep_to_sminn(c)
+         write(iulog,*), 'nfix_to_sminn=', nfix_to_sminn(c)
+         write(iulog,*), 'supplement_to_sminn=', supplement_to_sminn(c)
+         write(iulog,*), 'ffix_to_sminn=', ffix_to_sminn(c)
+
          ! calculate total column-level inputs
          col_ninputs(c) = ndep_to_sminn(c) + nfix_to_sminn(c) + supplement_to_sminn(c)
 
@@ -603,6 +608,12 @@ contains
          ! calculate total column-level outputs
 
          col_noutputs(c) = denit(c)
+
+         write(iulog,*), 'denit=', denit(c)
+         write(iulog,*), 'smin_no3_leached=', smin_no3_leached(c)
+         write(iulog,*), 'smin_no3_runoff=', smin_no3_runoff(c)
+         write(iulog,*), 'f_n2o_nit=', f_n2o_nit(c)
+
 
          if( .not.col%is_fates(c) ) then
             

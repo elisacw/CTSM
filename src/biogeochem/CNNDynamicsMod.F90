@@ -206,6 +206,8 @@ contains
     use shr_sys_mod      , only : shr_sys_flush
     use clm_varcon       , only : secspday, spval
     use CNSharedParamsMod    , only: use_fun
+    use SoilBiogeochemDecompCascadeConType , only : decomp_method, mimicsplus_decomp
+ 
     !
     ! !ARGUMENTS:
     integer                                , intent(in)    :: num_soilc       ! number of soil columns in filter
@@ -230,52 +232,57 @@ contains
          )
 
       dayspyr = get_curr_days_per_year()
-      if ( nfix_timeconst > 0._r8 .and. nfix_timeconst < 500._r8 ) then
-         ! use exponential relaxation with time constant nfix_timeconst for NPP - NFIX relation
-         ! Loop through columns
-         do fc = 1,num_soilc
-            c = filter_soilc(fc)         
+      if (.not. (use_fun .or. decomp_method == mimicsplus_decomp)) then
+         if ( nfix_timeconst > 0._r8 .and. nfix_timeconst < 500._r8 ) then
+            ! use exponential relaxation with time constant nfix_timeconst for NPP - NFIX relation
+            ! Loop through columns
+            do fc = 1,num_soilc
+               c = filter_soilc(fc)  
+                  if(col%is_fates(c))then
+                     s = clm_fates%f2hmap(clump_index)%hsites(c)
+                     ! %ema_npp is Smoothed [gc/m2/yr]
+                     !npp = clm_fates%fates(clump_index)%bc_out(s)%ema_npp/(dayspyr*secspday)
+                     ! FATES N cycling is not yet active, so runs are supplemented anyway
+                     ! this will be added when FATES N cycling is completed.
+                     npp = 0._r8
+                  else
+                     npp = col_lag_npp(c)
+                  end if
+               
+               if (npp /= spval) then
+                  ! need to put npp in units of gC/m^2/year here first
+                  t = (1.8_r8 * (1._r8 - exp(-0.003_r8 * npp *(secspday * dayspyr))))/(secspday * dayspyr)  
+                  nfix_to_sminn(c) = max(0._r8,t)
+               else
+                  nfix_to_sminn(c) = 0._r8
+               endif
+            end do
+         else
+            ! use annual-mean values for NPP-NFIX relation
+            do fc = 1,num_soilc
+               c = filter_soilc(fc)
 
-            if(col%is_fates(c))then
-               s = clm_fates%f2hmap(clump_index)%hsites(c)
-               ! %ema_npp is Smoothed [gc/m2/yr]
-               !npp = clm_fates%fates(clump_index)%bc_out(s)%ema_npp/(dayspyr*secspday)
-               ! FATES N cycling is not yet active, so runs are supplemented anyway
-               ! this will be added when FATES N cycling is completed.
-               npp = 0._r8
-            else
-               npp = col_lag_npp(c)
-            end if
-            
-            if (npp /= spval) then
-               ! need to put npp in units of gC/m^2/year here first
-               t = (1.8_r8 * (1._r8 - exp(-0.003_r8 * npp *(secspday * dayspyr))))/(secspday * dayspyr)  
+               if(col%is_fates(c))then
+                  s = clm_fates%f2hmap(clump_index)%hsites(c)
+                  !npp = clm_fates%fates(clump_index)%bc_out(s)%ema_npp 
+                  ! See above regarding FATES and N fixation
+                  npp = 0._r8
+               else 
+                  npp = cannsum_npp(c)
+               end if
+
+               t = (1.8_r8 * (1._r8 - exp(-0.003_r8 * npp)))/(secspday * dayspyr)
                nfix_to_sminn(c) = max(0._r8,t)
-            else
-               nfix_to_sminn(c) = 0._r8
-            endif
-         end do
+            end do
+         end if 
+
       else
-         ! use annual-mean values for NPP-NFIX relation
-         do fc = 1,num_soilc
+         ! FUN or MIMICS active – skip N-fix logic completely
+         do fc = 1, num_soilc
             c = filter_soilc(fc)
-
-            if(col%is_fates(c))then
-               s = clm_fates%f2hmap(clump_index)%hsites(c)
-               !npp = clm_fates%fates(clump_index)%bc_out(s)%ema_npp 
-               ! See above regarding FATES and N fixation
-               npp = 0._r8
-            else 
-               npp = cannsum_npp(c)
-            end if
-
-            t = (1.8_r8 * (1._r8 - exp(-0.003_r8 * npp)))/(secspday * dayspyr)
-            nfix_to_sminn(c) = max(0._r8,t)
+            nfix_to_sminn(c) = 0._r8
          end do
       endif
-      if(use_fun)then
-        nfix_to_sminn(c) = 0.0_r8
-      end if
 
     end associate
 

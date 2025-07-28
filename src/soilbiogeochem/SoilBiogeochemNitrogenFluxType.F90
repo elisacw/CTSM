@@ -49,6 +49,7 @@ module SoilBiogeochemNitrogenFluxType
      real(r8), pointer :: net_nmin_vr_col                           (:,:)   ! col vertically-resolved net rate of N mineralization (gN/m3/s)
      real(r8), pointer :: net_nmin_col                              (:)     ! col vert-int (diagnostic) net rate of N mineralization (gN/m2/s)
      real(r8), pointer :: sminn_to_plant_fun_col                    (:)     ! col total soil N uptake of FUN        (gN/m2/s)
+     real(r8), pointer :: sminn_to_symbiont_mimicsplus_col          (:)     ! col total soil N uptake of FUN        (gN/m2/s)
      ! ---------- NITRIF_DENITRIF  ---------------------
 
      ! nitrification / denitrification fluxes
@@ -218,6 +219,7 @@ contains
     allocate(this%sminn_to_plant_fun_vr_col         (begc:endc,1:nlevdecomp_full)) ; this%sminn_to_plant_fun_vr_col  (:,:)   = nan
     allocate(this%sminn_to_plant_fun_no3_vr_col     (begc:endc,1:nlevdecomp_full)) ; this%sminn_to_plant_fun_no3_vr_col(:,:) = nan
     allocate(this%sminn_to_plant_fun_nh4_vr_col     (begc:endc,1:nlevdecomp_full)) ; this%sminn_to_plant_fun_nh4_vr_col(:,:) = nan
+    allocate(this%sminn_to_symbiont_mimicsplus_col            (begc:endc))                   ; this%sminn_to_symbiont_mimicsplus_col  (:)     = nan
     allocate(this%sminn_to_symbiont_mimicsplus_vr_col         (begc:endc,1:nlevdecomp_full)) ; this%sminn_to_symbiont_mimicsplus_vr_col  (:,:)   = nan
     allocate(this%sminn_to_symbiont_mimicsplus_no3_vr_col     (begc:endc,1:nlevdecomp_full)) ; this%sminn_to_symbiont_mimicsplus_no3_vr_col(:,:) = nan
     allocate(this%sminn_to_symbiont_mimicsplus_nh4_vr_col     (begc:endc,1:nlevdecomp_full)) ; this%sminn_to_symbiont_mimicsplus_nh4_vr_col(:,:) = nan
@@ -1012,6 +1014,7 @@ contains
        this%net_nmin_col(i)                  = value_column
        this%denit_col(i)                     = value_column
        this%sminn_to_plant_fun_col(i)        = value_column
+       this%sminn_to_symbiont_mimicsplus_col(i) = value_column
        if (use_nitrif_denitrif) then
           this%f_nit_col(i)                  = value_column
           this%pot_f_nit_col(i)              = value_column

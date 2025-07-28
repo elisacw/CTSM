@@ -841,8 +841,8 @@ module CNFUNMod
        p = filter_soilp(fp)
        c = patch%column(p)
 
-       write(iulog,*), 'smin_nh4_to_plant_vr  = ', smin_nh4_to_plant_vr(c,j)
-       write(iulog,*), 'smin_no3_to_plant_vr  = ', smin_no3_to_plant_vr(c,j)
+       write(iulog,*), 'smin_nh4_to_plant_vrFUN  = ', smin_nh4_to_plant_vr(c,j)
+       write(iulog,*), 'smin_no3_to_plant_vrFUN  = ', smin_no3_to_plant_vr(c,j)
 
 
        sminn_no3_layer(c,j)= smin_no3_to_plant_vr(c,j) * dzsoi_decomp(j) * dt

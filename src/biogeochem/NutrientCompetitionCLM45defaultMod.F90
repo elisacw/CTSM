@@ -304,18 +304,19 @@ contains
          if(use_fun)then ! if we are using FUN, we get the N available from there.
             sminn_to_npool(p) = sminn_to_plant_fun(p) 
          else if (decomp_method == mimicsplus_decomp) then 
-               sminn_to_npool(p) = sminn_to_plant_mimicsplus(p) !ECW inorganic N that was taken up by symbionts and then send to plant
+            sminn_to_npool(p) = sminn_to_plant_mimicsplus(p) !ECW inorganic N that was taken up by symbionts and then send to plant
          else ! no FUN. :( we get N available from the FPG calculation in soilbiogeochemistry competition.
             sminn_to_npool(p) = plant_ndemand(p) * fpg(c)
          endif
+
          !ECW this needs to be here because MIMICsplus doesn't have retranslocation atm
          if (decomp_method == mimicsplus_decomp) then
-         plant_nalloc(p) = sminn_to_plant_mimicsplus(p)
-         plant_calloc(p) = plant_nalloc(p) * (c_allometry(p)/n_allometry(p))
+           plant_nalloc(p) = sminn_to_plant_mimicsplus(p)
+           plant_calloc(p) = plant_nalloc(p) * (c_allometry(p)/n_allometry(p))
+         else
+           plant_nalloc(p) = sminn_to_npool(p) + retransn_to_npool(p)
+           plant_calloc(p) = plant_nalloc(p) * (c_allometry(p)/n_allometry(p))
          end if
-         
-         plant_nalloc(p) = sminn_to_npool(p) + retransn_to_npool(p)
-         plant_calloc(p) = plant_nalloc(p) * (c_allometry(p)/n_allometry(p))
 
          if(.not.use_fun)then  !ORIGINAL CLM(CN) downregulation code.
             excess_cflux(p) = availc(p) - plant_calloc(p)
@@ -720,7 +721,7 @@ contains
                retransn_to_npool(p) = plant_ndemand(p)
             end if
 
-            if ( .not. use_fun ) then
+            if ( .not. use_fun) then
                plant_ndemand(p) = plant_ndemand(p) - retransn_to_npool(p)
             else
                if (season_decid(ivt(p)) == 1._r8.or.stress_decid(ivt(p))==1._r8) then

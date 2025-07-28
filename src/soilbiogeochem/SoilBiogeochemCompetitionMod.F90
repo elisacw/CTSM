@@ -222,7 +222,7 @@ contains
     ! !LOCAL VARIABLES:
     integer  :: c,p,l,pi,j,k                                          ! indices
     integer  :: fc                                                    ! filter column index
-   ! logical :: local_use_fun                                          ! local version of use_fun
+    logical :: local_use_fun                                          ! local version of use_fun
     real(r8) :: amnf_immob_vr                                         ! actual mineral N flux from immobilization (gN/m3/s)
     real(r8) :: n_deficit_vr                                          ! microbial N deficit, vertically resolved (gN/m3/s)
     real(r8) :: compet_plant_no3                                      ! (unitless) relative compettiveness of plants for NO3
@@ -305,7 +305,7 @@ contains
 
       sminn_to_plant_new(bounds%begc:bounds%endc)  =  0.0_r8
 
-     ! local_use_fun = use_fun ! .or. (decomp_method == mimicsplus_decomp)
+      local_use_fun = use_fun .or. (decomp_method == mimicsplus_decomp)
 
       if_nitrif: if (.not. use_nitrif_denitrif) then
 
@@ -388,7 +388,7 @@ contains
             end do
          end do
 
-         if (use_fun) then
+         if (use_fun .and. decomp_method /= mimicsplus_decomp) then
             call t_startf( 'CNFUN' )
             call CNFUN(bounds,num_bgc_soilc,filter_bgc_soilc,num_bgc_vegp,filter_bgc_vegp,waterstatebulk_inst, &
                       waterfluxbulk_inst,temperature_inst,soilstate_inst,cnveg_state_inst,cnveg_carbonstate_inst,&
@@ -402,10 +402,8 @@ contains
             call t_stopf( 'CNFUN' )
          end if
 
-         write(iulog,*), 'DEBUG: decomp_method =', decomp_method
-         write(iulog,*), 'DEBUG: mimicsplus_decomp =', mimicsplus_decomp
 
-         if (decomp_method == mimicsplus_decomp) then
+         if (decomp_method == mimicsplus_decomp .and. .not. use_fun) then
             call t_startf('CN_soil_veg_exchange')
             call CN_soil_veg_exchange (filter_bgc_vegp, filter_bgc_soilc, num_bgc_vegp, num_bgc_soilc, bounds, symbiont_inst, &
                                        cnveg_nitrogenstate_inst, waterstatebulk_inst, temperature_inst, cnveg_carbonflux_inst, &
@@ -417,6 +415,10 @@ contains
                      'unity')
             call t_stopf( 'CN_soil_veg_exchange' )
          end if
+
+         write(iulog,*), 'DEBUG: decomp_method =', decomp_method
+         write(iulog,*), 'DEBUG: mimicsplus_decomp =', mimicsplus_decomp
+
 
          ! sum up N fluxes to plant
          do j = 1, nlevdecomp
@@ -535,12 +537,10 @@ contains
             ! calculate the fraction of potential growth that can be
             ! acheived with the N available to plants      
             if (plant_ndemand(c) > 0.0_r8) then
-               if (use_fun ) then
-                  fpg(c) = sminn_to_plant_new(c) / plant_ndemand(c)
-               elseif (decomp_method == mimicsplus_decomp) then
-                  fpg(c) = sminn_to_plant_new(c) / plant_ndemand(c)
-               else
+              if ( .not. local_use_fun ) then
                   fpg(c) = sminn_to_plant(c) / plant_ndemand(c)
+               else
+                  fpg(c) = sminn_to_plant_new(c) / plant_ndemand(c)
                end if
             else
                fpg(c) = 1.0_r8
@@ -614,14 +614,10 @@ contains
 
                   f_nit_vr(c,j) = pot_f_nit_vr(c,j)
                   
-                  if (use_fun ) then
-                     smin_nh4_to_plant_vr(c,j) = smin_nh4_vr(c,j)/dt - actual_immob_nh4_vr(c,j) - f_nit_vr(c,j)
-                      write(iulog,*), 'smin_nh4_to_plant_vrFUN  = ', smin_nh4_to_plant_vr(c,j)
-                  elseif (decomp_method == mimicsplus_decomp) then 
-                     smin_nh4_to_plant_vr(c,j) = smin_nh4_vr(c,j)/dt - actual_immob_nh4_vr(c,j) - f_nit_vr(c,j)
-                      write(iulog,*), 'smin_nh4_to_plant_vrMIMICS  = ', smin_nh4_to_plant_vr(c,j)
+                  if ( .not. local_use_fun ) then
+                     smin_nh4_to_plant_vr(c,j) = plant_ndemand(c) * nuptake_prof(c,j)
                   else
-                     smin_nh4_to_plant_vr(c,j) = plant_ndemand(c) * nuptake_prof(c,j)                    
+                     smin_nh4_to_plant_vr(c,j) = smin_nh4_vr(c,j)/dt - actual_immob_nh4_vr(c,j) - f_nit_vr(c,j)
                   end if
 
                else
@@ -638,15 +634,15 @@ contains
                      f_nit_vr(c,j) =  min((smin_nh4_vr(c,j)/dt)*(pot_f_nit_vr(c,j)*compet_nit / &
                           sum_nh4_demand_scaled(c,j)), pot_f_nit_vr(c,j))
                                                  
-                     if (use_fun ) then ! RF added new term. send rest of N to plant - which decides whether it should pay or not? 
-                        smin_nh4_to_plant_vr(c,j) = smin_nh4_vr(c,j)/dt - actual_immob_nh4_vr(c,j) - f_nit_vr(c,j)
-                     elseif (decomp_method == mimicsplus_decomp) then 
-                        smin_nh4_to_plant_vr(c,j) = smin_nh4_vr(c,j)/dt - actual_immob_nh4_vr(c,j) - f_nit_vr(c,j)
-                     else
+                     if ( .not. local_use_fun ) then
                          smin_nh4_to_plant_vr(c,j) = min((smin_nh4_vr(c,j)/dt)*(plant_ndemand(c)* &
                           nuptake_prof(c,j)*compet_plant_nh4 / sum_nh4_demand_scaled(c,j)), plant_ndemand(c)*nuptake_prof(c,j))
+                          
+                     else
+                        ! RF added new term. send rest of N to plant - which decides whether it should pay or not? 
+                        smin_nh4_to_plant_vr(c,j) = smin_nh4_vr(c,j)/dt - actual_immob_nh4_vr(c,j) - f_nit_vr(c,j)
                      end if
-                    
+
                   else
                      actual_immob_nh4_vr(c,j) = 0.0_r8
                      smin_nh4_to_plant_vr(c,j) = 0.0_r8
@@ -669,22 +665,17 @@ contains
                   actual_immob_nh4_vr(c,j) = potential_immob_vr(c,j)
                end if
               
-               if(use_fun)then
-                  sum_no3_demand(c,j) = plant_ndemand(c)*nuptake_prof(c,j) + &
-                  (potential_immob_vr(c,j)-actual_immob_nh4_vr(c,j)) + pot_f_denit_vr(c,j)
-                   sum_no3_demand_scaled(c,j) = (plant_ndemand(c)*nuptake_prof(c,j))*compet_plant_no3 + &
-                  (potential_immob_vr(c,j)-actual_immob_nh4_vr(c,j))*compet_decomp_no3 + pot_f_denit_vr(c,j)*compet_denit
-               elseif (decomp_method == mimicsplus_decomp) then 
-                  sum_no3_demand(c,j) = plant_ndemand(c)*nuptake_prof(c,j) + &
-                  (potential_immob_vr(c,j)-actual_immob_nh4_vr(c,j)) + pot_f_denit_vr(c,j)
-                   sum_no3_demand_scaled(c,j) = (plant_ndemand(c)*nuptake_prof(c,j))*compet_plant_no3 + &
-                  (potential_immob_vr(c,j)-actual_immob_nh4_vr(c,j))*compet_decomp_no3 + pot_f_denit_vr(c,j)*compet_denit
-               else
+               if(.not.local_use_fun)then
                    sum_no3_demand(c,j) = (plant_ndemand(c)*nuptake_prof(c,j)-smin_nh4_to_plant_vr(c,j)) + &
                   (potential_immob_vr(c,j)-actual_immob_nh4_vr(c,j)) + pot_f_denit_vr(c,j)
                    sum_no3_demand_scaled(c,j) = (plant_ndemand(c)*nuptake_prof(c,j) &
                                                  -smin_nh4_to_plant_vr(c,j))*compet_plant_no3 + &
-                  (potential_immob_vr(c,j)-actual_immob_nh4_vr(c,j))*compet_decomp_no3 + pot_f_denit_vr(c,j)*compet_denit                  
+                  (potential_immob_vr(c,j)-actual_immob_nh4_vr(c,j))*compet_decomp_no3 + pot_f_denit_vr(c,j)*compet_denit
+               else
+                  sum_no3_demand(c,j) = plant_ndemand(c)*nuptake_prof(c,j) + &
+                  (potential_immob_vr(c,j)-actual_immob_nh4_vr(c,j)) + pot_f_denit_vr(c,j)
+                   sum_no3_demand_scaled(c,j) = (plant_ndemand(c)*nuptake_prof(c,j))*compet_plant_no3 + &
+                  (potential_immob_vr(c,j)-actual_immob_nh4_vr(c,j))*compet_decomp_no3 + pot_f_denit_vr(c,j)*compet_denit
                endif
 
                if (sum_no3_demand(c,j)*dt < smin_no3_vr(c,j)) then
@@ -697,23 +688,17 @@ contains
 
                   f_denit_vr(c,j) = pot_f_denit_vr(c,j)
 
-                  if(use_fun)then
+                   if(.not.local_use_fun)then
+                     smin_no3_to_plant_vr(c,j) = (plant_ndemand(c)*nuptake_prof(c,j)-smin_nh4_to_plant_vr(c,j))
+                  else
                      ! This restricts the N uptake of a single layer to the value determined from the total demands and the 
                      ! hypothetical uptake profile above. Which is a strange thing to do, since that is independent of FUN
                      ! do we need this at all? 
                      smin_no3_to_plant_vr(c,j) = plant_ndemand(c)*nuptake_prof(c,j)
-                  elseif (decomp_method == mimicsplus_decomp) then 
-                     !smin_no3_to_plant_vr(c,j) = plant_ndemand(c)*nuptake_prof(c,j)
-                     smin_no3_to_plant_vr(c,j) = smin_no3_vr(c,j)/dt - actual_immob_no3_vr(c,j) - f_denit_vr(c,j)
-                      write(iulog,*), 'smin_no3_to_plant_vrMIMICS  = ', smin_no3_to_plant_vr(c,j)
-                  else 
-                     smin_no3_to_plant_vr(c,j) = (plant_ndemand(c)*nuptake_prof(c,j)-smin_nh4_to_plant_vr(c,j))
-                     
                      ! RF added new term. send rest of N to plant - which decides whether it should pay or not? 
-                     !ECW should I also do this with mimicsplus?
-                     if (use_fun ) then
+                     !ECW
+                     if ( local_use_fun .or. decomp_method == mimicsplus_decomp) then
                         smin_no3_to_plant_vr(c,j) = smin_no3_vr(c,j)/dt - actual_immob_no3_vr(c,j) - f_denit_vr(c,j)
-                        write(iulog,*), 'smin_no3_to_plant_vrFUN  = ', smin_no3_to_plant_vr(c,j)
                      end if
                   endif
 
@@ -724,8 +709,19 @@ contains
                   ! soil mineral NO3 resource.
                   nlimit_no3(c,j) = 1
                                   
-                  if (sum_no3_demand(c,j) > 0.0_r8) then
-                     if(use_fun)then
+                 if (sum_no3_demand(c,j) > 0.0_r8) then
+                     if(.not.local_use_fun)then
+                        actual_immob_no3_vr(c,j) = min((smin_no3_vr(c,j)/dt)*((potential_immob_vr(c,j)- &
+                        actual_immob_nh4_vr(c,j))*compet_decomp_no3 / sum_no3_demand_scaled(c,j)), &
+                                  potential_immob_vr(c,j)-actual_immob_nh4_vr(c,j))
+        
+                        smin_no3_to_plant_vr(c,j) = min((smin_no3_vr(c,j)/dt)*((plant_ndemand(c)* &
+                                  nuptake_prof(c,j)-smin_nh4_to_plant_vr(c,j))*compet_plant_no3 / sum_no3_demand_scaled(c,j)), &
+                                  plant_ndemand(c)*nuptake_prof(c,j)-smin_nh4_to_plant_vr(c,j))
+        
+                        f_denit_vr(c,j) = min((smin_no3_vr(c,j)/dt)*(pot_f_denit_vr(c,j)*compet_denit / &
+                                  sum_no3_demand_scaled(c,j)), pot_f_denit_vr(c,j))
+                     else
                         actual_immob_no3_vr(c,j) = min((smin_no3_vr(c,j)/dt)*((potential_immob_vr(c,j)- &
                         actual_immob_nh4_vr(c,j))*compet_decomp_no3 / sum_no3_demand_scaled(c,j)), &
                                   potential_immob_vr(c,j)-actual_immob_nh4_vr(c,j))
@@ -738,28 +734,10 @@ contains
                                   
                         ! RF added new term. send rest of N to plant - which decides whether it should pay or not? 
                         smin_no3_to_plant_vr(c,j) = (smin_no3_vr(c,j) / dt) - actual_immob_no3_vr(c,j) - f_denit_vr(c,j)
-                     elseif (decomp_method == mimicsplus_decomp) then
-                           actual_immob_no3_vr(c,j) = min((smin_no3_vr(c,j)/dt)*((potential_immob_vr(c,j)- &
-                           actual_immob_nh4_vr(c,j))*compet_decomp_no3 / sum_no3_demand_scaled(c,j)), &
-                                     potential_immob_vr(c,j)-actual_immob_nh4_vr(c,j))
-   
-                           f_denit_vr(c,j) = min((smin_no3_vr(c,j)/dt)*(pot_f_denit_vr(c,j)*compet_denit / &
-                           sum_no3_demand_scaled(c,j)), pot_f_denit_vr(c,j))
-           
-                           smin_no3_to_plant_vr(c,j) = (smin_no3_vr(c,j)/dt)*((plant_ndemand(c)* &
-                                     nuptake_prof(c,j)-smin_nh4_to_plant_vr(c,j))*compet_plant_no3 / sum_no3_demand_scaled(c,j))
-                     else
-                        actual_immob_no3_vr(c,j) = min((smin_no3_vr(c,j)/dt)*((potential_immob_vr(c,j)- &
-                        actual_immob_nh4_vr(c,j))*compet_decomp_no3 / sum_no3_demand_scaled(c,j)), &
-                                  potential_immob_vr(c,j)-actual_immob_nh4_vr(c,j))
-        
-                        smin_no3_to_plant_vr(c,j) = min((smin_no3_vr(c,j)/dt)*((plant_ndemand(c)* &
-                                  nuptake_prof(c,j)-smin_nh4_to_plant_vr(c,j))*compet_plant_no3 / sum_no3_demand_scaled(c,j)), &
-                                  plant_ndemand(c)*nuptake_prof(c,j)-smin_nh4_to_plant_vr(c,j))
-        
-                        f_denit_vr(c,j) = min((smin_no3_vr(c,j)/dt)*(pot_f_denit_vr(c,j)*compet_denit / &
-                                  sum_no3_demand_scaled(c,j)), pot_f_denit_vr(c,j))                       
-                     end if
+                        
+  
+                     end if ! use_fun
+
 
                   else ! no no3 demand. no uptake fluxes.
                      actual_immob_no3_vr(c,j) = 0.0_r8
@@ -886,7 +864,7 @@ contains
             end do
          end do
 
-         else if(decomp_method == mimicsplus_decomp) then !ECW add code !ROSIE, here I followed the FUN code
+         else if(decomp_method == mimicsplus_decomp) then 
          do fc=1,num_bgc_soilc
             c = filter_bgc_soilc(fc)
             ! sum up N fluxes to plant after initial competition
@@ -953,54 +931,7 @@ contains
             c_overflow_vr(:,:,:) = 0.0_r8
          end if
 
-         if(use_fun)then
-         !calculate maximum N available to plants. 
-               do fc=1,num_bgc_soilc
-                  c = filter_bgc_soilc(fc)
-                  sminn_to_plant(c) = 0._r8
-               end do
-               do j = 1, nlevdecomp
-                  do fc=1,num_bgc_soilc
-                     c = filter_bgc_soilc(fc)
-                     sminn_to_plant_vr(c,j) = smin_nh4_to_plant_vr(c,j) + smin_no3_to_plant_vr(c,j)
-                     sminn_to_plant(c) = sminn_to_plant(c) + (sminn_to_plant_vr(c,j)) * dzsoi_decomp(j)
-                  end do
-               end do
-      
-   
-                ! add up fun fluxes from SMINN to plant. 
-                do j = 1, nlevdecomp
-                   do fc=1,num_bgc_soilc
-                      c = filter_bgc_soilc(fc)
-                      sminn_to_plant_new(c)  = sminn_to_plant_new(c) + &
-                                (sminn_to_plant_fun_no3_vr(c,j) + sminn_to_plant_fun_nh4_vr(c,j)) * dzsoi_decomp(j)
-                   end do
-                end do
-         
-         elseif (decomp_method == mimicsplus_decomp) then
-         !calculate maximum N available to plants. 
-            do fc=1,num_bgc_soilc
-               c = filter_bgc_soilc(fc)
-               sminn_to_plant(c) = 0._r8
-            end do
-            do j = 1, nlevdecomp
-               do fc=1,num_bgc_soilc
-                  c = filter_bgc_soilc(fc)
-                  sminn_to_plant_vr(c,j) = smin_nh4_to_plant_vr(c,j) + smin_no3_to_plant_vr(c,j)
-                  sminn_to_plant(c) = sminn_to_plant(c) + (sminn_to_plant_vr(c,j)) * dzsoi_decomp(j)
-               end do
-            end do
-
-             ! add up fun fluxes from SMINN to plant. 
-             do j = 1, nlevdecomp
-                do fc=1,num_bgc_soilc
-                   c = filter_bgc_soilc(fc)
-                   sminn_to_plant_new(c)  = sminn_to_plant_new(c) + &
-                             (sminn_to_symbiont_mimicsplus_no3_vr(c,j) + sminn_to_symbiont_mimicsplus_nh4_vr(c,j)) * dzsoi_decomp(j)
-                end do
-             end do                 
-                                 
-         else
+         if(.not.local_use_fun)then
             ! give plants a second pass to see if there is any mineral N left over with which to satisfy residual N demand.
             ! first take frm nh4 pool; then take from no3 pool
             do fc=1,num_bgc_soilc
@@ -1041,7 +972,6 @@ contains
                   sminn_to_plant(c) = sminn_to_plant(c) + (sminn_to_plant_vr(c,j)) * dzsoi_decomp(j)
                end do
             end do
-
             !
             ! and now do second pass for no3
             do fc=1,num_bgc_soilc
@@ -1082,7 +1012,39 @@ contains
                   sminn_to_plant(c) = sminn_to_plant(c) + (sminn_to_plant_vr(c,j)) * dzsoi_decomp(j)
                end do
             end do
-         end if 
+
+
+         else !use_fun
+         !calculate maximum N available to plants. 
+            do fc=1,num_bgc_soilc
+               c = filter_bgc_soilc(fc)
+               sminn_to_plant(c) = 0._r8
+            end do
+            do j = 1, nlevdecomp
+               do fc=1,num_bgc_soilc
+                  c = filter_bgc_soilc(fc)
+                  sminn_to_plant_vr(c,j) = smin_nh4_to_plant_vr(c,j) + smin_no3_to_plant_vr(c,j)
+                  sminn_to_plant(c) = sminn_to_plant(c) + (sminn_to_plant_vr(c,j)) * dzsoi_decomp(j)
+               end do
+            end do
+   
+
+             ! add up fun fluxes from SMINN to plant. 
+             do j = 1, nlevdecomp
+                do fc=1,num_bgc_soilc
+                   c = filter_bgc_soilc(fc)
+                   if (use_fun) then
+                   sminn_to_plant_new(c)  = sminn_to_plant_new(c) + &
+                             (sminn_to_plant_fun_no3_vr(c,j) + sminn_to_plant_fun_nh4_vr(c,j)) * dzsoi_decomp(j)
+                   else if (decomp_method == mimicsplus_decomp) then
+                   sminn_to_plant_new(c)  = sminn_to_plant_new(c) + &
+                             (sminn_to_symbiont_mimicsplus_no3_vr(c,j) + sminn_to_symbiont_mimicsplus_nh4_vr(c,j)) * dzsoi_decomp(j)
+                   end if 
+                end do
+             end do
+
+         end if !use_f
+         
 
          ! sum up N fluxes to immobilization
          do fc=1,num_bgc_soilc
@@ -1105,11 +1067,7 @@ contains
             ! calculate the fraction of potential growth that can be
             ! acheived with the N available to plants
             ! calculate the fraction of immobilization realized (for diagnostic purposes)
-            if(use_fun)then !FUN has no concept of FPG.
-               fpi(c) = 1._r8
-            elseif(decomp_method == mimicsplus_decomp) then 
-               fpi(c) = 1._r8
-            else
+            if(.not.local_use_fun)then !FUN has no concept of FPG.
                if (plant_ndemand(c) > 0.0_r8) then
                   fpg(c) = sminn_to_plant(c) / plant_ndemand(c)
                else
@@ -1119,6 +1077,8 @@ contains
 
             if (potential_immob(c) > 0.0_r8) then
                fpi(c) = actual_immob(c) / potential_immob(c)
+            else
+               fpi(c) = 1._r8
             end if
          end do ! end of column loops
 

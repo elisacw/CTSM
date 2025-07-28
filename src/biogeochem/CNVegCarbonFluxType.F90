@@ -230,8 +230,9 @@ module CNVegCarbonFluxType
      real(r8), pointer :: cpool_deadcroot_gr_patch                  (:)     ! dead coarse root growth respiration (gC/m2/s)
      real(r8), pointer :: cpool_deadcroot_storage_gr_patch          (:)     ! dead coarse root growth respiration to storage (gC/m2/s)
      real(r8), pointer :: transfer_deadcroot_gr_patch               (:)     ! dead coarse root growth respiration from storage (gC/m2/s)
-     real(r8), pointer :: symbiont_gr_patch                         (:)     ! symbiont respiration 
-     real(r8), pointer :: miner_n_patch                            (:)      ! miner respiration during mining (gC/m2/s) !ECW rename?
+     real(r8), pointer :: symbiont_gr_patch                         (:)     ! symbiont growth respiration 
+     real(r8), pointer :: symbiont_maint_patch                      (:)     ! symbiont maintainace respiration 
+     real(r8), pointer :: miner_n_patch                             (:)     ! miner respiration during mining (gC/m2/s) !ECW rename?
 
      ! growth respiration for prognostic crop model
      real(r8), pointer :: cpool_reproductive_gr_patch               (:,:)   ! reproductive (e.g., grain) growth respiration (gC/m2/s)
@@ -979,7 +980,8 @@ contains
     allocate(this%cpool_deadcroot_storage_gr_patch          (begp:endp)) ; this%cpool_deadcroot_storage_gr_patch          (:) = nan
     allocate(this%transfer_deadcroot_gr_patch               (begp:endp)) ; this%transfer_deadcroot_gr_patch               (:) = nan
     allocate(this%symbiont_gr_patch                         (begp:endp)) ; this%symbiont_gr_patch                         (:) = nan
-    allocate(this%miner_n_patch                            (begp:endp)) ; this%miner_n_patch                            (:) = nan
+    allocate(this%symbiont_maint_patch                      (begp:endp)) ; this%symbiont_maint_patch                      (:) = nan
+    allocate(this%miner_n_patch                            (begp:endp)) ; this%miner_n_patch                              (:) = nan
     allocate(this%leafc_storage_to_xfer_patch               (begp:endp)) ; this%leafc_storage_to_xfer_patch               (:) = nan
     allocate(this%frootc_storage_to_xfer_patch              (begp:endp)) ; this%frootc_storage_to_xfer_patch              (:) = nan
     allocate(this%livestemc_storage_to_xfer_patch           (begp:endp)) ; this%livestemc_storage_to_xfer_patch           (:) = nan
@@ -2012,6 +2014,11 @@ contains
        call hist_addfld1d (fname='SYMBIONT_GR', units='gC/m^2/s', &
             avgflag='A', long_name='symbiont respiration during growth', &
             ptr_patch=this%symbiont_gr_patch, default='inactive')
+      
+       this%symbiont_maint_patch(begp:endp) = spval
+       call hist_addfld1d (fname='SYMBIONT_MAINT', units='gC/m^2/s', &
+            avgflag='A', long_name='symbiont maintainace respiration', &
+            ptr_patch=this%symbiont_maint_patch, default='inactive')
 
        this%miner_n_patch(begp:endp) = spval
        call hist_addfld1d (fname='MINING_N', units='gC/m^2/s', &
@@ -4580,6 +4587,7 @@ contains
        this%cpool_deadcroot_gr_patch(i)                  = value_patch
        this%cpool_deadcroot_storage_gr_patch(i)          = value_patch
        this%symbiont_gr_patch(i)                         = value_patch
+       this%symbiont_maint_patch(i)                      = value_patch
        this%miner_n_patch(i)                             = value_patch
        this%transfer_deadcroot_gr_patch(i)               = value_patch
        this%leafc_storage_to_xfer_patch(i)               = value_patch
@@ -5001,25 +5009,21 @@ contains
 
        ! GR is the sum of current + transfer + storage GR 
        ! ECW symbiont respiration during growth and maintainace respiration
-       write(iulog,*), 'gr_patch before summing up  = ', this%gr_patch(p)
+       !write(iulog,*), 'gr_patch before summing up  = ', this%gr_patch(p)
        
        this%gr_patch(p) = &
             this%current_gr_patch(p)  + &
             this%transfer_gr_patch(p) + &
             this%storage_gr_patch(p)
             
-            write(iulog,*), 'gr_patch before mimics  = ', this%gr_patch(p)
+            !write(iulog,*), 'gr_patch before mimics  = ', this%gr_patch(p)
 
          if (decomp_method == mimicsplus_decomp) then
             this%gr_patch(p) =  this%gr_patch(p)   + &
-            this%symbiont_gr_patch(p) ! + this%miner_n_patch(p) 
+            this%symbiont_gr_patch(p)  + & 
+            this%symbiont_maint_patch(p) 
           end if
 
-          write(iulog,*), 'gr_patch after mimics  = ', this%gr_patch(p)
-          write(iulog,*), 'current_gr_patch(p)   = ', this%current_gr_patch(p) 
-          write(iulog,*), 'transfer_gr_patch(p)  = ', this%transfer_gr_patch(p)
-          write(iulog,*), 'storage_gr_patch(p)  = ', this%storage_gr_patch(p)
-          write(iulog,*), 'symbiont_gr_patch(p)  = ', this%symbiont_gr_patch(p)
 
        ! autotrophic respiration (AR) adn 
        if ( use_crop .and. patch%itype(p) >= npcropmin )then
