@@ -72,10 +72,10 @@ contains
     ! Set warning and error levels for Carbon and Nitrogen balance
     ! These could become namelist items if we want them to change for different
     ! types of cases
-    this%cwarning = 1.e-8_r8
-    this%nwarning = 1.e-7_r8
-    this%nerror   = 1.e3_r8   ! higher error tolarace when working with MIMICS (recommended by NCAR, Katie) original value: 1.e-3_r8
-    this%cerror   = 1.e3_r8   ! higher error tolarace when working with MIMICS (recommended by NCAR, Katie) original value: 1.e-7_r8
+    this%cwarning = 1.e-2_r8
+    this%nwarning = 1.e-2_r8
+    this%nerror   = 1.e-3_r8   ! higher error tolarace when working with MIMICS (recommended by NCAR, Katie) original value: 1.e-3_r8
+    this%cerror   = 1.e-3_r8   ! higher error tolarace when working with MIMICS (recommended by NCAR, Katie) original value: 1.e-7_r8
   end subroutine Init
 
   !-----------------------------------------------------------------------
@@ -582,10 +582,10 @@ contains
          ! calculate the total column-level nitrogen storage, for mass conservation check
          col_endnb(c) = totcoln(c)
 
-         write(iulog,*), 'ndep_to_sminn=', ndep_to_sminn(c)
-         write(iulog,*), 'nfix_to_sminn=', nfix_to_sminn(c)
-         write(iulog,*), 'supplement_to_sminn=', supplement_to_sminn(c)
-         write(iulog,*), 'ffix_to_sminn=', ffix_to_sminn(c)
+        ! write(iulog,*), 'ndep_to_sminn=', ndep_to_sminn(c)
+        ! write(iulog,*), 'nfix_to_sminn=', nfix_to_sminn(c)
+        ! write(iulog,*), 'supplement_to_sminn=', supplement_to_sminn(c)
+        ! write(iulog,*), 'ffix_to_sminn=', ffix_to_sminn(c)
 
          ! calculate total column-level inputs
          col_ninputs(c) = ndep_to_sminn(c) + nfix_to_sminn(c) + supplement_to_sminn(c)

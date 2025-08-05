@@ -150,7 +150,7 @@ contains
     !
     use clm_varctl    , only : carbon_resp_opt
     use CNVegMatrixMod, only : matrix_update_phc
-    use CNSoilVegMIMICSplus, only: symbiont_type, calc_enzymes
+    use CNSoilVegMIMICSplus, only: symbiont_type
     ! !ARGUMENTS:
     integer                              , intent(in)    :: num_soilc       ! number of soil columns filter
     integer                              , intent(in)    :: filter_soilc(:) ! filter for soil columns
@@ -230,18 +230,18 @@ contains
                         !ECW increase necromass flux from myc to SOMc&p
                         !ECW add leftover root C into SOMa
                         cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som) = (symbiont_inst%C_mortality(c,j)*symb_tau_soma) &
-                                                                                 + symbiont_inst%root_exudate_C_col(c,j)
+                                                                                 + symbiont_inst%root_exudate_C_col(c,j) * dt 
                         cf_soil%decomp_cpools_sourcesink_col(c,j,i_chem_som) = (cf_soil%decomp_cpools_sourcesink_col(c,j,i_chem_som) &
-                                                                                 + symbiont_inst%C_mortality(c,j)*symb_tau_somc) &
-                                                                                 - symbiont_inst%somc_cuptake_col(c,j)
+                                                                                 + (symbiont_inst%C_mortality(c,j)*symb_tau_somc) &
+                                                                                 - symbiont_inst%somc_cuptake_col(c,j)) * dt 
                         cf_soil%decomp_cpools_sourcesink_col(c,j,i_phys_som) = (cf_soil%decomp_cpools_sourcesink_col(c,j,i_phys_som) &
-                                                                                 + symbiont_inst%C_mortality(c,j)*symb_tau_somp) &
-                                                                                 - symbiont_inst%somp_cuptake_col(c,j) 
+                                                                                 + (symbiont_inst%C_mortality(c,j)*symb_tau_somp) &
+                                                                                 - symbiont_inst%somp_cuptake_col(c,j)) * dt 
 
                         ! Carbon send to SOMa due to mining
                         cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som) = cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som) &
-                                                                                 + symbiont_inst%somc_cuptake_col(c,j) &
-                                                                                 + symbiont_inst%somp_cuptake_col(c,j) 
+                                                                                 + (symbiont_inst%somc_cuptake_col(c,j) &
+                                                                                 + symbiont_inst%somp_cuptake_col(c,j)) * dt  
                                                                                  
                         ! add C enzyme fluxx here, if I ever make it symbiont_inst%C_enz_mine2soma_col(c,j)
 

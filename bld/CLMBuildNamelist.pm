@@ -952,8 +952,13 @@ sub setup_cmdl_bgc {
       # if MIMICS+ is on and use_fates = .true. then use_lch4 must = .true.
      if ( (! &value_is_true($nl_flags->{'use_lch4'})) && &value_is_true($nl_flags->{'use_fates'}) ) {
         if ( $soil_decomp_method eq "MIMICSplusAas2023" ) {
-           $log->warning("If MIMICSplus is on and use_fates = .true. then use_lch4 must be .true. and currently it's not" );
+           $log->warning("If MIMICSplus+ is on and use_fates = .true. then use_lch4 must be .true. and currently it's not" );
         }
+     }
+     if ( $soil_decomp_method eq "MIMICSplusAas2023" ) {
+       if ( (! &value_is_true($nl_flags->{'use_cn'}) ) && ! &value_is_true($nl_flags->get_value('use_nitrif_denitrif')) ) {
+            $log->fatal_error("When MIMICSplusAas2023 is on, use_cn and use_nitrif_denitrif MUST also be on!");
+       }
      }
   }
   #
@@ -963,7 +968,8 @@ sub setup_cmdl_bgc {
   if ( ! defined($nl->get_value($var)) ) {
      add_default($opts, $nl_flags->{'inputdata_rootdir'}, $definition, $defaults, $nl, $var,
                  'phys'=>$nl_flags->{'phys'}, 'use_cn'=>$nl_flags->{'use_cn'},
-                 'use_nitrif_denitrif'=>$nl_flags->{'use_nitrif_denitrif'} );
+                 'use_nitrif_denitrif'=>$nl_flags->{'use_nitrif_denitrif'},
+                 'soil_decomp_method'=>$soil_decomp_method );
   }
   if ( (! &value_is_true($nl_flags->{'use_cn'}) ) && &value_is_true($nl->get_value('use_fun')) ) {
      $log->fatal_error("When FUN is on, use_cn MUST also be on!");

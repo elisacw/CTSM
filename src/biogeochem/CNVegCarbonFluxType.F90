@@ -185,6 +185,7 @@ module CNVegCarbonFluxType
      real(r8), pointer :: livestem_xsmr_patch                       (:)     ! live stem maintenance respiration from storage (gC/m2/s)
      real(r8), pointer :: livecroot_xsmr_patch                      (:)     ! live coarse root maintenance respiration from storage (gC/m2/s)
      real(r8), pointer :: reproductive_xsmr_patch                   (:,:)   ! crop reproductive (e.g., grain) or organs maint. respiration from storage (gC/m2/s)
+     real(r8), pointer :: symbiont_maint_patch                      (:)     ! symbiont maintainace respiration (gC/m2/s)
 
      ! photosynthesis fluxes                                   
      real(r8), pointer :: psnsun_to_cpool_patch                     (:)     ! C fixation from sunlit canopy (gC/m2/s)
@@ -231,7 +232,6 @@ module CNVegCarbonFluxType
      real(r8), pointer :: cpool_deadcroot_storage_gr_patch          (:)     ! dead coarse root growth respiration to storage (gC/m2/s)
      real(r8), pointer :: transfer_deadcroot_gr_patch               (:)     ! dead coarse root growth respiration from storage (gC/m2/s)
      real(r8), pointer :: symbiont_gr_patch                         (:)     ! symbiont growth respiration 
-     real(r8), pointer :: symbiont_maint_patch                      (:)     ! symbiont maintainace respiration 
      real(r8), pointer :: miner_n_patch                             (:)     ! miner respiration during mining (gC/m2/s) !ECW rename?
 
      ! growth respiration for prognostic crop model
@@ -945,6 +945,7 @@ contains
     allocate(this%livestem_xsmr_patch                       (begp:endp)) ; this%livestem_xsmr_patch                       (:) = nan
     allocate(this%livecroot_xsmr_patch                      (begp:endp)) ; this%livecroot_xsmr_patch                      (:) = nan
     allocate(this%reproductive_xsmr_patch            (begp:endp, nrepr)) ; this%reproductive_xsmr_patch                 (:,:) = nan
+    allocate(this%symbiont_maint_patch                      (begp:endp)) ; this%symbiont_maint_patch                      (:) = nan
     allocate(this%psnsun_to_cpool_patch                     (begp:endp)) ; this%psnsun_to_cpool_patch                     (:) = nan
     allocate(this%psnshade_to_cpool_patch                   (begp:endp)) ; this%psnshade_to_cpool_patch                   (:) = nan
     allocate(this%cpool_to_xsmrpool_patch                   (begp:endp)) ; this%cpool_to_xsmrpool_patch                   (:) = nan
@@ -980,7 +981,6 @@ contains
     allocate(this%cpool_deadcroot_storage_gr_patch          (begp:endp)) ; this%cpool_deadcroot_storage_gr_patch          (:) = nan
     allocate(this%transfer_deadcroot_gr_patch               (begp:endp)) ; this%transfer_deadcroot_gr_patch               (:) = nan
     allocate(this%symbiont_gr_patch                         (begp:endp)) ; this%symbiont_gr_patch                         (:) = nan
-    allocate(this%symbiont_maint_patch                      (begp:endp)) ; this%symbiont_maint_patch                      (:) = nan
     allocate(this%miner_n_patch                            (begp:endp)) ; this%miner_n_patch                              (:) = nan
     allocate(this%leafc_storage_to_xfer_patch               (begp:endp)) ; this%leafc_storage_to_xfer_patch               (:) = nan
     allocate(this%frootc_storage_to_xfer_patch              (begp:endp)) ; this%frootc_storage_to_xfer_patch              (:) = nan
@@ -4587,7 +4587,6 @@ contains
        this%cpool_deadcroot_gr_patch(i)                  = value_patch
        this%cpool_deadcroot_storage_gr_patch(i)          = value_patch
        this%symbiont_gr_patch(i)                         = value_patch
-       this%symbiont_maint_patch(i)                      = value_patch
        this%miner_n_patch(i)                             = value_patch
        this%transfer_deadcroot_gr_patch(i)               = value_patch
        this%leafc_storage_to_xfer_patch(i)               = value_patch
@@ -4612,6 +4611,9 @@ contains
 
        this%crop_seedc_to_leaf_patch(i)                  = value_patch
        this%crop_harvestc_to_cropprodc_patch(i)          = value_patch
+
+       this%symbiont_maint_patch(i)                      = value_patch
+
        !   Matrix
        if(use_matrixcn)then
           this%matrix_Cinput_patch(i)   = value_patch
@@ -4941,6 +4943,11 @@ contains
             this%froot_mr_patch(p)    + &
             this%livestem_mr_patch(p) + &
             this%livecroot_mr_patch(p)
+      
+       if (decomp_method == mimicsplus_decomp) then
+            this%mr_patch(p) =  this%mr_patch(p)   + &
+            this%symbiont_maint_patch(p) 
+       end if
 
        if (carbon_resp_opt == 1) then
           this%mr_patch(p)  = &
@@ -5020,9 +5027,8 @@ contains
 
          if (decomp_method == mimicsplus_decomp) then
             this%gr_patch(p) =  this%gr_patch(p)   + &
-            this%symbiont_gr_patch(p)  + & 
-            this%symbiont_maint_patch(p) 
-          end if
+            this%symbiont_gr_patch(p) 
+         end if
 
 
        ! autotrophic respiration (AR) adn 

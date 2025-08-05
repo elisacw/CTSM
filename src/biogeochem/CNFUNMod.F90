@@ -992,6 +992,9 @@ pft:do fp = 1,num_soilp        ! PFT Starts
 
       !---------How much carbon is provided, to be used for either growth
       ! or Nitrogen uptake?-------------------
+
+      write(iulog,*), 'availcFUN=', availc(p)
+      
       availc_pool(p)            =  availc(p)        *  dt
 
       if (availc_pool(p) > 0._r8) then
