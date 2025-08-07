@@ -82,7 +82,8 @@ module clm_driver
   use PatchType              , only : patch
   use clm_instMod
   use SoilMoistureStreamMod  , only : PrescribedSoilMoistureInterp, PrescribedSoilMoistureAdvance
-  use SoilBiogeochemDecompCascadeConType , only : no_soil_decomp, decomp_method
+  use SoilBiogeochemDecompCascadeConType , only : no_soil_decomp, decomp_method, mimicsplus_decomp
+
   !
   ! !PUBLIC TYPES:
   implicit none
@@ -331,6 +332,18 @@ contains
        call t_startf('begcnbal_grc')
        if (use_cn .or. use_fates_bgc) then
           ! Initialize gridcell-level balance check
+          if (decomp_method == mimicsplus_decomp) then
+              call symbiont_inst%Summary(bounds_clump, filter(nc)%bgc_vegp, &
+                 filter(nc)%num_bgc_vegp, filter(nc)%bgc_soilc, &
+                 filter(nc)%num_bgc_soilc, 'c12', &
+                 soilbiogeochem_carbonstate_inst%totsymbc_col(bounds_clump%begc:bounds_clump%endc))
+    
+              call symbiont_inst%Summary(bounds_clump, filter(nc)%bgc_vegp, &
+                 filter(nc)%num_bgc_vegp, filter(nc)%bgc_soilc, &
+                 filter(nc)%num_bgc_soilc, 'n', &
+                 soilbiogeochem_nitrogenstate_inst%totsymbn_col(bounds_clump%begc:bounds_clump%endc))
+          endif
+
           call bgc_vegetation_inst%InitGridcellBalance(bounds_clump, &
                filter(nc)%num_allc, filter(nc)%allc, &
                filter(nc)%num_bgc_soilc, filter(nc)%bgc_soilc, &
@@ -421,6 +434,19 @@ contains
        call t_startf('begcnbal_col')
        if (use_cn .or. use_fates_bgc) then
           ! Initialize column-level balance check
+
+          if (decomp_method == mimicsplus_decomp) then
+            call symbiont_inst%Summary(bounds_clump, filter(nc)%bgc_vegp, &
+             filter(nc)%num_bgc_vegp, filter(nc)%bgc_soilc, &
+             filter(nc)%num_bgc_soilc, 'c12', &
+             soilbiogeochem_carbonstate_inst%totsymbc_col(bounds_clump%begc:bounds_clump%endc))
+
+            call symbiont_inst%Summary(bounds_clump, filter(nc)%bgc_vegp, &
+             filter(nc)%num_bgc_vegp, filter(nc)%bgc_soilc, &
+             filter(nc)%num_bgc_soilc, 'n', &
+             soilbiogeochem_nitrogenstate_inst%totsymbn_col(bounds_clump%begc:bounds_clump%endc))
+          endif
+          
           call bgc_vegetation_inst%InitColumnBalance(bounds_clump, &
                filter(nc)%num_allc, filter(nc)%allc, &
                filter(nc)%num_bgc_soilc, filter(nc)%bgc_soilc, &
@@ -1102,6 +1128,17 @@ contains
 
        
        if (use_cn .or. use_fates_bgc) then
+          if (decomp_method == mimicsplus_decomp) then
+              call symbiont_inst%Summary(bounds_clump, filter(nc)%bgc_vegp, &
+                 filter(nc)%num_bgc_vegp, filter(nc)%bgc_soilc, &
+                 filter(nc)%num_bgc_soilc, 'c12', &
+                 soilbiogeochem_carbonstate_inst%totsymbc_col(bounds_clump%begc:bounds_clump%endc))
+    
+              call symbiont_inst%Summary(bounds_clump, filter(nc)%bgc_vegp, &
+                 filter(nc)%num_bgc_vegp, filter(nc)%bgc_soilc, &
+                 filter(nc)%num_bgc_soilc, 'n', &
+                 soilbiogeochem_nitrogenstate_inst%totsymbn_col(bounds_clump%begc:bounds_clump%endc))
+          endif
           call t_startf('EcosysDynPostDrainage')
           call bgc_vegetation_inst%EcosystemDynamicsPostDrainage(bounds_clump, &
                filter(nc)%num_allc, filter(nc)%allc, &

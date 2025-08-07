@@ -171,7 +171,7 @@ contains
     allocate(this%totmicc_col    (begc :endc)) ; this%totmicc_col    (:) = nan
     allocate(this%totlitc_col    (begc :endc)) ; this%totlitc_col    (:) = nan
     allocate(this%totsomc_col    (begc :endc)) ; this%totsomc_col    (:) = nan
-    allocate(this%totsymbc_col    (begc :endc)) ; this%totsymbc_col    (:) = nan
+    allocate(this%totsymbc_col   (begc :endc)) ; this%totsymbc_col    (:) = nan
     allocate(this%totlitc_1m_col (begc :endc)) ; this%totlitc_1m_col (:) = nan
     allocate(this%totsomc_1m_col (begc :endc)) ; this%totsomc_1m_col (:) = nan
     allocate(this%dyn_cbal_adjustments_col (begc:endc)) ; this%dyn_cbal_adjustments_col (:) = nan
@@ -1656,10 +1656,17 @@ contains
             this%ctrunc_col(c)  + &
             totvegc_col
      
+
+              
        ! Adding symbiotic biomass to total ecosystem & column nitrogen for mimicsplus
          if (decomp_method == mimicsplus_decomp) then
-            this%totecosysc_col(c) = this%totecosysc_col(c) + this%totsymbc_col(c)
-            this%totc_col(c) = this%totc_col(c) + this%totsymbc_col(c)
+            this%totecosysc_col(c) =      &
+                 this%totecosysc_col(c) + &
+                 this%totsymbc_col(c)
+            
+            this%totc_col(c) =      &
+                 this%totc_col(c) + &
+                 this%totsymbc_col(c)
          endif
     end do
        

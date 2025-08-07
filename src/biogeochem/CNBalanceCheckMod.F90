@@ -75,7 +75,7 @@ contains
     this%cwarning = 1.e-2_r8
     this%nwarning = 1.e-2_r8
     this%nerror   = 1.e-3_r8   ! higher error tolarace when working with MIMICS (recommended by NCAR, Katie) original value: 1.e-3_r8
-    this%cerror   = 1.e-3_r8   ! higher error tolarace when working with MIMICS (recommended by NCAR, Katie) original value: 1.e-7_r8
+    this%cerror   = 1.e-7_r8   ! higher error tolarace when working with MIMICS (recommended by NCAR, Katie) original value: 1.e-7_r8
   end subroutine Init
 
   !-----------------------------------------------------------------------

@@ -4944,11 +4944,6 @@ contains
             this%livestem_mr_patch(p) + &
             this%livecroot_mr_patch(p)
       
-       if (decomp_method == mimicsplus_decomp) then
-            this%mr_patch(p) =  this%mr_patch(p)   + &
-            this%symbiont_maint_patch(p) 
-       end if
-
        if (carbon_resp_opt == 1) then
           this%mr_patch(p)  = &
                this%cpool_to_resp_patch(p)     + &
@@ -4963,6 +4958,12 @@ contains
                   this%mr_patch(p) + &
                   this%reproductive_mr_patch(p,k)
           end do
+       end if
+
+       if (decomp_method == mimicsplus_decomp) then
+           this%mr_patch(p) =  &
+                 this%mr_patch(p)   + &
+                 this%symbiont_maint_patch(p) 
        end if
 
        ! growth respiration (GR)
@@ -5016,20 +5017,18 @@ contains
 
        ! GR is the sum of current + transfer + storage GR 
        ! ECW symbiont respiration during growth and maintainace respiration
-       !write(iulog,*), 'gr_patch before summing up  = ', this%gr_patch(p)
+      
        
        this%gr_patch(p) = &
             this%current_gr_patch(p)  + &
             this%transfer_gr_patch(p) + &
             this%storage_gr_patch(p)
-            
-            !write(iulog,*), 'gr_patch before mimics  = ', this%gr_patch(p)
-
+      
          if (decomp_method == mimicsplus_decomp) then
-            this%gr_patch(p) =  this%gr_patch(p)   + &
-            this%symbiont_gr_patch(p) 
+            this%gr_patch(p) =  &
+                 this%gr_patch(p)   + &
+                 this%symbiont_gr_patch(p) 
          end if
-
 
        ! autotrophic respiration (AR) adn 
        if ( use_crop .and. patch%itype(p) >= npcropmin )then
@@ -5478,6 +5477,8 @@ contains
        this%er_col(c) = &
             this%ar_col(c) + &
             soilbiogeochem_hr_col(c)
+
+      write(iulog,*), 'er_col  = ', this%er_col(c)
       !ECW respiration from symbionts should rather go to hr
        
        ! net ecosystem production, excludes fire flux, landcover change, 
