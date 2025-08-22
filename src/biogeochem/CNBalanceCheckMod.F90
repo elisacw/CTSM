@@ -26,6 +26,8 @@ module CNBalanceCheckMod
   use CNSharedParamsMod               , only : use_fun
   use CLMFatesInterfaceMod            , only : hlm_fates_interface_type
   use clm_varpar                      , only : nlevdecomp
+  use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, decomp_method, mimics_decomp, mimicsplus_decomp, use_soil_matrixcn
+  
   
   !
   implicit none
@@ -219,7 +221,7 @@ contains
        clm_fates)
     !
     ! !USES:
-    use subgridAveMod, only: c2g
+    use subgridAveMod, only: c2g, p2c
     
     !
     ! !DESCRIPTION:
@@ -243,7 +245,7 @@ contains
     
     !
     ! !LOCAL VARIABLES:
-    integer :: c, g, err_index ! indices
+    integer :: c, g, err_index,j ! indices
     integer  :: s              ! fates site index (follows c)
     integer  :: fc             ! lake filter indices
     integer  :: ic             ! index of the current clump
@@ -257,6 +259,12 @@ contains
     real(r8) :: hrv_xsmrpool_amount_left_to_dribble(bounds%begg:bounds%endg)
     real(r8) :: gru_conv_cflux_amount_left_to_dribble(bounds%begg:bounds%endg)
     real(r8) :: dwt_conv_cflux_amount_left_to_dribble(bounds%begg:bounds%endg)
+    real(r8) :: cmort_myc
+    real(r8) :: somc_cuptake
+    real(r8) :: somp_cuptake
+    real(r8) :: root_c_ex
+    real(r8) :: mr_myc(bounds%begc:bounds%endc)
+    real(r8) :: gr_myc(bounds%begc:bounds%endc)
 
     !-----------------------------------------------------------------------
 
@@ -283,9 +291,24 @@ contains
          som_c_leached           =>    soilbiogeochem_carbonflux_inst%som_c_leached_col , & ! Input:  [real(r8) (:) ]  (gC/m2/s) total SOM C loss from vertical transport 
 
          totcolc                 =>    soilbiogeochem_carbonstate_inst%totc_col          , & ! Input:  [real(r8) (:) ]  (gC/m2) total column carbon, incl veg and cpool
-         fates_litter_flux       =>    soilbiogeochem_carbonflux_inst%fates_litter_flux  &   ! Total carbon litter flux from FATES to CLM [gC/m2/s]
-         )
+         fates_litter_flux       =>    soilbiogeochem_carbonflux_inst%fates_litter_flux  , &   ! Total carbon litter flux from FATES to CLM [gC/m2/s]
+        
+         C_mortality          => cnveg_carbonflux_inst%C_mortality    , &     ! Symbiotic turnover per soil layer and column [gC/m3/s]
+         somc_cuptake_col     => cnveg_carbonflux_inst%somc_cuptake_col , &   ! Nitrogen uptake from SOMc via mining       [gC/m3/s]
+         somp_cuptake_col     => cnveg_carbonflux_inst%somp_cuptake_col , &   ! Nitrogen uptake from SOMp via mining       [gC/m3/s]
+         root_exudate_C_col   => cnveg_carbonflux_inst%root_exudate_C_col, &   ! Leftover C from allocation to symbionts    [gC/m3/s]
 
+         symbiont_gr          => cnveg_carbonflux_inst%symbiont_gr_patch, &
+         symbiont_mr          => cnveg_carbonflux_inst%symbiont_maint_patch, &
+         totmycc              => soilbiogeochem_carbonstate_inst%totsymbc_col, &
+         totmicc              => soilbiogeochem_carbonstate_inst%totmicc_col, &
+         totlitc              => soilbiogeochem_carbonstate_inst%totlitc_col, &
+         totsomc              => soilbiogeochem_carbonstate_inst%totsomc_col, &
+         ctrunc              => soilbiogeochem_carbonstate_inst%ctrunc_col, &
+         cwdc              => soilbiogeochem_carbonstate_inst%cwdc_col, &
+         totvegc              => cnveg_carbonstate_inst%totc_p2c_col &
+    )
+       
       ! set time steps
       dt = get_step_size_real()
 
@@ -293,6 +316,16 @@ contains
       ic = bounds%clump_index
       
       err_found = .false.
+
+      mr_myc(bounds%begc:bounds%endc) = 0.0_r8
+      gr_myc(bounds%begc:bounds%endc) = 0.0_r8
+          call p2c(bounds, num_soilc, filter_soilc, &
+         symbiont_gr(bounds%begp:bounds%endp), &
+         gr_myc(bounds%begc:bounds%endc))
+         call p2c(bounds, num_soilc, filter_soilc, &
+         symbiont_mr(bounds%begp:bounds%endp), &
+         mr_myc(bounds%begc:bounds%endc))
+
       do fc = 1,num_soilc
          c = filter_soilc(fc)
 
@@ -357,6 +390,19 @@ contains
 
       if (err_found) then
          c = err_index
+         if (decomp_method == mimicsplus_decomp) then
+            root_c_ex = 0.0_r8
+            cmort_myc = 0.0_r8
+            somc_cuptake = 0.0_r8
+            somp_cuptake = 0.0_r8
+            do j = 1,nlevdecomp
+               root_c_ex = root_c_ex + root_exudate_C_col(c,j)*col%dz(c,j)
+               cmort_myc = cmort_myc + C_mortality(c,j)*col%dz(c,j)
+               somc_cuptake = somc_cuptake + somc_cuptake_col(c,j)*col%dz(c,j)
+               somp_cuptake = somp_cuptake + somp_cuptake_col(c,j)*col%dz(c,j)
+            enddo
+         endif
+
          write(iulog,*)'column cbalance error    = ', col_errcb(c), c
          write(iulog,*)'is fates column?         = ', col%is_fates(c)
          write(iulog,*)'Latdeg,Londeg=',grc%latdeg(col%gridcell(c)),grc%londeg(col%gridcell(c))
@@ -381,6 +427,28 @@ contains
             write(iulog,*)'hr                       = ',soilbiogeochem_carbonflux_inst%hr_col(c)*dt
          end if
          write(iulog,*)'-1*som_c_leached         = ',som_c_leached(c)*dt
+
+         if (decomp_method == mimicsplus_decomp) then 
+            write(iulog,*)'--- MIMICSPLUS ---'
+            write(iulog,*)'Sym_gr        = ', gr_myc(c) *dt
+            write(iulog,*)'Sym_mr        = ', mr_myc(c)*dt
+            write(iulog,*)'C_mortality         = ',cmort_myc*dt
+            write(iulog,*)'somc_cuptake_col    = ',somc_cuptake*dt
+            write(iulog,*)'somp_cuptake_col    = ',somp_cuptake*dt
+            write(iulog,*)'root_exudate_C_col  = ',root_c_ex*dt
+            write(iulog,*)'--- ENDB-POOLS ---'
+            write(iulog,*)'totmycc    =', totmycc(c)
+            write(iulog,*)'totvegc    =', totvegc(c)
+            write(iulog,*)'totmicc    =', totmicc(c)
+            write(iulog,*)'totsomc    =', totsomc(c)
+            write(iulog,*)'totlitc    =', totlitc(c)
+            write(iulog,*)'cwdc       =', cwdc(c)
+            write(iulog,*)'ctrun      =', ctrunc(c)
+            write(iulog,*)'cmort layer', C_mortality(c,1:nlevdecomp)*dt
+
+         end if
+
+
          call endrun(subgrid_index=c, subgrid_level=subgrid_level_column, msg=errMsg(sourcefile, __LINE__))
       end if
 

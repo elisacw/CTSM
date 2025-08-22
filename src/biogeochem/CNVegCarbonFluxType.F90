@@ -434,6 +434,16 @@ module CNVegCarbonFluxType
      integer,  pointer :: matrix_fitransfer_doner_patch             (:)      ! A-matrix_fire non-zero indices (column indices)
      integer,  pointer :: matrix_fitransfer_receiver_patch          (:)      ! A-matrix_fire non-zero indices (row indices)
 
+     !MIMICS+ fluxes
+     real(r8), pointer :: C_mortality                        (:,:)    
+     real(r8), pointer :: somc_cuptake_col                   (:,:)    
+     real(r8), pointer :: somp_cuptake_col                   (:,:)    
+     real(r8), pointer :: root_exudate_C_col                 (:,:)    
+     
+
+    
+    
+
      ! Matrix variables
      integer ileafst_to_ileafxf_ph                    ! Index of phenology related C transfer from leaf storage pool to leaf transfer pool
      integer ileafxf_to_ileaf_ph                      ! Index of phenology related C transfer from leaf transfer pool to leaf pool
@@ -1177,6 +1187,14 @@ contains
     allocate(this%npp_growth_patch       (begp:endp)) ; this%npp_growth_patch       (:) = nan
     allocate(this%leafc_change_patch      (begp:endp)) ; this%leafc_change_patch      (:) = nan
     allocate(this%soilc_change_patch      (begp:endp)) ; this%soilc_change_patch      (:) = nan
+
+    !MIMICS+
+   allocate(this%C_mortality           (begc:endc,1:nlevdecomp)) ; this%C_mortality      (:,:) = nan
+   allocate(this%somc_cuptake_col      (begc:endc,1:nlevdecomp)) ; this%somc_cuptake_col      (:,:) = nan
+   allocate(this%somp_cuptake_col      (begc:endc,1:nlevdecomp)) ; this%somp_cuptake_col      (:,:) = nan
+   allocate(this%root_exudate_C_col    (begc:endc,1:nlevdecomp)) ; this%root_exudate_C_col      (:,:) = nan
+
+
     ! Allocate Matrix data
     if(use_matrixcn)then
        allocate(this%matrix_Cinput_patch         (begp:endp))                         ; this%matrix_Cinput_patch      (:) = nan
@@ -4813,6 +4831,16 @@ contains
           this%xsmrpool_to_atm_col(i)  = value_column
        end if
 
+       do j = 1, nlevdecomp
+          !MIMICS+
+         this%C_mortality(i,j)                      = value_column
+         this%somc_cuptake_col(i,j)                 = value_column
+         this%somp_cuptake_col(i,j)                 = value_column
+         this%root_exudate_C_col(i,j)               = value_column
+       end do
+ 
+
+
     end do
 
   end subroutine SetValues
@@ -4960,11 +4988,11 @@ contains
           end do
        end if
 
-       if (decomp_method == mimicsplus_decomp) then
-           this%mr_patch(p) =  &
-                 this%mr_patch(p)   + &
-                 this%symbiont_maint_patch(p) 
-       end if
+      ! if (decomp_method == mimicsplus_decomp) then
+      !     this%mr_patch(p) =  &
+      !           this%mr_patch(p)   + &
+      !           this%symbiont_maint_patch(p) 
+      ! end if
 
        ! growth respiration (GR)
 
@@ -5024,11 +5052,11 @@ contains
             this%transfer_gr_patch(p) + &
             this%storage_gr_patch(p)
       
-         if (decomp_method == mimicsplus_decomp) then
-            this%gr_patch(p) =  &
-                 this%gr_patch(p)   + &
-                 this%symbiont_gr_patch(p) 
-         end if
+        ! if (decomp_method == mimicsplus_decomp) then
+         !   this%gr_patch(p) =  &
+         !        this%gr_patch(p)   + &
+        !         this%symbiont_gr_patch(p) 
+        ! end if
 
        ! autotrophic respiration (AR) adn 
        if ( use_crop .and. patch%itype(p) >= npcropmin )then
@@ -5045,6 +5073,10 @@ contains
        
        if (use_fun) then
           this%ar_patch(p) = this%ar_patch(p) + this%soilc_change_patch(p)
+       end if
+
+        if (decomp_method == mimicsplus_decomp) then
+          this%ar_patch(p) = this%ar_patch(p) + this%symbiont_gr_patch(p) + this%symbiont_maint_patch(p) 
        end if
      
       
@@ -5478,9 +5510,6 @@ contains
             this%ar_col(c) + &
             soilbiogeochem_hr_col(c)
 
-      write(iulog,*), 'er_col  = ', this%er_col(c)
-      !ECW respiration from symbionts should rather go to hr
-       
        ! net ecosystem production, excludes fire flux, landcover change, 
        ! and loss from wood products, positive for sink (NEP)
        this%nep_col(c) = &

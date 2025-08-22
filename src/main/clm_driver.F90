@@ -337,7 +337,7 @@ contains
                  filter(nc)%num_bgc_vegp, filter(nc)%bgc_soilc, &
                  filter(nc)%num_bgc_soilc, 'c12', &
                  soilbiogeochem_carbonstate_inst%totsymbc_col(bounds_clump%begc:bounds_clump%endc))
-    
+
               call symbiont_inst%Summary(bounds_clump, filter(nc)%bgc_vegp, &
                  filter(nc)%num_bgc_vegp, filter(nc)%bgc_soilc, &
                  filter(nc)%num_bgc_soilc, 'n', &
@@ -1133,7 +1133,7 @@ contains
                  filter(nc)%num_bgc_vegp, filter(nc)%bgc_soilc, &
                  filter(nc)%num_bgc_soilc, 'c12', &
                  soilbiogeochem_carbonstate_inst%totsymbc_col(bounds_clump%begc:bounds_clump%endc))
-    
+
               call symbiont_inst%Summary(bounds_clump, filter(nc)%bgc_vegp, &
                  filter(nc)%num_bgc_vegp, filter(nc)%bgc_soilc, &
                  filter(nc)%num_bgc_soilc, 'n', &
