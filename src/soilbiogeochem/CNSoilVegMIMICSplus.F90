@@ -533,7 +533,7 @@ contains
    real(r8) :: root_dens_frac(bounds%begp:bounds%endp,1:nlevdecomp)     ! Fraction of root density          [-]
 
    ! VARIABLES FOR LOCAL BALANCE CHECK
-   real(r8) :: errbalc, errbaln                                                   ! balance error
+   real(r8) :: errbalc, errbaln                                         ! balance error
    real(r8) :: C_alloc(bounds%begp:bounds%endp,1:n_symb)                !
    real(r8) :: N_to_plant(bounds%begp:bounds%endp,1:n_symb)
    real(r8) :: symb_growth_gross(bounds%begp:bounds%endp,1:n_symb)
@@ -558,6 +558,9 @@ contains
    real(r8) :: nh4_active_up(bounds%begp:bounds%endp,1:nlevdecomp)   ! Active root NH4 (ammonium) uptake  [gN/m3/s]
    real(r8) :: no3_scav_up(bounds%begp:bounds%endp,1:nlevdecomp)     ! Scavenger NO3 (nitrate) uptake     [gN/m3/s]
    real(r8) :: nh4_scav_up(bounds%begp:bounds%endp,1:nlevdecomp)     ! Scavenger NH4 (ammonium) uptake    [gN/m3/s]
+   real(r8) :: sum_no3_up(bounds%begp:bounds%endp,1:nlevdecomp)     ! Scavenger NH4 (ammonium) uptake    [gN/m3/s]
+   real(r8) :: sum_nh4_up(bounds%begp:bounds%endp,1:nlevdecomp)     ! Scavenger NH4 (ammonium) uptake    [gN/m3/s]
+   
    real(r8) :: N_fixation(bounds%begp:bounds%endp)                   ! Nitrogen uptake from fixation      [gN/m2/s]
   
    real(r8) :: somc_nuptake(bounds%begp:bounds%endp, 1:nlevdecomp)   ! Nitrogen uptake from SOMc pool by miners   [gN/m3/s]
@@ -568,8 +571,6 @@ contains
    real(r8) :: maint_resp_N(bounds%begp:bounds%endp, 1:n_symb)       ! N remaining in N pool from C maintainance respiration [gN/m2/s]
    real(r8) :: maint_resp                              ! Maintainace respiration, C from symbiont pool used to sustain existing biomass [gC/m2/s]
    real(r8) :: growth_resp(bounds%begp:bounds%endp,1:n_symb)
-
-   real(r8) :: myc_biomass_layer(bounds%begp:bounds%endp, 1:nlevdecomp)           ! Mycorrhyzal biomass per soil layer       [gC/m3]
 
    real(r8) :: total_symbiont_turnover_C(bounds%begp:bounds%endp, 1:n_symb)       ! Part of symbiont turnover going into SOM [gC/m2/s]
    real(r8) :: total_symbiont_turnover_N(bounds%begp:bounds%endp, 1:n_symb)       ! Part of symbiont turnover going into SOM [gN/m2/s]
@@ -628,7 +629,7 @@ contains
    sulman_cn_symbionts     => params_inst%sulman_cn_symbionts , &   ! C:N ratios of fixer, miner, scavengers as array         [-]
    symb_tau_som            => params_inst%symb_tau_som        , &   ! Fraction symbiont necromass into SOM pools              [-]
 
-   froot_prof           => soilbiogeochem_state_inst%froot_prof_patch                   , & ! Input:  [real(r8) (:,:) ]  (1/m) profile of fine roots                                 
+   froot_prof           => soilbiogeochem_state_inst%froot_prof_patch        , & ! Input: (:,:)   (1/m) profile of fine roots                                 
    crootfr              => soilstate_inst%crootfr_patch                      , & ! Input: (:,:)     (-) patch fraction of roots for carbon in each soil layer (nlevgrnd)
    frootc               => cnveg_carbonstate_inst%frootc_patch               , & ! Input:   (:) (gC/m2) fine root C
    leafn                => cnveg_nitrogenstate_inst%leafn_patch              , & ! Input:   (:) (gN/m2) leaf N                                    
@@ -643,17 +644,17 @@ contains
    availc               => cnveg_carbonflux_inst%availc_patch                , & ! Output:  (:) (gC/m2/s) C flux available for allocation 
    npp_growth           => cnveg_carbonflux_inst%npp_growth_patch            , & ! Output:  (:) (gC/m2/s) Total C u for growth in FUN / MIMICSplus
   
+   sminn_to_symbiont_vr     => cnveg_nitrogenflux_inst%sminn_to_symbiont_mimicsplus_vr_patch    , & ! Output: (:,:) (gN/m2/s) Total layer soil N uptake of MIMICSplus 
+   smin_no3_to_symbiont_vr  => cnveg_nitrogenflux_inst%smin_no3_to_symbiont_mimicsplus_vr_patch , & ! Output: (:,:) (gN/m2/s) Total layer soil NO3 uptake of MIMICSplus 
+   smin_nh4_to_symbiont_vr  => cnveg_nitrogenflux_inst%smin_nh4_to_symbiont_mimicsplus_vr_patch , & ! Output: (:,:) (gN/m2/s) Total layer soil NH4 uptake of MIMICSplus
+   
    smin_no3_to_plant_vr => soilbiogeochem_nitrogenflux_inst%smin_no3_to_plant_vr_col , & ! Input:  (:,:) (gN/m3/s) col vertically-resolved plant uptake of soil NO3 
    smin_nh4_to_plant_vr => soilbiogeochem_nitrogenflux_inst%smin_nh4_to_plant_vr_col , & ! Input:  (:,:) (gN/m3/s) col vertically-resolved plant uptake of soil NH4 
    
-   total_inorgN_uptake_vr  => cnveg_nitrogenflux_inst%sminn_to_symbiont_mimicsplus_vr_patch     , & ! Output: (:,:) (gN/m2/s) Total layer soil N uptake of MIMICSplus 
-   total_inorg_no3_uptake  => cnveg_nitrogenflux_inst%sminn_to_symbiont_mimicsplus_no3_vr_patch , & ! Output: (:,:) (gN/m2/s) Total layer soil NO3 uptake of MIMICSplus 
-   total_inorg_nh4_uptake  => cnveg_nitrogenflux_inst%sminn_to_symbiont_mimicsplus_nh4_vr_patch , & ! Output: (:,:) (gN/m2/s) Total layer soil NH4 uptake of MIMICSplus
-
    decomp_cpools_vr     => soilbiogeochem_carbonstate_inst%decomp_cpools_vr_col   , &  ! Input: (:,:,:) (gC/m3)  vertically-resolved decomposing (litter, cwd, soil) C pools
    decomp_npools_vr     => soilbiogeochem_nitrogenstate_inst%decomp_npools_vr_col , &  ! Input: (:,:,:) (gN/m3)  vertically-resolved decomposing (litter, cwd, soil) N pools
-   totsymbc             =>   soilbiogeochem_carbonstate_inst%totsymbc_col         , &  ! Total C of symbiont pools [gC/m2]
-   totsymbn             =>   soilbiogeochem_nitrogenstate_inst%totsymbn_col       , &  ! Total N of symbiont pools [gC/m2]
+   totsymbc             => soilbiogeochem_carbonstate_inst%totsymbc_col         , &  ! Total C of symbiont pools [gC/m2]
+   totsymbn             => soilbiogeochem_nitrogenstate_inst%totsymbn_col       , &  ! Total N of symbiont pools [gC/m2]
  
    ! Symbiont variables  
    is_active            => symbiont_inst%is_active      , &     ! If symbiont uptake pathway is active for patch   [-]
@@ -665,25 +666,32 @@ contains
    C_biomass            => symbiont_inst%C_biomass      , &     ! Carbon biomass of symbiont                   [gC/m2]
    N_biomass            => symbiont_inst%N_biomass      , &     ! Nitrogen biomass of symbiont                 [gN/m2]
    symb_growth          => symbiont_inst%symb_growth    , &     ! Symbiotic biomass growth rate                [gC/m2]
-  ! C_mortality          => symbiont_inst%C_mortality    , &     ! Symbiotic turnover per soil layer and column [gC/m3/s]
-  N_mortality          => symbiont_inst%N_mortality    , &     ! Symbiotic turnover per soil layer and column [gN/m3/s]
-   somc_nuptake_col     => symbiont_inst%somc_nuptake_col , &   ! Nitrogen uptake from SOMc via mining         [gN/m3/s]
-   somp_nuptake_col     => symbiont_inst%somp_nuptake_col , &   ! Nitrogen uptake from SOMp via mining         [gN/m3/s]
-   N_mine_somc2soma_col    => symbiont_inst%N_mine_somc2soma_col, &   ! Leftover part of co-mineralized N, not taken up by miners  [gN/m3/s]
-   N_mine_somp2soma_col    => symbiont_inst%N_mine_somp2soma_col, &   ! Leftover part of co-mineralized N, not taken up by miners  [gN/m3/s]
+   !C_mortality          => symbiont_inst%C_mortality    , &     ! Symbiotic turnover per soil layer and column [gC/m3/s]
+   !N_mortality          => symbiont_inst%N_mortality    , &     ! Symbiotic turnover per soil layer and column [gN/m3/s]
+   !somc_nuptake_col     => symbiont_inst%somc_nuptake_col , &   ! Nitrogen uptake from SOMc via mining         [gN/m3/s]
+   !somp_nuptake_col     => symbiont_inst%somp_nuptake_col , &   ! Nitrogen uptake from SOMp via mining         [gN/m3/s]
+   !N_mine_somc2soma_col    => symbiont_inst%N_mine_somc2soma_col, &   ! Leftover part of co-mineralized N, not taken up by miners  [gN/m3/s]
+   !N_mine_somp2soma_col    => symbiont_inst%N_mine_somp2soma_col, &   ! Leftover part of co-mineralized N, not taken up by miners  [gN/m3/s]
    symbiont_gr_patch    => cnveg_carbonflux_inst%symbiont_gr_patch     , & ! Total C loss of symbionts that is repired (growth)    [gC/m2/s] 
    symbiont_maint_patch => cnveg_carbonflux_inst%symbiont_maint_patch  , & ! Total C loss of symbionts repired (maintainence)      [gC/m2/s] 
    
    plant_ndemand             => cnveg_nitrogenflux_inst%plant_ndemand_patch            , & ! Output:[real(r8) (:)]  N flux required to support initial GPP (gN/m2/s)
-   N_to_plant_mimicsplus => cnveg_nitrogenflux_inst%N_to_plant_mimicsplus_patch, & ! Output:[real(r8) (:)]  nitrogen sent to plant from symbionts (gN/m2/s)
+   n_to_plant_mimicsplus => cnveg_nitrogenflux_inst%n_to_plant_mimicsplus_patch, & ! Output:[real(r8) (:)]  nitrogen sent to plant from symbionts (gN/m2/s)
    
-   nfix_to_sminn          => soilbiogeochem_nitrogenflux_inst%nfix_to_sminn_col   , & ! Output:  [real(r8) (:)] symbiotic/asymbiotic N fixation to soil mineral N (gN/m2/s)
+   nfix_to_sminn_mimicsplus  => soilbiogeochem_nitrogenflux_inst%nfix_to_sminn_mimicsplus_col   , & ! Output:  [real(r8) (:)] symbiotic/asymbiotic N fixation to soil mineral N (gN/m2/s)
    N_fixation             => cnveg_nitrogenflux_inst%Nfix_patch                   , & ! Output:  [real(r8) (:) ]  Symbiotic BNF (gN/m2/s)
        
    !somc_cuptake_col     => symbiont_inst%somc_cuptake_col , &   ! Nitrogen uptake from SOMc via mining       [gC/m3/s]
    !somp_cuptake_col     => symbiont_inst%somp_cuptake_col , &   ! Nitrogen uptake from SOMp via mining       [gC/m3/s]
    !root_exudate_C_col   => symbiont_inst%root_exudate_C_col &   ! Leftover C from allocation to symbionts    [gC/m3/s]
 
+   N_mortality          => cnveg_nitrogenflux_inst%N_mortality    , &     ! Symbiotic turnover per soil layer and column [gN/m3/s]
+   somc_nuptake_col     => cnveg_nitrogenflux_inst%somc_nuptake_col , &   ! Nitrogen uptake from SOMc via mining         [gN/m3/s]
+   somp_nuptake_col     => cnveg_nitrogenflux_inst%somp_nuptake_col , &   ! Nitrogen uptake from SOMp via mining         [gN/m3/s]
+   N_mine_somc2soma_col    => cnveg_nitrogenflux_inst%N_mine_somc2soma_col, &   ! Leftover part of co-mineralized N, not taken up by miners  [gN/m3/s]
+   N_mine_somp2soma_col    => cnveg_nitrogenflux_inst%N_mine_somp2soma_col, &   ! Leftover part of co-mineralized N, not taken up by miners  [gN/m3/s]
+ 
+   
    C_mortality          => cnveg_carbonflux_inst%C_mortality    , &     ! Symbiotic turnover per soil layer and column [gC/m3/s]
    somc_cuptake_col     => cnveg_carbonflux_inst%somc_cuptake_col , &   ! Nitrogen uptake from SOMc via mining       [gC/m3/s]
    somp_cuptake_col     => cnveg_carbonflux_inst%somp_cuptake_col , &   ! Nitrogen uptake from SOMp via mining       [gC/m3/s]
@@ -696,7 +704,6 @@ contains
    ! https://escomp.github.io/ctsm-docs/versions/master/html/tech_note/Plant_Hydraulics/CLM50_Tech_Note_Plant_Hydraulics.html?highlight=root
    availc_alloc(bounds%begp:bounds%endp)                          = 0.0_r8
    C_allocation_to_N_acq(bounds%begp:bounds%endp)                 = 0.0_r8
-   myc_biomass_layer(bounds%begp:bounds%endp, 1:nlevdecomp)       = 0.0_r8
    root_dens_frac(bounds%begp:bounds%endp, 1:nlevdecomp)          = 0.0_r8
    root_exudate_C(bounds%begp:bounds%endp)                        = 0.0_r8
    root_exudate_C_layer(bounds%begp:bounds%endp,1:nlevdecomp)     = 0.0_r8
@@ -728,25 +735,18 @@ contains
 
 
       !---------------
-  
 
-        ! integrate froot_prof over depth
         do j = 1,nlevdecomp
            norm_froot_prof(p,j) = froot_prof(p,j) * col%dz(c,j)
         end do
-        
-        ! normalize
+      
         if (sum(norm_froot_prof(p,1:nlevdecomp)) > 0._r8) then
            do j = 1,nlevdecomp
               norm_froot_prof(p,j) = norm_froot_prof(p,j) / sum(norm_froot_prof(p,1:nlevdecomp))
            end do
         else
-           ! no roots → no fractions
            norm_froot_prof(p,1:nlevdecomp) = 0._r8
         endif
-   
-         
-      
       
       !--------------
 
@@ -776,7 +776,9 @@ contains
       !      root_dens_frac(p,j) = (crootfr(p,j) * frootc(p)) / root_dens_sum
       !   else
       !      root_dens_frac(p,j) = 0.0_r8
-      !   end if         
+      !   end if   
+            
+    ! Inorganic soil nitrogen flux avaliable for plant uptake
       do j = 1, nlevdecomp
          smin_nh4_avail(p,j) = smin_nh4_to_plant_vr(c,j)  
          smin_no3_avail(p,j) = smin_no3_to_plant_vr(c,j) 
@@ -816,6 +818,8 @@ contains
    nh4_scav_up(begp:endp,1:nlevdecomp)                      = 0.0_r8
    no3_active_up(begp:endp,1:nlevdecomp)                    = 0.0_r8
    nh4_active_up(begp:endp,1:nlevdecomp)                    = 0.0_r8
+   sum_no3_up(begp:endp,1:nlevdecomp)                       = 0.0_r8
+   sum_nh4_up(begp:endp,1:nlevdecomp)                       = 0.0_r8
    N_fixation(begp:endp)                                    = 0.0_r8
    root_N_uptake(begp:endp)                                 = 0.0_r8
    root_N_to_plant(begp:endp)                               = 0.0_r8
@@ -880,29 +884,30 @@ contains
       root_N_uptake(p)     = 0.0_r8
       root_N_to_plant(p)   = 0.0_r8
       do j = 1, nlevdecomp
-         total_inorg_no3_uptake(p,j) = (no3_passiv_up(p,j) + no3_active_up(p,j) + no3_scav_up(p,j)) * col%dz(c,j)
-         total_inorg_nh4_uptake(p,j) = (nh4_passiv_up(p,j) + nh4_active_up(p,j) + nh4_scav_up(p,j)) * col%dz(c,j)
-         if (total_inorg_nh4_uptake(p,j) > 0.0_r8) then
+         sum_no3_up(p,j) = (no3_passiv_up(p,j) + no3_active_up(p,j) + no3_scav_up(p,j))
+         sum_nh4_up(p,j) = (nh4_passiv_up(p,j) + nh4_active_up(p,j) + nh4_scav_up(p,j))
+         
+         if (sum_nh4_up(p,j) > 0.0_r8) then
             write(iulog,*)' '
          endif
          if(smin_nh4_avail(p,j) > 0.0_r8) then
             write(iulog,*)' '
          endif
-         if (total_inorg_no3_uptake(p,j) > 0.0_r8) then
+         if (sum_no3_up(p,j) > 0.0_r8) then
             write(iulog,*)' '
          endif
          if(smin_no3_avail(p,j) > 0.0_r8) then
             write(iulog,*)' '
          endif
 
-         if (smin_no3_avail(p,j) <= 0.0_r8 .and. total_inorg_no3_uptake(p,j) > 0.0_r8) then
+         if (smin_no3_avail(p,j) <= 0.0_r8 .and. sum_no3_up(p,j) > 0.0_r8) then
             write(iulog,*) 'Warning: NO3 uptake attempted from layer with zero availability.'
             no3_passiv_up(p,j) = 0.0_r8
             no3_active_up(p,j) = 0.0_r8
             no3_scav_up(p,j)   = 0.0_r8
         endif
 
-        if (smin_nh4_avail(p,j) <= 0.0_r8 .and. total_inorg_nh4_uptake(p,j) > 0.0_r8) then
+        if (smin_nh4_avail(p,j) <= 0.0_r8 .and. sum_nh4_up(p,j) > 0.0_r8) then
             write(iulog,*) 'Warning: NH4 uptake attempted from layer with zero availability.'
             nh4_passiv_up(p,j) = 0.0_r8
             nh4_active_up(p,j) = 0.0_r8
@@ -913,30 +918,30 @@ contains
          ! If nitrogen uptake exceeds avaliable nitrogen, scale each uptake pathway down
          ! Without multipling by 0.9, I scale to N uptake down, but still allow to take up all avaliable N from soil (maybe not so good)
          ! Therefore I multiply with 0.9 to leave 10% in soil
-         if ( (total_inorg_no3_uptake(p,j) > smin_no3_avail(p,j)) .and. &
+         if ( (smin_no3_to_symbiont_vr(p,j) > smin_no3_avail(p,j)) .and. &
               (smin_no3_avail(p,j) > 0.0_r8) ) then
            write(iulog,*)'NO3 uptake by passive / active / scavenger pathway exceeds soil N uptake and was scaled down, leaving 10% N in soil'
-           no3_passiv_up(p,j)  = no3_passiv_up(p,j)  * (smin_no3_avail(p,j) / total_inorg_no3_uptake(p,j)) * 0.9_r8
-           no3_active_up(p,j)  = no3_active_up(p,j)  * (smin_no3_avail(p,j) / total_inorg_no3_uptake(p,j)) * 0.9_r8
-           no3_scav_up(p,j)    = no3_scav_up(p,j)    * (smin_no3_avail(p,j) / total_inorg_no3_uptake(p,j)) * 0.9_r8
+           no3_passiv_up(p,j)  = no3_passiv_up(p,j)  * ((smin_no3_avail(p,j) / sum_no3_up(p,j)) * 0.9_r8)
+           no3_active_up(p,j)  = no3_active_up(p,j)  * ((smin_no3_avail(p,j) / sum_no3_up(p,j)) * 0.9_r8)
+           no3_scav_up(p,j)    = no3_scav_up(p,j)    * ((smin_no3_avail(p,j) / sum_no3_up(p,j)) * 0.9_r8)
          endif
 
-         if ( (total_inorg_nh4_uptake(p,j) > smin_nh4_avail(p,j)) .and. &
+         if ( (smin_nh4_to_symbiont_vr(p,j) > smin_nh4_avail(p,j)) .and. &
               (smin_nh4_avail(p,j) > 0.0_r8) ) then
             write(iulog,*)'NH4 uptake by passive / active / scavenger pathway exceeds soil N uptake and was scaled down, leaving 10% N in soil'
-            nh4_passiv_up(p,j)  = nh4_passiv_up(p,j)  * (smin_nh4_avail(p,j) / total_inorg_nh4_uptake(p,j)) * 0.9_r8
-            nh4_active_up(p,j)  = nh4_active_up(p,j)  * (smin_nh4_avail(p,j) / total_inorg_nh4_uptake(p,j)) * 0.9_r8
-            nh4_scav_up(p,j)    = nh4_scav_up(p,j)    * (smin_nh4_avail(p,j) / total_inorg_nh4_uptake(p,j)) * 0.9_r8
+            nh4_passiv_up(p,j)  = nh4_passiv_up(p,j)  * ((smin_nh4_avail(p,j) / sum_nh4_up(p,j)) * 0.9_r8)
+            nh4_active_up(p,j)  = nh4_active_up(p,j)  * ((smin_nh4_avail(p,j) / sum_nh4_up(p,j)) * 0.9_r8)
+            nh4_scav_up(p,j)    = nh4_scav_up(p,j)    * ((smin_nh4_avail(p,j) / sum_nh4_up(p,j)) * 0.9_r8)
          endif
 
          root_N_uptake(p) = root_N_uptake(p) + no3_active_up(p,j) + nh4_active_up(p,j)
 
          root_N_to_plant(p) = root_N_to_plant(p) + no3_active_up(p,j) + nh4_active_up(p,j) +  no3_passiv_up(p,j) + nh4_passiv_up(p,j)
 
-         total_inorg_no3_uptake(p,j) = (no3_passiv_up(p,j) + no3_active_up(p,j) + no3_scav_up(p,j))
-         total_inorg_nh4_uptake(p,j) = (nh4_passiv_up(p,j) + nh4_active_up(p,j) + nh4_scav_up(p,j))
+         smin_no3_to_symbiont_vr(p,j) = (no3_passiv_up(p,j) + no3_active_up(p,j) + no3_scav_up(p,j)) * col%dz(c,j)
+         smin_nh4_to_symbiont_vr(p,j) = (nh4_passiv_up(p,j) + nh4_active_up(p,j) + nh4_scav_up(p,j)) * col%dz(c,j)
 
-         total_inorgN_uptake_vr(p,j) = total_inorg_nh4_uptake(p,j) + total_inorg_no3_uptake(p,j)
+         sminn_to_symbiont_vr(p,j) = smin_nh4_to_symbiont_vr(p,j) + smin_no3_to_symbiont_vr(p,j)
 
       end do
    end do
@@ -966,6 +971,7 @@ contains
       N_fixation(p) = C_biomass(p,i_fixer) * sulman_rfix ! units: gN/m2/s
       N_reservoir(p,i_fixer) = N_reservoir(p,i_fixer) + (N_fixation(p) * dt)
    enddo
+
    !------------------------
 
 
@@ -1087,6 +1093,7 @@ contains
        
        ! N fixers just make all the N they need for their biomass
        ! Don't understand, but this should be the variable going into nfix? 
+
        
        !N_fixation(p) = N_fixation(p) / dt ! make it gN/m2/s, since above it is calculated an used in gN/m2
 
@@ -1119,7 +1126,8 @@ contains
 
 
    do fp = 1,num_soilp
-         p = filter_soilp(fp)
+      p = filter_soilp(fp)
+      c = patch%column(p)
    
       ! RESERVOIR UPDATES
       
@@ -1135,7 +1143,7 @@ contains
       N_reservoir(p,i_fixer) = N_reservoir(p,i_fixer) - (N_to_plant(p,i_fixer) * dt)
        
        ! Total nitrogen uptake by plant from intermediate symbiont pools gN/m2/s
-       N_to_plant_mimicsplus(p) = N_to_plant(p,i_scav) + N_to_plant(p,i_miner) + N_to_plant(p,i_fixer) 
+      n_to_plant_mimicsplus(p) = N_to_plant(p,i_scav) + N_to_plant(p,i_miner) + N_to_plant(p,i_fixer) + root_N_to_plant(p)
     
 
        ! THIS IS NOT OKE
@@ -1169,10 +1177,11 @@ contains
 
        do j = 1, nlevdecomp
             N_symb_up(p,i_scav) = N_symb_up(p,i_scav) + (no3_scav_up(p,j) + nh4_scav_up(p,j)) * col%dz(c,j)
-            N_symb_up(p,i_miner) = N_symb_up(p,i_miner) + somc_nuptake(p,j) + somp_nuptake(p,j) * col%dz(c,j)
+            N_symb_up(p,i_miner) = N_symb_up(p,i_miner) + (somc_nuptake(p,j) + somp_nuptake(p,j)) * col%dz(c,j)
        end do
 
        N_symb_up(p,i_fixer) = N_fixation(p)
+     
   
           
    ! LOCAL CARBON BALANCE CHECK
@@ -1191,6 +1200,7 @@ contains
                    - (N_to_plant(p,i) * dt)                                                    &   ! outgoing N
                    - (total_symbiont_turnover_N(p,i) * dt * params_inst%sulman_tau_sym))           ! to soil
           if (abs(errbalc) > 1.0e-10_r8 .or. abs(errbaln) > 1.0e-10_r8) then
+          !if (abs(errbalc) > 1.0e-10_r8 .or. abs(errbaln) > 0.0_r8) then
              write(iulog,*), '------------------------------------------------'
              write(iulog,*), 'ECW: NOT BALANCED', trim(symb_name(i))
              write(iulog,*), 'ECW: C/N BALANCE ERRORS: ', errbalc, errbaln
@@ -1208,16 +1218,30 @@ contains
              write(iulog,*), 'ECW:N send to plant '              , N_to_plant(p,i)     * dt
              write(iulog,*), 'ECW:N Maint resp. to reservoir '   , maint_resp_N(p,i)   * dt
              write(iulog,*), 'ECW:N Turnover '                   , total_symbiont_turnover_N(p,i) * params_inst%sulman_tau_sym * dt
+          
+             if (i == i_miner .and. C_biomass(p,i) > 0.0_r8) then 
+             do j = 1,nlevdecomp
+               if (norm_froot_prof(p,j) > 0.0_r8) then
+                !output N in somp loop and fluxes
+                 write(iulog,*) 'Layer: ', j
+                 write(iulog,*), 'norm_froot_prof'     , norm_froot_prof(p,j)
+                 write(iulog,*), 'somc_nuptake'        , somc_nuptake(p,j)
+                 write(iulog,*), 'N_mine_somc2soma'    , N_mine_somc2soma(p,j)
+                 write(iulog,*), 'N SOMc'              , decomp_npools_vr(c,j,i_chem_som)
+                 write(iulog,*), ' t_soisno'           , t_soisno(c,j)
+               end if
+             end do 
+                   !write(iulog,*), 'wliq' , wliq
+             end if
+            
           end if
-          !if (abs())
+          
        end do
-
 
    ! LOCAL N BALANCE CHECK
 
    end do ! Add nitrogen that was taken through the roots straight to the plant
     
-       
       
    !npp_growth(bounds%begp:bounds%endp) = N_to_plant_mimicsplus(p) * plantCN + root_exudate_C(p)
 
@@ -1243,8 +1267,6 @@ contains
       call p2c(bounds, num_bgc_soilc, filter_bgc_soilc, &
       symb_turnover_layer_N(bounds%begp:bounds%endp,j), &
       N_mortality(bounds%begc:bounds%endc,j))
-
-
 
       ! Leftover part of co-mineralized N, into SOMa
       call p2c(bounds, num_bgc_soilc, filter_bgc_soilc, &
@@ -1274,38 +1296,16 @@ contains
       root_exudate_C_col(bounds%begc:bounds%endc,j))  
    
   end do
-      ! Maybe I need to make my own variables instead of using these:  
-      call p2c(bounds, num_bgc_soilc, filter_bgc_soilc, &
-      N_fixation(bounds%begp:bounds%endp), &
-      nfix_to_sminn(bounds%begc:bounds%endc))
 
-    
+    ! Maybe I need to make my own variables instead of using these:  
+    ! This needs to be here, bc N_fixation gets a different value later
+    call p2c(bounds, num_bgc_soilc, filter_bgc_soilc, &
+    N_fixation(bounds%begp:bounds%endp), &
+    nfix_to_sminn_mimicsplus(bounds%begc:bounds%endc))
+   
 
-     ! call p2c(bounds, nlevdecomp, &
-      !      symb_turnover_layer_C(bounds%begp:bounds%endp,1:nlevdecomp), &
-       !     C_mortality(bounds%begc:bounds%endc,1:nlevdecomp), 'unity')
+     
 
-
-
-   do fp = 1,num_soilp
-      p = filter_soilp(fp)
-      c = patch%column(p)
-      do j = 1, nlevdecomp
-         if (decomp_cpools_vr(c,j,i_phys_som) - somp_cuptake_col(c,j) * dt < 0.0_r8 ) then
-         write(iulog,*), ' somp diag ', col%dz(c,j), decomp_cpools_vr(c,j,i_phys_som),somp_cuptake_col(c,j)
-         endif
-         if (decomp_cpools_vr(c,j,i_chem_som) - somc_cuptake_col(c,j) * dt < 0.0_r8 ) then
-         write(iulog,*), ' somc diag ', col%dz(c,j), decomp_cpools_vr(c,j,i_chem_som),somc_cuptake_col(c,j)
-         end if
-         if(abs(somc_cuptake(p,j))< 0.0_r8 .or. &
-         abs(somp_cuptake(p,j))< 0.0_r8 ) then
-         write(iulog,*),'ERROR : som fluxes'
-         write(iulog,*),'somc,somp',somc_cuptake(p,j),somp_cuptake(p,j)
-         call endrun(msg=errMsg(sourcefile, __LINE__))
-         endif
-
-      enddo
-   enddo
 
    end associate
    end subroutine CN_soil_veg_exchange
@@ -1318,7 +1318,7 @@ contains
    function Vmax_myc(soil_T)
       real(r8), intent(in)   :: soil_T                 ! Soil temperature in Kelvin
       real(r8), parameter    :: Tref=293.15            ! Reference Temperature in Kelvin
-      !real(r8), parameter    :: Ea=37000_r8            ! Activation energy (kJ/mol) Sulman et al. (2019)
+      !real(r8), parameter    :: Ea=37000_r8           ! Activation energy (kJ/mol) Sulman et al. (2019)
       real(r8), parameter    :: Ea=54000_r8            ! Activation energy (J/mol) ELIN
       real(r8), parameter    :: R_gas = 8.314472       ! Universal gas constant, J/mol*K
       real(r8)               :: alpha                  ! Scaling factor that normalizes the exponential temperature response to match a specified reference value. [s]
@@ -1372,21 +1372,12 @@ contains
       ! On the dry side of the function, make sure it does not go below min_dry_resp_factor
       if(wliq<theta_resp_max .and. theta_func<min_dry_resp_factor) theta_func=min_dry_resp_factor
 
-
       enzymes = myc_biomass_layer * enzyme_frac      
      
-
-      ! If there is carbon avaliable, calculate mycorrhizal repiration
-
-      ! ECW change when enzymes go into SOM pools
-      ! enzymes can be calculated in resp_myc
-      ! This needs to be connected to soil carbon in CNCStateUpdate
-      ! Doubel check this in Sulman code
-
-      !CHECK UNITS
-      !CHECK UNITS C UPTAKE
+      ! If there is carbon avaliable, calculate mycorrhizal repiration     
       if (soil_carbon > 0.0_r8 .and. wliq > 0.0_r8) then 
-         resp_myc = Vmax_myc(soil_T) * soil_carbon * enzymes / (soil_carbon * params_inst%sulman_km_mine + enzymes) * theta_func
+         !resp_myc = Vmax_myc(soil_T) * soil_carbon * enzymes / (soil_carbon * params_inst%sulman_km_mine + enzymes) * theta_func
+         resp_myc = Vmax_myc(soil_T) * enzymes * (soil_carbon / (soil_carbon + params_inst%sulman_km_mine)) * theta_func
       else 
          resp_myc = 0.0_r8
       end if 
@@ -1520,7 +1511,7 @@ contains
       integer :: p, fp, c, fc, j, k, l, s  ! indices
       integer :: begp, endp, begc, endc
 
-      real(r8),intent(in)     :: norm_froot_prof(bounds%begp:bounds%endp,1:nlevdecomp)     ! Fraction of root desity     [-]
+      real(r8),intent(in)     :: norm_froot_prof(bounds%begp:bounds%endp,1:nlevdecomp)    ! Fraction of root desity     [-]
       real(r8),intent(inout)  :: no3_soil(bounds%begp:bounds%endp,1:nlevdecomp)           ! avaliable soil mineral NO3  [gN/m3/s]
       real(r8),intent(inout)  :: nh4_soil(bounds%begp:bounds%endp,1:nlevdecomp)           ! avaliable soil mineral NH4  [gN/m3/s]
       real(r8),intent(inout)  :: no3_uptake(bounds%begp:bounds%endp,1:nlevdecomp)         ! NO3 uptake from soil        [gN/m3/s]
@@ -1622,19 +1613,19 @@ contains
       integer :: p, fp, c, fc, j, k, l, s ! indices
       integer :: begp, endp, begc, endc
 
-      real(r8), intent(in)    :: norm_froot_prof(bounds%begp:bounds%endp, 1:nlevdecomp)  ! Fraction of root desity [-]
+      real(r8), intent(in)    :: norm_froot_prof(bounds%begp:bounds%endp, 1:nlevdecomp) ! Fraction of root desity [-]
       real(r8), intent(inout) :: somc_nuptake(bounds%begp:bounds%endp,1:nlevdecomp)     ! Nitrogen removed from SOMc pool into int miner pool [gN/m3/s]
       real(r8), intent(inout) :: somp_nuptake(bounds%begp:bounds%endp,1:nlevdecomp)     ! Nitrogen removed from SOMp pool into int miner pool [gN/m3/s]
-      real(r8), intent(inout) :: somc_cuptake(bounds%begp:bounds%endp,1:nlevdecomp)     ! Carbon removed from SOMc pool into int miner pool [gC/m3/s]
-      real(r8), intent(inout) :: somp_cuptake(bounds%begp:bounds%endp,1:nlevdecomp)     ! Carbon removed from SOMp pool into int miner pool [gC/m3/s]
+      real(r8), intent(inout) :: somc_cuptake(bounds%begp:bounds%endp,1:nlevdecomp)     ! Carbon removed from SOMc pool into int miner pool   [gC/m3/s]
+      real(r8), intent(inout) :: somp_cuptake(bounds%begp:bounds%endp,1:nlevdecomp)     ! Carbon removed from SOMp pool into int miner pool   [gC/m3/s]
       real(r8), intent(inout) :: N_mine_somc2soma(bounds%begp:bounds%endp,1:nlevdecomp) ! Leftover N due to NUE after mining from SOMc to SOMa [gN/m3/s]
       real(r8), intent(inout) :: N_mine_somp2soma(bounds%begp:bounds%endp,1:nlevdecomp) ! Leftover N due to NUE after mining from SOMp to SOMa [gN/m3/s]
 
       real(r8) :: wliq                                                     ! Fraction of liquid water-filled pore space (0.0 - 1.0)
       real(r8) :: wice                                                     ! Fraction of frozen water-filled pore space (0.0 - 1.0)
       real(r8) :: wair                                                     ! Fraction of air-filled pore space (0.0 - 1.0)
-      real(r8) :: myc_biomass_layer(bounds%begp:bounds%endp, 1:nlevdecomp) ! Mycorrhyzal biomass in soil  [gC/m3]
-      real(r8) :: total_org_nuptake(bounds%begp:bounds%endp)               ! Total N uptake from all soil layers []
+      real(r8) :: myc_biomass_layer(bounds%begp:bounds%endp, 1:nlevdecomp) ! Mycorrhyzal biomass in soil                   [gC/m3]
+      real(r8) :: total_org_nuptake(bounds%begp:bounds%endp)               ! Total N uptake from all soil layers           [gN/m3/s]
       
       associate(                                                     &
          t_soisno          => temperature_inst%t_soisno_col        , &     ! Input:  [real(r8) (:,:)] soil temperature (Kelvin)  (-nlevsno+1:nlevgrnd)
@@ -1665,7 +1656,6 @@ contains
             do j = 1, nlevdecomp
                ! Miners per layer
                myc_biomass_layer(p,j) = C_biomass(p,i_miner) * norm_froot_prof(p,j) / col%dz(c,j)
-
 
                ! this is necessary for miners when they somehow all die.
                if (C_biomass(p,i_miner) <= 0.0_r8) then ! ==
@@ -1699,7 +1689,6 @@ contains
 
                N_mine_somp2soma(p,j) = leftover_n_mining(decomp_cpools_vr(c,j,i_phys_som), decomp_npools_vr(c,j,i_phys_som), &    ! N left in soil during mining
                                         myc_biomass_layer(p,j), t_soisno(c,j), wliq, wair)
-   
 
             end do
       
@@ -1791,7 +1780,7 @@ contains
       real(r8) :: leftover_n_mining              ! Mycorrhizal nitrogen uptake from soil organic matter pools via mining process [gN/m3/s]
 
       ! ! LOCAL VARIABLES:
-      real(r8) :: miner_nuptake                  ! Mycorrhizal nitrogen uptake from soil organic matter pools via mining process [gN/m3/s]
+      real(r8) :: n_som_to_miner                  ! Mycorrhizal nitrogen uptake from soil organic matter pools via mining process [gN/m3/s]
       real(r8) :: pot_tempN_decomposed           ! 
    
       leftover_n_mining = 0.0_r8
@@ -1800,10 +1789,10 @@ contains
       pot_tempN_decomposed = potential_mined_n(soil_carbon, soil_nitrogen, myc_biomass_layer, soil_T, soil_water, soil_air)
 
      ! Apply nitrogen use efficiency (sulman_nue_mine) to scale the actual uptake.
-      miner_nuptake  = pot_tempN_decomposed*params_inst%sulman_nue_mine
+      n_som_to_miner  = pot_tempN_decomposed*params_inst%sulman_nue_mine
 
       ! Remaining N that is not taken up
-      leftover_n_mining = pot_tempN_decomposed - miner_nuptake
+      leftover_n_mining = pot_tempN_decomposed - n_som_to_miner
 
    end function leftover_n_mining
    

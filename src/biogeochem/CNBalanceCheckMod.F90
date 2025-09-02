@@ -304,8 +304,8 @@ contains
          totmicc              => soilbiogeochem_carbonstate_inst%totmicc_col, &
          totlitc              => soilbiogeochem_carbonstate_inst%totlitc_col, &
          totsomc              => soilbiogeochem_carbonstate_inst%totsomc_col, &
-         ctrunc              => soilbiogeochem_carbonstate_inst%ctrunc_col, &
-         cwdc              => soilbiogeochem_carbonstate_inst%cwdc_col, &
+         ctrunc               => soilbiogeochem_carbonstate_inst%ctrunc_col, &
+         cwdc                 => soilbiogeochem_carbonstate_inst%cwdc_col, &
          totvegc              => cnveg_carbonstate_inst%totc_p2c_col &
     )
        
@@ -556,7 +556,7 @@ contains
     !
     ! !USES:
     use clm_varctl, only : use_crop
-    use subgridAveMod, only: c2g
+    use subgridAveMod, only: c2g, p2c
     use atm2lndType, only: atm2lnd_type
     use SoilBiogeochemDecompCascadeConType , only : decomp_method, mimicsplus_decomp
  
@@ -592,6 +592,15 @@ contains
     real(r8):: grc_ninputs(bounds%begg:bounds%endg)
     real(r8):: grc_noutputs(bounds%begg:bounds%endg)
     real(r8):: grc_errnb(bounds%begg:bounds%endg)
+
+    real(r8) :: nmort_myc
+    real(r8) :: somc_nuptake
+    real(r8) :: somp_nuptake
+    real(r8) :: n_somc2soma
+    real(r8) :: n_somp2soma
+    real(r8) :: n_to_plant_col(bounds%begc:bounds%endc)
+    real(r8) :: n_from_soil
+
     !-----------------------------------------------------------------------
 
     associate(                                                                             & 
@@ -608,6 +617,7 @@ contains
          col_endnb           => this%endnb_col                                           , & ! Output: [real(r8) (:) ]  (gN/m2) column nitrogen mass, end of time step
          ndep_to_sminn       => soilbiogeochem_nitrogenflux_inst%ndep_to_sminn_col       , & ! Input:  [real(r8) (:) ]  (gN/m2/s) atmospheric N deposition to soil mineral N        
          nfix_to_sminn       => soilbiogeochem_nitrogenflux_inst%nfix_to_sminn_col       , & ! Input:  [real(r8) (:) ]  (gN/m2/s) symbiotic/asymbiotic N fixation to soil mineral N 
+         nfix_to_sminn_mimicsplus  => soilbiogeochem_nitrogenflux_inst%nfix_to_sminn_mimicsplus_col       , & ! Input:  [real(r8) (:) ]  (gN/m2/s) symbiotic/asymbiotic N fixation to soil mineral N 
          ffix_to_sminn       => soilbiogeochem_nitrogenflux_inst%ffix_to_sminn_col       , & ! Input:  [real(r8) (:) ]  (gN/m2/s) free living N fixation to soil mineral N         
          fert_to_sminn       => soilbiogeochem_nitrogenflux_inst%fert_to_sminn_col       , & ! Input:  [real(r8) (:) ]  (gN/m2/s)                                         
          soyfixn_to_sminn    => soilbiogeochem_nitrogenflux_inst%soyfixn_to_sminn_col    , & ! Input:  [real(r8) (:) ]  (gN/m2/s)                                         
@@ -629,9 +639,38 @@ contains
 
          totcoln             => soilbiogeochem_nitrogenstate_inst%totn_col               , & ! Input:  [real(r8) (:) ]  (gN/m2) total column nitrogen, incl veg
          sminn_to_plant      => soilbiogeochem_nitrogenflux_inst%sminn_to_plant_col,       &
-         fates_litter_flux   => soilbiogeochem_nitrogenflux_inst%fates_litter_flux  &   ! Total nitrogen litter flux from FATES to CLM [gN/m2/s]
+         fates_litter_flux   => soilbiogeochem_nitrogenflux_inst%fates_litter_flux,  &   ! Total nitrogen litter flux from FATES to CLM [gN/m2/s]
+         
+         
+         N_mortality          => cnveg_nitrogenflux_inst%N_mortality    , &     ! Symbiotic turnover per soil layer and column [gN/m3/s]
+         somc_nuptake_col     => cnveg_nitrogenflux_inst%somc_nuptake_col , &   ! Nitrogen uptake from SOMc via mining         [gN/m3/s]
+         somp_nuptake_col     => cnveg_nitrogenflux_inst%somp_nuptake_col , &   ! Nitrogen uptake from SOMp via mining         [gN/m3/s]
+         N_mine_somc2soma_col    => cnveg_nitrogenflux_inst%N_mine_somc2soma_col, &   ! Leftover part of co-mineralized N, not taken up by miners  [gN/m3/s]
+         N_mine_somp2soma_col    => cnveg_nitrogenflux_inst%N_mine_somp2soma_col, &   ! Leftover part of co-mineralized N, not taken up by miners  [gN/m3/s]
+       
+         n_to_plant_mimicsplus => cnveg_nitrogenflux_inst%n_to_plant_mimicsplus_patch, & ! Output:[real(r8) (:)]  nitrogen sent to plant from symbionts (gN/m2/s)
+         sminn_to_symbiont_nh4  => soilbiogeochem_nitrogenflux_inst%sminn_to_symbiont_mimicsplus_nh4_vr_col     , & ! Output: (:,:) (gN/m2/s) Total layer soil N uptake of MIMICSplus 
+         sminn_to_symbiont_no3  => soilbiogeochem_nitrogenflux_inst%sminn_to_symbiont_mimicsplus_no3_vr_col     , & ! Output: (:,:) (gN/m2/s) Total layer soil N uptake of MIMICSplus 
+
+
+         totmycn              => soilbiogeochem_nitrogenstate_inst%totsymbn_col, &
+         totmicn              => soilbiogeochem_nitrogenstate_inst%totmicn_col, &
+         totlitn              => soilbiogeochem_nitrogenstate_inst%totlitn_col, &
+         totsomn              => soilbiogeochem_nitrogenstate_inst%totsomn_col, &
+         ntrunc               => soilbiogeochem_nitrogenstate_inst%ntrunc_col, &
+         cwdn                 => soilbiogeochem_nitrogenstate_inst%cwdn_col, &
+
+         totvegn              => cnveg_nitrogenstate_inst%totn_p2c_col &
+   
+         
          )
 
+         n_to_plant_col(bounds%begc:bounds%endc) = 0.0_r8
+
+         call p2c(bounds, num_soilc, filter_soilc, &
+         n_to_plant_mimicsplus(bounds%begp:bounds%endp), &
+         n_to_plant_col(bounds%begc:bounds%endc))
+         
 
       ! set time steps
       dt = get_step_size_real()
@@ -650,11 +689,6 @@ contains
          ! calculate the total column-level nitrogen storage, for mass conservation check
          col_endnb(c) = totcoln(c)
 
-        ! write(iulog,*), 'ndep_to_sminn=', ndep_to_sminn(c)
-        ! write(iulog,*), 'nfix_to_sminn=', nfix_to_sminn(c)
-        ! write(iulog,*), 'supplement_to_sminn=', supplement_to_sminn(c)
-        ! write(iulog,*), 'ffix_to_sminn=', ffix_to_sminn(c)
-
          ! calculate total column-level inputs
          col_ninputs(c) = ndep_to_sminn(c) + nfix_to_sminn(c) + supplement_to_sminn(c)
 
@@ -666,6 +700,10 @@ contains
          if(use_fun)then ! .or. decomp_method == mimicsplus_decomp
             col_ninputs(c) = col_ninputs(c) + ffix_to_sminn(c) ! for FUN, free living fixation is a seprate flux. RF. 
          endif
+
+         if (decomp_method == mimicsplus_decomp) then 
+             col_ninputs(c) = col_ninputs(c) + nfix_to_sminn_mimicsplus(c)
+         end if 
      
          if (use_crop) then
             col_ninputs(c) = col_ninputs(c) + fert_to_sminn(c) + soyfixn_to_sminn(c)
@@ -733,6 +771,7 @@ contains
          if (abs(col_errnb(c)) > this%nwarning) then
             write(iulog,*) 'nbalance warning at c =', c, col_errnb(c), col_endnb(c)
             write(iulog,*)'inputs,ffix,nfix,ndep = ',ffix_to_sminn(c)*dt,nfix_to_sminn(c)*dt,ndep_to_sminn(c)*dt
+            write(iulog,*)'inputs,nfix_mimicsplus = ',nfix_to_sminn_mimicsplus(c)*dt
             write(iulog,*)'outputs,lch,roff,dnit = ',smin_no3_leached(c)*dt, smin_no3_runoff(c)*dt,f_n2o_nit(c)*dt
          end if
 
@@ -740,6 +779,25 @@ contains
 
       if (err_found) then
          c = err_index
+
+           if (decomp_method == mimicsplus_decomp) then
+               nmort_myc = 0.0_r8
+               somc_nuptake = 0.0_r8
+               somp_nuptake = 0.0_r8
+               n_somc2soma = 0.0_r8
+               n_somp2soma = 0.0_r8
+               n_from_soil = 0.0_r8
+
+               do j = 1,nlevdecomp
+                  nmort_myc = nmort_myc + N_mortality(c,j)*col%dz(c,j)
+                  somc_nuptake = somc_nuptake + somc_nuptake_col(c,j)*col%dz(c,j)
+                  somp_nuptake = somp_nuptake + somp_nuptake_col(c,j)*col%dz(c,j)
+                  n_somc2soma = n_somc2soma + N_mine_somc2soma_col(c,j)*col%dz(c,j)
+                  n_somp2soma = n_somp2soma + N_mine_somp2soma_col(c,j)*col%dz(c,j)
+                  n_from_soil = n_from_soil + (sminn_to_symbiont_nh4(c,j) + sminn_to_symbiont_no3(c,j)) *col%dz(c,j)
+               enddo
+             endif
+
          write(iulog,*)'column nbalance error    = ',col_errnb(c), c
          write(iulog,*)'Latdeg,Londeg            = ',grc%latdeg(col%gridcell(c)),grc%londeg(col%gridcell(c))
          write(iulog,*)'begnb                    = ',col_begnb(c)
@@ -752,12 +810,36 @@ contains
             write(iulog,*)'inputs,ndep,nfix,suppn= ',ndep_to_sminn(c)*dt,nfix_to_sminn(c)*dt,supplement_to_sminn(c)*dt
          else
             write(iulog,*)'inputs,ffix,nfix,ndep = ',ffix_to_sminn(c)*dt,nfix_to_sminn(c)*dt,ndep_to_sminn(c)*dt
+             write(iulog,*)'inputs,nfix_mimicsplus = ',nfix_to_sminn_mimicsplus(c)*dt
          end if
          if(col%is_fates(c))then
             write(iulog,*)'outputs,lch,roff,dnit,plnt = ',smin_no3_leached(c)*dt, smin_no3_runoff(c)*dt,f_n2o_nit(c)*dt,sminn_to_plant(c)*dt
          else
             write(iulog,*)'outputs,lch,roff,dnit    = ',smin_no3_leached(c)*dt, smin_no3_runoff(c)*dt,f_n2o_nit(c)*dt
          end if
+
+
+            if (decomp_method == mimicsplus_decomp) then 
+               write(iulog,*)'--- MIMICSPLUS NITROGEN ---'
+               write(iulog,*)'N_mortality         = ',nmort_myc*dt
+               write(iulog,*)'somc_nuptake_col    = ',somc_nuptake*dt
+               write(iulog,*)'somp_nuptake_col    = ',somp_nuptake*dt
+               write(iulog,*)'n_somc2soma    = ',n_somc2soma*dt
+               write(iulog,*)'n_somp2soma    = ',n_somp2soma*dt
+               write(iulog,*)'--- PLANT / SOIL NITROGEN ---'
+               write(iulog,*)'n_to_plant    = ',n_to_plant_col(c)*dt
+               write(iulog,*)'n_from_soil    = ',n_from_soil*dt
+               write(iulog,*)'--- ENDB-POOLS ---'
+               write(iulog,*)'totmycn    =', totmycn(c)
+               write(iulog,*)'totvegn    =', totvegn(c)
+               write(iulog,*)'totmicn    =', totmicn(c)
+               write(iulog,*)'totsomn    =', totsomn(c)
+               write(iulog,*)'totlitn    =', totlitn(c)
+               write(iulog,*)'cwdn       =', cwdn(c)
+               write(iulog,*)'ntrunc      =', ntrunc(c)
+               write(iulog,*)'nmort layer', N_mortality(c,1:nlevdecomp)*dt
+            end if
+
          call endrun(subgrid_index=c, subgrid_level=subgrid_level_column, msg=errMsg(sourcefile, __LINE__))
       end if
 
@@ -838,6 +920,8 @@ contains
             write(iulog,*) 'dwt_conv_nflux_grc       =', dwt_conv_nflux_grc(g) * dt
             write(iulog,*) '-gru_wood_productn_gain_grc =', -gru_wood_productn_gain_grc(g) * dt
             write(iulog,*) 'product_loss_grc         =', product_loss_grc(g) * dt
+
+
             call endrun(subgrid_index=g, subgrid_level=subgrid_level_gridcell, msg=errMsg(sourcefile, __LINE__))
          end if
          

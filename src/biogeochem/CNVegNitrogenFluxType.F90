@@ -282,15 +282,23 @@ module CNVegNitrogenFluxType
      real(r8), pointer :: sminn_to_plant_fun_vr_patch               (:,:)   ! Total layer soil N uptake of FUN  (gN/m2/s)
      real(r8), pointer :: sminn_to_plant_fun_no3_vr_patch           (:,:)   ! Total layer no3 uptake of FUN     (gN/m2/s)
      real(r8), pointer :: sminn_to_plant_fun_nh4_vr_patch           (:,:)   ! Total layer nh4 uptake of FUN     (gN/m2/s)
-     real(r8), pointer :: N_to_plant_mimicsplus_patch           (:)     ! N send to plants from symbionts MIMICSplus (gN/m2/s)
-     real(r8), pointer :: sminn_to_symbiont_mimicsplus_vr_patch     (:,:)   ! Total layer soil N uptake of MIMICSplus  (gN/m2/s)
-     real(r8), pointer :: sminn_to_symbiont_mimicsplus_no3_vr_patch (:,:)   ! Total layer no3 uptake of MIMICSplus     (gN/m2/s)
-     real(r8), pointer :: sminn_to_symbiont_mimicsplus_nh4_vr_patch (:,:)   ! Total layer nh4 uptake of MIMICSplus     (gN/m2/s)
+     real(r8), pointer :: n_to_plant_mimicsplus_patch               (:)     ! N send to plants from symbionts MIMICSplus (gN/m2/s)
+     real(r8), pointer :: sminn_to_symbiont_mimicsplus_vr_patch     (:,:)   ! Total layer soil N uptake of MIMICSplus    (gN/m2/s)
+     real(r8), pointer :: smin_no3_to_symbiont_mimicsplus_vr_patch  (:,:)   ! Total layer no3 uptake of MIMICSplus       (gN/m2/s)
+     real(r8), pointer :: smin_nh4_to_symbiont_mimicsplus_vr_patch  (:,:)   ! Total layer nh4 uptake of MIMICSplus       (gN/m2/s)
      real(r8), pointer :: cost_nfix_patch                           (:)     ! Average cost of fixation          (gN/m2/s)
      real(r8), pointer :: cost_nactive_patch                        (:)     ! Average cost of active uptake     (gN/m2/s)
      real(r8), pointer :: cost_nretrans_patch                       (:)     ! Average cost of retranslocation   (gN/m2/s)
-     real(r8), pointer :: nuptake_npp_fraction_patch                (:)     ! frac of npp spent on N acquisition   (gN/m2/s)
+     real(r8), pointer :: nuptake_npp_fraction_patch                (:)     ! frac of npp spent on N acquisition(gN/m2/s)
    
+     ! MIMICS+
+     real(r8), pointer :: N_mortality                        (:,:)
+     real(r8), pointer :: somc_nuptake_col                   (:,:)    
+     real(r8), pointer :: somp_nuptake_col                   (:,:)    
+     real(r8), pointer :: N_mine_somc2soma_col               (:,:)
+     real(r8), pointer :: N_mine_somp2soma_col               (:,:)
+     
+
 	 ! Matrix
      real(r8), pointer :: matrix_nalloc_patch                       (:,:)   ! B-matrix for nitrogen allocation
      real(r8), pointer :: matrix_Ninput_patch                       (:)     ! I-matrix for nitrogen input
@@ -1055,14 +1063,22 @@ contains
     allocate(this%sminn_to_plant_fun_vr_patch (begp:endp,1:nlevdecomp_full)); this%sminn_to_plant_fun_vr_patch          (:,:) = nan
     allocate(this%sminn_to_plant_fun_no3_vr_patch (begp:endp,1:nlevdecomp_full));  this%sminn_to_plant_fun_no3_vr_patch      (:,:) = nan
     allocate(this%sminn_to_plant_fun_nh4_vr_patch (begp:endp,1:nlevdecomp_full)); this%sminn_to_plant_fun_nh4_vr_patch      (:,:) = nan
-    allocate(this%N_to_plant_mimicsplus_patch    (begp:endp)); this%N_to_plant_mimicsplus_patch(:) = nan
+    allocate(this%n_to_plant_mimicsplus_patch    (begp:endp)); this%n_to_plant_mimicsplus_patch(:) = nan
     allocate(this%sminn_to_symbiont_mimicsplus_vr_patch (begp:endp,1:nlevdecomp_full)); this%sminn_to_symbiont_mimicsplus_vr_patch(:,:) = nan
-    allocate(this%sminn_to_symbiont_mimicsplus_no3_vr_patch (begp:endp,1:nlevdecomp_full)); this%sminn_to_symbiont_mimicsplus_no3_vr_patch(:,:) = nan
-    allocate(this%sminn_to_symbiont_mimicsplus_nh4_vr_patch (begp:endp,1:nlevdecomp_full)); this%sminn_to_symbiont_mimicsplus_nh4_vr_patch(:,:) = nan
+    allocate(this%smin_no3_to_symbiont_mimicsplus_vr_patch (begp:endp,1:nlevdecomp_full)); this%smin_no3_to_symbiont_mimicsplus_vr_patch(:,:) = nan
+    allocate(this%smin_nh4_to_symbiont_mimicsplus_vr_patch (begp:endp,1:nlevdecomp_full)); this%smin_nh4_to_symbiont_mimicsplus_vr_patch(:,:) = nan
     allocate(this%cost_nfix_patch              (begp:endp)) ;    this%cost_nfix_patch            (:) = nan
     allocate(this%cost_nactive_patch           (begp:endp)) ;    this%cost_nactive_patch         (:) = nan
     allocate(this%cost_nretrans_patch          (begp:endp)) ;    this%cost_nretrans_patch        (:) = nan
     allocate(this%nuptake_npp_fraction_patch   (begp:endp)) ;    this%nuptake_npp_fraction_patch (:) = nan
+
+
+   allocate(this%N_mortality           (begc:endc,1:nlevdecomp)) ; this%N_mortality      (:,:) = nan
+   allocate(this%somc_nuptake_col      (begc:endc,1:nlevdecomp)) ; this%somc_nuptake_col      (:,:) = nan
+   allocate(this%somp_nuptake_col      (begc:endc,1:nlevdecomp)) ; this%somp_nuptake_col      (:,:) = nan
+   allocate(this%N_mine_somc2soma_col      (begc:endc,1:nlevdecomp)) ; this%N_mine_somc2soma_col      (:,:) = nan
+   allocate(this%N_mine_somp2soma_col      (begc:endc,1:nlevdecomp)) ; this%N_mine_somp2soma_col      (:,:) = nan
+
 	! Matrix
     if(use_matrixcn)then
        allocate(this%matrix_Ninput_patch               (begp:endp))               ; this%matrix_Ninput_patch              (:)   =  nan
@@ -1880,25 +1896,25 @@ contains
 
     if (decomp_method == mimicsplus_decomp) then
 
-    this%N_to_plant_mimicsplus_patch(begp:endp) = spval
+    this%n_to_plant_mimicsplus_patch(begp:endp) = spval
     call hist_addfld1d (fname='N_TO_PLANT_MIMICSPLUS', units='gN/m^2/s', &
          avgflag='A', long_name='Total soil N uptake of MIMICSPLUS to plant',        &
-         ptr_patch=this%N_to_plant_mimicsplus_patch) 
+         ptr_patch=this%n_to_plant_mimicsplus_patch) 
          
     this%sminn_to_symbiont_mimicsplus_vr_patch(begp:endp,1:nlevdecomp_full) = spval
     call hist_addfld2d (fname='SMINN_TO_SYMB_MIMICSPLUS', units='gN/m^2/s', type2d='levsoi',&
          avgflag='A', long_name='Total soil symbiont N uptake', &
          ptr_patch=this%sminn_to_symbiont_mimicsplus_vr_patch)
  
-    this%sminn_to_symbiont_mimicsplus_no3_vr_patch(begp:endp,1:nlevdecomp_full) = spval
+    this%smin_no3_to_symbiont_mimicsplus_vr_patch(begp:endp,1:nlevdecomp_full) = spval
     call hist_addfld2d (fname='SMINN_TO_SYMB_MIMICSPLUS_NO3', units='gN/m^2/s', type2d='levsoi',&
          avgflag='A', long_name='Symbiont soil nitrate N uptake', &
-         ptr_patch=this%sminn_to_symbiont_mimicsplus_no3_vr_patch)
+         ptr_patch=this%smin_no3_to_symbiont_mimicsplus_vr_patch)
    
-   this%sminn_to_symbiont_mimicsplus_nh4_vr_patch(begp:endp,1:nlevdecomp_full) = spval
+   this%smin_nh4_to_symbiont_mimicsplus_vr_patch(begp:endp,1:nlevdecomp_full) = spval
     call hist_addfld2d (fname='SMINN_TO_SYMB_MIMICSPLUS_NH4', units='gN/m^2/s', type2d='levsoi', &
          avgflag='A', long_name='Symbiont soil ammonium N uptake', &
-         ptr_patch=this%sminn_to_symbiont_mimicsplus_nh4_vr_patch)
+         ptr_patch=this%smin_nh4_to_symbiont_mimicsplus_vr_patch)
 
     end if 
 
@@ -2004,11 +2020,11 @@ contains
           end if
        end if
 
-       this%N_to_plant_mimicsplus_patch(p)   = 0._r8 !ECW suspicious
+       this%n_to_plant_mimicsplus_patch(p)   = 0._r8 !ECW suspicious
        do j = 1, nlevdecomp
           this%sminn_to_symbiont_mimicsplus_vr_patch(p,j)       = 0._r8
-          this%sminn_to_symbiont_mimicsplus_no3_vr_patch(p,j)   = 0._r8
-          this%sminn_to_symbiont_mimicsplus_nh4_vr_patch(p,j)   = 0._r8
+          this%smin_no3_to_symbiont_mimicsplus_vr_patch(p,j)   = 0._r8
+          this%smin_nh4_to_symbiont_mimicsplus_vr_patch(p,j)   = 0._r8
        end do 
     end do
 
@@ -2340,7 +2356,7 @@ contains
     real(r8), intent(in) :: value_column
     !
     ! !LOCAL VARIABLES:
-    integer :: fi,i,j,k,l     ! loop index
+    integer :: fi,i,j,k,l,p    ! loop index
     !------------------------------------------------------------------------
 
     do fi = 1,num_patch
@@ -2614,6 +2630,19 @@ contains
        end do
     end do
 
+
+   do fi = 1,num_column
+      i = filter_column(fi)
+     do j = 1, nlevdecomp
+          !MIMICS+
+         this%N_mortality(i,j)                      = value_column
+         this%somc_nuptake_col(i,j)                 = value_column
+         this%somp_nuptake_col(i,j)                 = value_column
+         this%N_mine_somc2soma_col(i,j)             = value_column
+         this%N_mine_somp2soma_col(i,j)             = value_column
+     end do
+   end do
+ 
   end subroutine SetValues
 
   !-----------------------------------------------------------------------

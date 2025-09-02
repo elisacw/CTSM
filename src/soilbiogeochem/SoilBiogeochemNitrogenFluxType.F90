@@ -23,7 +23,8 @@ module SoilBiogeochemNitrogenFluxType
 
      ! deposition fluxes
      real(r8), pointer :: ndep_to_sminn_col                         (:)     ! col atmospheric N deposition to soil mineral N (gN/m2/s)
-     real(r8), pointer :: nfix_to_sminn_col                         (:)     ! col symbiotic/asymbiotic N fixation to soil mineral N (gN/m2/s) 
+     real(r8), pointer :: nfix_to_sminn_col                         (:)     ! col symbiotic/asymbiotic N fixation to soil mineral N (gN/m2/s)
+     real(r8), pointer :: nfix_to_sminn_mimicsplus_col              (:)     ! col symbiotic/asymbiotic N fixation to soil mineral N (gN/m2/s)  
      real(r8), pointer :: ffix_to_sminn_col                         (:)     ! col free living N fixation to soil mineral N (gN/m2/s)  
      real(r8), pointer :: fert_to_sminn_col                         (:)     ! col fertilizer N to soil mineral N (gN/m2/s)
      real(r8), pointer :: soyfixn_to_sminn_col                      (:)     ! col soybean fixation to soil mineral N (gN/m2/s)
@@ -193,6 +194,7 @@ contains
     begc = bounds%begc; endc = bounds%endc
     allocate(this%ndep_to_sminn_col                 (begc:endc))                   ; this%ndep_to_sminn_col          (:)   = nan
     allocate(this%nfix_to_sminn_col                 (begc:endc))                   ; this%nfix_to_sminn_col          (:)   = nan
+    allocate(this%nfix_to_sminn_mimicsplus_col      (begc:endc))                   ; this%nfix_to_sminn_mimicsplus_col (:)   = nan
     allocate(this%ffix_to_sminn_col                 (begc:endc))                   ; this%ffix_to_sminn_col          (:)   = nan
     allocate(this%fert_to_sminn_col                 (begc:endc))                   ; this%fert_to_sminn_col          (:)   = nan
     allocate(this%soyfixn_to_sminn_col              (begc:endc))                   ; this%soyfixn_to_sminn_col       (:)   = nan
@@ -367,6 +369,11 @@ contains
          avgflag='A', long_name='symbiotic/asymbiotic N fixation to soil mineral N', &
          ptr_col=this%nfix_to_sminn_col, default=default)
 
+    this%nfix_to_sminn_mimicsplus_col(begc:endc) = spval
+    call hist_addfld1d (fname='NFIX_TO_SMINN_MIMICSPLUS', units='gN/m^2/s', &
+         avgflag='A', long_name='symbiotic/asymbiotic N fixation to soil mineral N', &
+         ptr_col=this%nfix_to_sminn_mimicsplus_col, default=default)
+         
     if ( use_fun )then
        this%ffix_to_sminn_col(begc:endc) = spval
        call hist_addfld1d (fname='FFIX_TO_SMINN', units='gN/m^2/s', &
@@ -1003,6 +1010,7 @@ contains
 
        this%ndep_to_sminn_col(i)             = value_column
        this%nfix_to_sminn_col(i)             = value_column
+       this%nfix_to_sminn_mimicsplus_col(i)  = value_column
        this%ffix_to_sminn_col(i)             = value_column
        this%fert_to_sminn_col(i)             = value_column
        this%soyfixn_to_sminn_col(i)          = value_column

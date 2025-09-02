@@ -828,12 +828,12 @@ contains
             soilbiogeochem_nitrogenstate_inst, soilbiogeochem_nitrogenflux_inst, cnveg_state_inst, &
             waterfluxbulk_inst, soilstate_inst, cnveg_carbonstate_inst, soilbiogeochem_carbonstate_inst, cnveg_nitrogenflux_inst, soilbiogeochem_state_inst)
             call p2c(bounds,nlevdecomp, &
-                       cnveg_nitrogenflux_inst%sminn_to_symbiont_mimicsplus_no3_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp),&
+                       cnveg_nitrogenflux_inst%smin_no3_to_symbiont_mimicsplus_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp),&
                        soilbiogeochem_nitrogenflux_inst%sminn_to_symbiont_mimicsplus_no3_vr_col(bounds%begc:bounds%endc,1:nlevdecomp),&
                        'unity')
 
             call p2c(bounds,nlevdecomp, &
-                       cnveg_nitrogenflux_inst%sminn_to_symbiont_mimicsplus_nh4_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp),&
+                       cnveg_nitrogenflux_inst%smin_nh4_to_symbiont_mimicsplus_vr_patch(bounds%begp:bounds%endp,1:nlevdecomp),&
                        soilbiogeochem_nitrogenflux_inst%sminn_to_symbiont_mimicsplus_nh4_vr_col(bounds%begc:bounds%endc,1:nlevdecomp),&
                        'unity')
             call t_stopf( 'CN_soil_veg_exchange' )

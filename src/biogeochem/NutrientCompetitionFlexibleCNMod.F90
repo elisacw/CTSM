@@ -357,7 +357,7 @@ contains
          Nam                          => cnveg_nitrogenflux_inst%Nam_patch                         , & ! Output:  [real(r8) (:) ]  AM uptake (gN/m2/s)
          Necm                         => cnveg_nitrogenflux_inst%Necm_patch                        , & ! Output:  [real(r8) (:) ]  ECM uptake (gN/m2/s)
          sminn_to_plant_fun           => cnveg_nitrogenflux_inst%sminn_to_plant_fun_patch          , & ! Output:  [real(r8) (:) ]  Total soil N uptake of FUN (gN/m2/s)        => cnveg_nitrogenflux_inst%sminn_to_plant_fun_patch          , & ! Output:  [real(r8) (:) ]  Total soil N uptake of FUN (gN/m2/s)
-         N_to_plant_mimicsplus    => cnveg_nitrogenflux_inst%N_to_plant_mimicsplus_patch   , & ! Output:  [real(r8) (:) ]  Total soil N uptake of MIMICSplus (gN/m2/s)        
+         n_to_plant_mimicsplus        => cnveg_nitrogenflux_inst%n_to_plant_mimicsplus_patch   , & ! Output:  [real(r8) (:) ]  Total soil N uptake of MIMICSplus (gN/m2/s)        
 
          iretransn_to_ileaf           => cnveg_nitrogenflux_inst%iretransn_to_ileaf_ph             , & ! Transfer index (from retranslocation pool to leaf pool)
          iretransn_to_ileafst         => cnveg_nitrogenflux_inst%iretransn_to_ileafst_ph           , & ! Transfer index (from retranslocation pool to leaf storage pool)

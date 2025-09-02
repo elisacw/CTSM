@@ -182,18 +182,18 @@ contains
                      nf_veg%phenology_n_to_litr_n_col(c,j,i_str_lit) * dt
                   if (decomp_method == mimicsplus_decomp) then
                      ! Necromass flux of symbionts into SOM pools
-                     nf_soil%decomp_npools_sourcesink_col(c,j,i_avl_som) = nf_soil%decomp_npools_sourcesink_col(c,j,i_avl_som) + symbiont_inst%N_mortality(c,j)*symb_tau_soma * dt
+                     nf_soil%decomp_npools_sourcesink_col(c,j,i_avl_som) = nf_soil%decomp_npools_sourcesink_col(c,j,i_avl_som) + nf_veg%N_mortality(c,j)*symb_tau_soma * dt
                      nf_soil%decomp_npools_sourcesink_col(c,j,i_chem_som) = nf_soil%decomp_npools_sourcesink_col(c,j,i_chem_som) &
-                                                                              + (symbiont_inst%N_mortality(c,j)* symb_tau_somc &
-                                                                              + symbiont_inst%N_mine_somc2soma_col(c,j) + symbiont_inst%N_mine_somp2soma_col(c,j)) * dt
+                                                                              + (nf_veg%N_mortality(c,j)* symb_tau_somc &
+                                                                              + nf_veg%N_mine_somc2soma_col(c,j) + nf_veg%N_mine_somp2soma_col(c,j)) * dt
                      nf_soil%decomp_npools_sourcesink_col(c,j,i_phys_som) =  nf_soil%decomp_npools_sourcesink_col(c,j,i_phys_som) &
-                                                                              + (symbiont_inst%N_mortality(c,j)*symb_tau_somp) * dt 
+                                                                              + (nf_veg%N_mortality(c,j)*symb_tau_somp) * dt 
                     
                      ! Nitrogen uptake by miners from SOM 
                      nf_soil%decomp_npools_sourcesink_col(c,j,i_chem_som) = nf_soil%decomp_npools_sourcesink_col(c,j,i_chem_som) &
-                                                                              - symbiont_inst%somc_nuptake_col(c,j) * dt 
+                                                                              - nf_veg%somc_nuptake_col(c,j) * dt 
                      nf_soil%decomp_npools_sourcesink_col(c,j,i_phys_som) =  nf_soil%decomp_npools_sourcesink_col(c,j,i_phys_som) &
-                                                                              - symbiont_inst%somp_nuptake_col(c,j) * dt 
+                                                                              - nf_veg%somp_nuptake_col(c,j) * dt 
                   endif
                else
                   do i = i_litr_min, i_litr_max

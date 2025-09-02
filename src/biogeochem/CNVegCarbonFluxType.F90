@@ -435,7 +435,7 @@ module CNVegCarbonFluxType
      integer,  pointer :: matrix_fitransfer_receiver_patch          (:)      ! A-matrix_fire non-zero indices (row indices)
 
      !MIMICS+ fluxes
-     real(r8), pointer :: C_mortality                        (:,:)    
+     real(r8), pointer :: C_mortality                        (:,:)
      real(r8), pointer :: somc_cuptake_col                   (:,:)    
      real(r8), pointer :: somp_cuptake_col                   (:,:)    
      real(r8), pointer :: root_exudate_C_col                 (:,:)    
