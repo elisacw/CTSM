@@ -1317,14 +1317,16 @@ contains
            this%sminn_col(c)   + &
            this%ntrunc_col(c)  + &
            totvegn_col
+
+      ! Adding symbiotic biomass to total ecosystem & column nitrogen for mimicsplus
+      if (decomp_method == mimicsplus_decomp) then
+         this%totecosysn_col(c) = this%totecosysn_col(c) + this%totsymbn_col(c)
+         this%totn_col(c) = this%totn_col(c) + this%totsymbn_col(c)
+      endif
       
    end do
 
-   ! Adding symbiotic biomass to total ecosystem & column nitrogen for mimicsplus
-   if (decomp_method == mimicsplus_decomp) then
-      this%totecosysn_col(c) = this%totecosysn_col(c) + this%totsymbn_col(c)
-      this%totn_col(c) = this%totn_col(c) + this%totsymbn_col(c)
-   endif
+
    
  end subroutine Summary
 

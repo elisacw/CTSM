@@ -106,8 +106,8 @@ module SoilBiogeochemNitrogenFluxType
      real(r8), pointer :: anaerobic_frac_col                        (:,:)
      real(r8), pointer :: sminn_to_plant_fun_no3_vr_col             (:,:)   ! col total layer no3 uptake of FUN     (gN/m2/s)
      real(r8), pointer :: sminn_to_plant_fun_nh4_vr_col             (:,:)   ! col total layer nh4 uptake of FUN     (gN/m2/s)
-     real(r8), pointer :: sminn_to_symbiont_mimicsplus_no3_vr_col      (:,:)   ! col total layer no3 uptake of MIMICSplus     (gN/m2/s)
-     real(r8), pointer :: sminn_to_symbiont_mimicsplus_nh4_vr_col      (:,:)   ! col total layer nh4 uptake of MIMICSplus     (gN/m2/s)
+     real(r8), pointer :: sminn_to_symbiont_mimicsplus_no3_vr_col   (:,:)   ! col total layer no3 uptake of MIMICSplus     (gN/m2/s)
+     real(r8), pointer :: sminn_to_symbiont_mimicsplus_nh4_vr_col   (:,:)   ! col total layer nh4 uptake of MIMICSplus     (gN/m2/s)
      !----------- no NITRIF_DENITRIF--------------
 
      ! denitrification fluxes

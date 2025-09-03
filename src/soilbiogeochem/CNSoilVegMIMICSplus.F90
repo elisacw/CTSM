@@ -534,16 +534,16 @@ contains
 
    ! VARIABLES FOR LOCAL BALANCE CHECK
    real(r8) :: errbalc, errbaln                                         ! balance error
-   real(r8) :: C_alloc(bounds%begp:bounds%endp,1:n_symb)                !
-   real(r8) :: N_to_plant(bounds%begp:bounds%endp,1:n_symb)
-   real(r8) :: symb_growth_gross(bounds%begp:bounds%endp,1:n_symb)
+   real(r8) :: C_alloc(bounds%begp:bounds%endp,1:n_symb)                ! Carbon allocation to symbionts based on ROI [gC/m2/s]
+   real(r8) :: N_to_plant(bounds%begp:bounds%endp,1:n_symb)             ! Nitrogen allocation to plant                [gN/m2/s]
+   real(r8) :: symb_growth_gross(bounds%begp:bounds%endp,1:n_symb)      ! Gross symbiotic growth (without  CUE)       [gC/m2/s]
 
    real(r8) :: old_C_biomass(bounds%begp:bounds%endp,1:n_symb)
    real(r8) :: old_N_biomass(bounds%begp:bounds%endp,1:n_symb)
    real(r8) :: old_C_reservoir(bounds%begp:bounds%endp,1:n_symb)
    real(r8) :: old_N_reservoir(bounds%begp:bounds%endp,1:n_symb)
 
-   real(r8) :: N_symb_up(bounds%begp:bounds%endp,1:n_symb)           ! Symbiont Nuptake                  [gN/m3/s]
+   real(r8) :: N_symb_up(bounds%begp:bounds%endp,1:n_symb)              ! Symbiont nitrogen uptake                    [gN/m3/s]
 
 
    ! Nitrogen uptake variables for pathways into intermediated pools
@@ -558,8 +558,8 @@ contains
    real(r8) :: nh4_active_up(bounds%begp:bounds%endp,1:nlevdecomp)   ! Active root NH4 (ammonium) uptake  [gN/m3/s]
    real(r8) :: no3_scav_up(bounds%begp:bounds%endp,1:nlevdecomp)     ! Scavenger NO3 (nitrate) uptake     [gN/m3/s]
    real(r8) :: nh4_scav_up(bounds%begp:bounds%endp,1:nlevdecomp)     ! Scavenger NH4 (ammonium) uptake    [gN/m3/s]
-   real(r8) :: sum_no3_up(bounds%begp:bounds%endp,1:nlevdecomp)     ! Scavenger NH4 (ammonium) uptake    [gN/m3/s]
-   real(r8) :: sum_nh4_up(bounds%begp:bounds%endp,1:nlevdecomp)     ! Scavenger NH4 (ammonium) uptake    [gN/m3/s]
+   real(r8) :: sum_no3_up(bounds%begp:bounds%endp,1:nlevdecomp)     ! Scavenger NH4 (ammonium) uptake     [gN/m3/s]
+   real(r8) :: sum_nh4_up(bounds%begp:bounds%endp,1:nlevdecomp)     ! Scavenger NH4 (ammonium) uptake     [gN/m3/s]
    
    real(r8) :: N_fixation(bounds%begp:bounds%endp)                   ! Nitrogen uptake from fixation      [gN/m2/s]
   
@@ -569,8 +569,8 @@ contains
    real(r8) :: somp_cuptake(bounds%begp:bounds%endp, 1:nlevdecomp)   ! Carbon uptake from SOMp pool by miners     [gC/m3/s]
      
    real(r8) :: maint_resp_N(bounds%begp:bounds%endp, 1:n_symb)       ! N remaining in N pool from C maintainance respiration [gN/m2/s]
-   real(r8) :: maint_resp                              ! Maintainace respiration, C from symbiont pool used to sustain existing biomass [gC/m2/s]
-   real(r8) :: growth_resp(bounds%begp:bounds%endp,1:n_symb)
+   real(r8) :: maint_resp                                            ! Maintainace respiration, C from symbiont pool used to sustain existing biomass [gC/m2/s]
+   real(r8) :: growth_resp(bounds%begp:bounds%endp,1:n_symb)         ! Growth respiration [gN/m2/s]
 
    real(r8) :: total_symbiont_turnover_C(bounds%begp:bounds%endp, 1:n_symb)       ! Part of symbiont turnover going into SOM [gC/m2/s]
    real(r8) :: total_symbiont_turnover_N(bounds%begp:bounds%endp, 1:n_symb)       ! Part of symbiont turnover going into SOM [gN/m2/s]
@@ -584,7 +584,7 @@ contains
    real(r8) :: root_exudate_C(bounds%begp:bounds%endp)                            ! Leftover C from allocation to symbionts    [gC/m2/s]
    real(r8) :: root_exudate_C_layer(bounds%begp:bounds%endp,1:nlevdecomp)         ! Leftover C from allocation to symbionts    [gC/m3/s]
    real(r8) :: N_biomass_old(bounds%begp:bounds%endp)                             ! temporary variable, to calculate delta N bimass for fixers [gN/m2]
-   real(r8) :: root_N_uptake(bounds%begp:bounds%endp)                             ! active root N uptake [gN/m2/s]
+   real(r8) :: root_N_active_uptake(bounds%begp:bounds%endp)                             ! active root N uptake [gN/m2/s]
    real(r8) :: root_N_to_plant(bounds%begp:bounds%endp)                           ! toatl (active + passive) root N uptake [gN/m2/s]
    real(r8) :: scale_N_to_plant(bounds%begp:bounds%endp)       ! Scale factor to scale N uptake to plant if it is bigger that the uptake capazitiy of plant
 
@@ -660,7 +660,7 @@ contains
    is_active            => symbiont_inst%is_active      , &     ! If symbiont uptake pathway is active for patch   [-]
    perecm               => pftcon%perecm                , &     ! The fraction of ECM-associated PFT               [-]
    symb_eff             => symbiont_inst%symb_eff       , &     ! Symbiont efficiency in nitrogen uptake       [gC/gN]
-   symb_name            => symbiont_inst%symb_name      , &  
+   symb_name            => symbiont_inst%symb_name      , &     ! 
    C_reservoir          => symbiont_inst%C_reservoir    , &     ! Carbon reservoir in intermediate pools       [gC/m2]
    N_reservoir          => symbiont_inst%N_reservoir    , &     ! Nitrogen reservoir in intermediate pools     [gN/m2]
    C_biomass            => symbiont_inst%C_biomass      , &     ! Carbon biomass of symbiont                   [gC/m2]
@@ -821,7 +821,7 @@ contains
    sum_no3_up(begp:endp,1:nlevdecomp)                       = 0.0_r8
    sum_nh4_up(begp:endp,1:nlevdecomp)                       = 0.0_r8
    N_fixation(begp:endp)                                    = 0.0_r8
-   root_N_uptake(begp:endp)                                 = 0.0_r8
+   root_N_active_uptake(begp:endp)                          = 0.0_r8
    root_N_to_plant(begp:endp)                               = 0.0_r8
    
 
@@ -861,15 +861,12 @@ contains
       do j = 1,nlevdecomp
          t_soi_degC = t_soisno(c,j) - tfrz     ! Soil temperature in degrees Celcius
          if (t_soi_degC > 0.01_r8 .and. h2osoi_liq(c,j) > 0.01_r8) then
-            no3_passiv_up(p,j) = waterfluxbulk_inst%qflx_tran_veg_patch(p) * (smin_no3_avail(p,j) / h2osoi_liq(c,j)) !per patch?
+            no3_passiv_up(p,j) = waterfluxbulk_inst%qflx_tran_veg_patch(p) * (smin_no3_avail(p,j) / h2osoi_liq(c,j))
             nh4_passiv_up(p,j) = waterfluxbulk_inst%qflx_tran_veg_patch(p) * (smin_nh4_avail(p,j) / h2osoi_liq(c,j))
          else
             nh4_passiv_up(p,j) = 0.0_r8
             no3_passiv_up(p,j) = 0.0_r8
          end if
-         ! NO3 and NH4 uptake depends on how much N is available in soil
-        ! nh4_passiv_up(p,j) = min(nh4_passiv_up(p,j), smin_nh4_avail(p,j)) !ECW not sure, check
-        ! no3_passiv_up(p,j) = min(no3_passiv_up(p,j), smin_no3_avail(p,j))
       enddo 
    enddo
 
@@ -881,26 +878,13 @@ contains
       p = filter_soilp(fp)
       c = patch%column(p)
       
-      root_N_uptake(p)     = 0.0_r8
-      root_N_to_plant(p)   = 0.0_r8
+      root_N_active_uptake(p)     = 0.0_r8
+      root_N_to_plant(p)          = 0.0_r8
       do j = 1, nlevdecomp
          sum_no3_up(p,j) = (no3_passiv_up(p,j) + no3_active_up(p,j) + no3_scav_up(p,j))
          sum_nh4_up(p,j) = (nh4_passiv_up(p,j) + nh4_active_up(p,j) + nh4_scav_up(p,j))
          
-         if (sum_nh4_up(p,j) > 0.0_r8) then
-            write(iulog,*)' '
-         endif
-         if(smin_nh4_avail(p,j) > 0.0_r8) then
-            write(iulog,*)' '
-         endif
-         if (sum_no3_up(p,j) > 0.0_r8) then
-            write(iulog,*)' '
-         endif
-         if(smin_no3_avail(p,j) > 0.0_r8) then
-            write(iulog,*)' '
-         endif
-
-         if (smin_no3_avail(p,j) <= 0.0_r8 .and. sum_no3_up(p,j) > 0.0_r8) then
+        if (smin_no3_avail(p,j) <= 0.0_r8 .and. sum_no3_up(p,j) > 0.0_r8) then
             write(iulog,*) 'Warning: NO3 uptake attempted from layer with zero availability.'
             no3_passiv_up(p,j) = 0.0_r8
             no3_active_up(p,j) = 0.0_r8
@@ -918,7 +902,7 @@ contains
          ! If nitrogen uptake exceeds avaliable nitrogen, scale each uptake pathway down
          ! Without multipling by 0.9, I scale to N uptake down, but still allow to take up all avaliable N from soil (maybe not so good)
          ! Therefore I multiply with 0.9 to leave 10% in soil
-         if ( (smin_no3_to_symbiont_vr(p,j) > smin_no3_avail(p,j)) .and. &
+         if ( (sum_no3_up(p,j) > smin_no3_avail(p,j)) .and. &
               (smin_no3_avail(p,j) > 0.0_r8) ) then
            write(iulog,*)'NO3 uptake by passive / active / scavenger pathway exceeds soil N uptake and was scaled down, leaving 10% N in soil'
            no3_passiv_up(p,j)  = no3_passiv_up(p,j)  * ((smin_no3_avail(p,j) / sum_no3_up(p,j)) * 0.9_r8)
@@ -926,7 +910,7 @@ contains
            no3_scav_up(p,j)    = no3_scav_up(p,j)    * ((smin_no3_avail(p,j) / sum_no3_up(p,j)) * 0.9_r8)
          endif
 
-         if ( (smin_nh4_to_symbiont_vr(p,j) > smin_nh4_avail(p,j)) .and. &
+         if ( (sum_nh4_up(p,j) > smin_nh4_avail(p,j)) .and. &
               (smin_nh4_avail(p,j) > 0.0_r8) ) then
             write(iulog,*)'NH4 uptake by passive / active / scavenger pathway exceeds soil N uptake and was scaled down, leaving 10% N in soil'
             nh4_passiv_up(p,j)  = nh4_passiv_up(p,j)  * ((smin_nh4_avail(p,j) / sum_nh4_up(p,j)) * 0.9_r8)
@@ -934,10 +918,11 @@ contains
             nh4_scav_up(p,j)    = nh4_scav_up(p,j)    * ((smin_nh4_avail(p,j) / sum_nh4_up(p,j)) * 0.9_r8)
          endif
 
-         root_N_uptake(p) = root_N_uptake(p) + no3_active_up(p,j) + nh4_active_up(p,j)
+         root_N_active_uptake(p) = root_N_active_uptake(p) + no3_active_up(p,j) + nh4_active_up(p,j)
 
          root_N_to_plant(p) = root_N_to_plant(p) + no3_active_up(p,j) + nh4_active_up(p,j) +  no3_passiv_up(p,j) + nh4_passiv_up(p,j)
 
+         ! Total NO3 and NH4 soil uptake that needs to be substracted from inorganic N soil pool
          smin_no3_to_symbiont_vr(p,j) = (no3_passiv_up(p,j) + no3_active_up(p,j) + no3_scav_up(p,j)) * col%dz(c,j)
          smin_nh4_to_symbiont_vr(p,j) = (nh4_passiv_up(p,j) + nh4_active_up(p,j) + nh4_scav_up(p,j)) * col%dz(c,j)
 
@@ -946,17 +931,7 @@ contains
       end do
    end do
 
-   ! smin_avail is the inorganic N avaliable for plant uptake and should equal the sum of all symbiont uptakes
-   do j = 1, nlevdecomp
-      do p = bounds%begp,bounds%endp
-       smin_no3_avail(p,j) = no3_passiv_up(p,j) + no3_active_up(p,j) + no3_scav_up(p,j)
-       smin_nh4_avail(p,j) = nh4_passiv_up(p,j) + nh4_active_up(p,j) + nh4_scav_up(p,j) 
-      end do
-      ! make patch to column
-      call p2c(bounds, num_bgc_soilc, filter_bgc_soilc, smin_no3_avail(bounds%begp:bounds%endp,j), smin_no3_avail_col(bounds%begc:bounds%endc,j))
-      call p2c(bounds, num_bgc_soilc, filter_bgc_soilc, smin_nh4_avail(bounds%begp:bounds%endp,j), smin_nh4_avail_col(bounds%begc:bounds%endc,j))
-   end do 
-
+  
    !--------------------------
    ! UPDATEING RESERVOIRS 
  
@@ -1120,7 +1095,7 @@ contains
       !----------------------------------------------------------------------------------------------------------------------------
 
    call roi_symbionts(filter_soilp, filter_bgc_soilc, num_soilp, num_bgc_soilc, &
-                        bounds, symbiont_inst, root_N_uptake, root_N_to_plant,  &
+                        bounds, symbiont_inst, root_N_active_uptake, root_N_to_plant,  &
                         C_allocation_to_N_acq(bounds%begp:bounds%endp), root_exudate_C(bounds%begp:bounds%endp), &
                         C_alloc(bounds%begp:bounds%endp,1:n_symb), N_to_plant(bounds%begp:bounds%endp,1:n_symb))
 
@@ -1297,14 +1272,12 @@ contains
    
   end do
 
-    ! Maybe I need to make my own variables instead of using these:  
+   
     ! This needs to be here, bc N_fixation gets a different value later
     call p2c(bounds, num_bgc_soilc, filter_bgc_soilc, &
     N_fixation(bounds%begp:bounds%endp), &
     nfix_to_sminn_mimicsplus(bounds%begc:bounds%endc))
    
-
-     
 
 
    end associate
@@ -1475,11 +1448,6 @@ contains
             else
              nh4_uptake(p,j) = 0.0_r8
             end if 
-
-            ! NO3 and NH4 uptake depends on how much N is available in soil
-            no3_uptake(p,j) = min(no3_uptake(p,j), no3_soil(p,j)) !ECW not sure, check
-            nh4_uptake(p,j) = min(nh4_uptake(p,j), nh4_soil(p,j))
-  
          else 
             no3_uptake(p,j) = 0.0_r8
             nh4_uptake(p,j) = 0.0_r8
@@ -1555,10 +1523,6 @@ contains
                   nh4_uptake(p,j) = sulman_v_scav * (nh4_soil(p,j) * dt) / ((nh4_soil(p,j) * dt) + sulman_k_scav_Ninorg) * &
                       myc_biomass_layer(p,j) / (myc_biomass_layer(p,j) + sulman_k_scav)
                   
-                  ! NO3 and NH4 uptake depends on how much N is available in soil
-                  !no3_uptake(p,j) = min(no3_uptake(p,j), no3_soil(p,j))
-                  !nh4_uptake(p,j) = min(nh4_uptake(p,j), nh4_soil(p,j))
-            
                   total_scav_nuptake(p) = (no3_uptake(p,j) + nh4_uptake(p,j))
                   
                   no3_soil(p,j) = max(0.0_r8,no3_soil(p,j) - no3_uptake(p,j)) !ECW
@@ -1799,7 +1763,7 @@ contains
   !------------------------------------------------------------------------------------------------
    
   subroutine roi_symbionts(filter_soilp, filter_bgc_soilc, num_soilp, num_bgc_soilc,  &
-                              bounds, symbiont_inst, root_N_uptake, root_N_to_plant,  &
+                              bounds, symbiont_inst, root_N_active_uptake, root_N_to_plant,  &
                               C_allocation_to_N_acq, root_exudate_C, C_alloc, N_to_plant)
   
    ! ARGUMENTS
@@ -1813,7 +1777,7 @@ contains
    real(r8), intent(in)    :: C_allocation_to_N_acq(bounds%begp:bounds%endp) ! Carbon allocated to nitrogen acquisition    [gC/m2/s]
    real(r8), intent(inout) :: C_alloc(bounds%begp:bounds%endp,1:n_symb)      ! Carbon allocation to symbionts based on ROI [gC/m2/s]
    real(r8), intent(inout) :: root_exudate_C(bounds%begp:bounds%endp)        ! Leftover C from allocation to symbionts     [gC/m2/s]
-   real(r8), intent(in)    :: root_N_uptake(bounds%begp:bounds%endp)         ! active root N uptake                        [gN/m2/s]
+   real(r8), intent(in)    :: root_N_active_uptake(bounds%begp:bounds%endp)         ! active root N uptake                        [gN/m2/s]
    real(r8), intent(in)    :: root_N_to_plant(bounds%begp:bounds%endp)       ! total (active + passive) root N uptake      [gN/m2/s]
    real(r8), intent(inout) :: N_to_plant(bounds%begp:bounds%endp,1:n_symb)   ! Nitrogen allocation to plant                [gN/m2/s]
    !
@@ -1879,7 +1843,7 @@ contains
    end if 
 
    if (C_allocation_to_N_acq(p) > 0.0_r8) then
-      root_roi(p) = max(0.001,(root_N_uptake(p)/dt)/C_allocation_to_N_acq(p))
+      root_roi(p) = max(0.001,(root_N_active_uptake(p))/C_allocation_to_N_acq(p))
    else
       root_roi(p) = (mine_roi(p) + scav_roi(p))*0.25_r8
    endif
