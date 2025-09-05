@@ -74,10 +74,10 @@ contains
     ! Set warning and error levels for Carbon and Nitrogen balance
     ! These could become namelist items if we want them to change for different
     ! types of cases
-    this%cwarning = 1.e-7_r8
+    this%cwarning = 1.e-8_r8
     this%nwarning = 1.e-7_r8
-    this%nerror   = 1.e-4_r8   ! higher error tolarace when working with MIMICS (recommended by NCAR, Katie) original value: 1.e-3_r8
-    this%cerror   = 1.e-6_r8   ! higher error tolarace when working with MIMICS (recommended by NCAR, Katie) original value: 1.e-7_r8
+    this%nerror   = 1.e-3_r8   ! higher error tolarace when working with MIMICS (recommended by NCAR, Katie) original value: 1.e-3_r8
+    this%cerror   = 1.e-7_r8   ! higher error tolarace when working with MIMICS (recommended by NCAR, Katie) original value: 1.e-7_r8
   end subroutine Init
 
   !-----------------------------------------------------------------------
