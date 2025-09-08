@@ -428,25 +428,24 @@ contains
          end if
          write(iulog,*)'-1*som_c_leached         = ',som_c_leached(c)*dt
 
-         if (decomp_method == mimicsplus_decomp) then 
-            write(iulog,*)'--- MIMICSPLUS ---'
-            write(iulog,*)'Sym_gr        = ', gr_myc(c) *dt
-            write(iulog,*)'Sym_mr        = ', mr_myc(c)*dt
-            write(iulog,*)'C_mortality         = ',cmort_myc*dt
-            write(iulog,*)'somc_cuptake_col    = ',somc_cuptake*dt
-            write(iulog,*)'somp_cuptake_col    = ',somp_cuptake*dt
-            write(iulog,*)'root_exudate_C_col  = ',root_c_ex*dt
-            write(iulog,*)'--- ENDB-POOLS ---'
-            write(iulog,*)'totmycc    =', totmycc(c)
-            write(iulog,*)'totvegc    =', totvegc(c)
-            write(iulog,*)'totmicc    =', totmicc(c)
-            write(iulog,*)'totsomc    =', totsomc(c)
-            write(iulog,*)'totlitc    =', totlitc(c)
-            write(iulog,*)'cwdc       =', cwdc(c)
-            write(iulog,*)'ctrun      =', ctrunc(c)
-            write(iulog,*)'cmort layer', C_mortality(c,1:nlevdecomp)*dt
-
-         end if
+         !if (decomp_method == mimicsplus_decomp) then 
+         !   write(iulog,*)'--- MIMICSPLUS ---'
+         !   write(iulog,*)'Sym_gr        = ', gr_myc(c) *dt
+         !   write(iulog,*)'Sym_mr        = ', mr_myc(c)*dt
+         !   write(iulog,*)'C_mortality         = ',cmort_myc*dt
+         !   write(iulog,*)'somc_cuptake_col    = ',somc_cuptake*dt
+         !   write(iulog,*)'somp_cuptake_col    = ',somp_cuptake*dt
+         !   write(iulog,*)'root_exudate_C_col  = ',root_c_ex*dt
+         !   write(iulog,*)'--- ENDB-POOLS ---'
+         !   write(iulog,*)'totmycc    =', totmycc(c)
+         !   write(iulog,*)'totvegc    =', totvegc(c)
+         !   write(iulog,*)'totmicc    =', totmicc(c)
+         !   write(iulog,*)'totsomc    =', totsomc(c)
+         !   write(iulog,*)'totlitc    =', totlitc(c)
+         !   write(iulog,*)'cwdc       =', cwdc(c)
+         !   write(iulog,*)'ctrun      =', ctrunc(c)
+         !   write(iulog,*)'cmort layer', C_mortality(c,1:nlevdecomp)*dt
+         !end if
 
 
          call endrun(subgrid_index=c, subgrid_level=subgrid_level_column, msg=errMsg(sourcefile, __LINE__))
@@ -811,7 +810,7 @@ contains
             write(iulog,*)'inputs,ndep,nfix,suppn= ',ndep_to_sminn(c)*dt,nfix_to_sminn(c)*dt,supplement_to_sminn(c)*dt
          else
             write(iulog,*)'inputs,ffix,nfix,ndep = ',ffix_to_sminn(c)*dt,nfix_to_sminn(c)*dt,ndep_to_sminn(c)*dt
-             write(iulog,*)'inputs,nfix_mimicsplus = ',nfix_to_sminn_mimicsplus(c)*dt
+            !write(iulog,*)'inputs,nfix_mimicsplus = ',nfix_to_sminn_mimicsplus(c)*dt
          end if
          if(col%is_fates(c))then
             write(iulog,*)'outputs,lch,roff,dnit,plnt = ',smin_no3_leached(c)*dt, smin_no3_runoff(c)*dt,f_n2o_nit(c)*dt,sminn_to_plant(c)*dt
@@ -820,26 +819,26 @@ contains
          end if
 
 
-            if (decomp_method == mimicsplus_decomp) then 
-               write(iulog,*)'--- MIMICSPLUS NITROGEN ---'
-               write(iulog,*)'N_mortality         = ',nmort_myc*dt
-               write(iulog,*)'somc_nuptake_col    = ',somc_nuptake*dt
-               write(iulog,*)'somp_nuptake_col    = ',somp_nuptake*dt
-               write(iulog,*)'n_somc2soma    = ',n_somc2soma*dt
-               write(iulog,*)'n_somp2soma    = ',n_somp2soma*dt
-               write(iulog,*)'--- PLANT / SOIL NITROGEN ---'
-               write(iulog,*)'n_to_plant    = ',n_to_plant_col(c)*dt
-               write(iulog,*)'n_from_soil    = ',n_from_soil*dt
-               write(iulog,*)'--- ENDB-POOLS ---'
-               write(iulog,*)'totmycn    =', totmycn(c)
-               write(iulog,*)'totvegn    =', totvegn(c)
-               write(iulog,*)'totmicn    =', totmicn(c)
-               write(iulog,*)'totsomn    =', totsomn(c)
-               write(iulog,*)'totlitn    =', totlitn(c)
-               write(iulog,*)'cwdn       =', cwdn(c)
-               write(iulog,*)'ntrunc      =', ntrunc(c)
-               write(iulog,*)'nmort layer', N_mortality(c,1:nlevdecomp)*dt
-            end if
+            !if (decomp_method == mimicsplus_decomp) then 
+            !   write(iulog,*)'--- MIMICSPLUS NITROGEN ---'
+            !   write(iulog,*)'N_mortality         = ',nmort_myc*dt
+            !   write(iulog,*)'somc_nuptake_col    = ',somc_nuptake*dt
+            !   write(iulog,*)'somp_nuptake_col    = ',somp_nuptake*dt
+            !   write(iulog,*)'n_somc2soma    = ',n_somc2soma*dt
+            !   write(iulog,*)'n_somp2soma    = ',n_somp2soma*dt
+            !   write(iulog,*)'--- PLANT / SOIL NITROGEN ---'
+            !   write(iulog,*)'n_to_plant    = ',n_to_plant_col(c)*dt
+            !   write(iulog,*)'n_from_soil    = ',n_from_soil*dt
+            !   write(iulog,*)'--- ENDB-POOLS ---'
+            !   write(iulog,*)'totmycn    =', totmycn(c)
+            !   write(iulog,*)'totvegn    =', totvegn(c)
+            !   write(iulog,*)'totmicn    =', totmicn(c)
+            !   write(iulog,*)'totsomn    =', totsomn(c)
+            !   write(iulog,*)'totlitn    =', totlitn(c)
+            !   write(iulog,*)'cwdn       =', cwdn(c)
+            !   write(iulog,*)'ntrunc      =', ntrunc(c)
+            !   write(iulog,*)'nmort layer', N_mortality(c,1:nlevdecomp)*dt
+            !end if
 
          call endrun(subgrid_index=c, subgrid_level=subgrid_level_column, msg=errMsg(sourcefile, __LINE__))
       end if

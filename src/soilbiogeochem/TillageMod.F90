@@ -140,7 +140,7 @@ contains
     case( mimics_decomp )
         tString = 'mimics_till_decompk_multipliers'
     case( mimicsplus_decomp )
-        tString = 'mimicsplus_till_decompk_multipliers'
+        tString = 'mimics_till_decompk_multipliers'
     case default
        write(decomp_method_str, '(I3)') decomp_method
        call endrun('Bad decomp_method = '//decomp_method_str )

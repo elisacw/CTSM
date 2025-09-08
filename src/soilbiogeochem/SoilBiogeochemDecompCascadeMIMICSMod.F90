@@ -41,7 +41,6 @@ module SoilBiogeochemDecompCascadeMIMICSMod
   public :: readParams                      ! Read in parameters from params file
   public :: init_decompcascade_mimics       ! Initialization
   public :: decomp_rates_mimics             ! Figure out decomposition rates
-  public :: calc_myc_mining_rates
   !
   ! !PUBLIC DATA MEMBERS 
   !
@@ -127,21 +126,6 @@ module SoilBiogeochemDecompCascadeMIMICSMod
      real(r8) :: mimics_initial_Cstocks_depth  ! Soil depth for initial C stocks for a cold-start (m)
      real(r8) :: mimics_fi
 
-     real(r8) :: mimicsplus_k_myc_som
-     real(r8) :: mimicsplus_k_mo
-     real(r8) :: mimicsplus_vmax_myc
-     real(r8) :: mimicsplus_k_m_emyc
-     real(r8) :: mimicsplus_mge_ecm
-     real(r8) :: mimicsplus_mge_am
-     real(r8) :: mimicsplus_fphys_ecm
-     real(r8) :: mimicsplus_fchem_ecm
-     real(r8) :: mimicsplus_tau_ecm
-     real(r8) :: mimicsplus_fphys_am
-     real(r8) :: mimicsplus_fchem_am
-     real(r8) :: mimicsplus_tau_am
-     real(r8) :: mimicsplus_cn_myc
-
-
      ! The next few vectors are dimensioned by the number of decomposition
      ! transitions that make use of the corresponding parameters, currently
      ! six. The transitions are represented in this order:
@@ -168,49 +152,43 @@ module SoilBiogeochemDecompCascadeMIMICSMod
      real(r8), allocatable :: mimics_desorp(:)
      real(r8), allocatable :: mimics_tau_r(:)
      real(r8), allocatable :: mimics_tau_k(:)
-     real(r8), allocatable :: sulman_cn_symbionts(:)     !C:N ratio of fixers, miners, scavengers as an array
+
      real(r8), allocatable :: sulman_initial_C_stocks(:) !Initial carbon stocks of fixers, miners, scavengers as an array
-     real(r8), allocatable :: symb_tau_som(:)            !Fraction symbiont necromass into soil organic matter pools
+     real(r8), allocatable :: symbiont_CUE(:)            !Symbiont growth efficiency / CUE [-]
+     real(r8), allocatable :: symbiont_tau(:)            ! Turnover of symbionts [s-1]
+
+     real(r8), allocatable :: symbiont_tau_som(:)        !Fraction of necromass into SOM pools [fraction]
+     !real(r8) :: symb_tau_somc       
+     !real(r8) :: symb_tau_soma
+     !real(r8) :: symb_tau_somp
+
+     real(r8), allocatable :: sulman_cn_symbionts(:)     !C:N ratio of fixers, miners, scavengers as an array
      real(r8), allocatable :: mimics_initial_Cstocks(:)  ! Initial C stocks for a cold-start (gC/m3)
      
      ! Sulman parameter
-     real(r8) :: sulman_v_nh4         !Maximum NH4+ immobilization rate [s-1]
-     real(r8) :: sulman_v_no3         !Maximum NO3- immobilization rate [s-1]
-     real(r8) :: sulman_vmax_denit    !Maximum denitrification decomposition rate at reference temperature [s-1]
-     real(r8) :: sulman_fden          !Maximum denitrification decomposition rate at reference temperature [unitless]
-     real(r8) :: sulman_kdenit        !Half-saturation constant for nitrate concentration in denitrification [kg NO3-N kg NO3-N demand-1 year-1]
-     real(r8) :: sulman_root_no3      !Maximum root active nitrate uptake rate [gN/m3/s]
-     real(r8) :: sulman_root_nh4      !Maximum root active ammonium uptake rate [gN/m3/s]
-     real(r8) :: sulman_km_no3        !Half-saturation nitrate concentration for root active uptake [gN/m3]
-     real(r8) :: sulman_km_nh4        !Half-saturation nitrate concentration for root active uptake [g N m-3]
-     real(r8) :: sulman_r_rhiz        !Radius of the rhizosphere [m]
-     real(r8) :: sulman_v_scav        !Maximum N uptake rate by scavenging mycorrhizae [gN/m3/s]
-     real(r8) :: sulman_k_scav_Ninorg  !Half-saturation inorganic N concentration for mycorrhizal uptake [g N m-3]
-     real(r8) :: sulman_k_scav        !Half-saturation mycorrhizal biomass concentration for scavenging [g C m-3]
-     real(r8) :: sulman_km_mine       !Half-saturation mycorrhizal biomass concentration for scavenging [g C m-3]
+     real(r8) :: sulman_max_symb_growth   !Maximum symbiont growth rate [gC/m2/s]
+     real(r8) :: sulman_kgrowth           !Half-saturation of intermediate C pool for symbiotic growth [gC/m2]
+     
+     real(r8) :: symbiont_necromass       !Fraction of symbiotic biomass turnover into SOM as necromass [fraction]
+     real(r8) :: symbiont_mr              !Fraction of symbiotic biomass turnover not used for maintenance respiration [fraction]
      real(r8) :: sulman_cue_mine      !Carbon use efficiency of mycorrhizal mining [fraction]
      real(r8) :: sulman_nue_mine      !Nitrogen use efficiency of mycorrhizal mining [fraction]
+     real(r8) :: sulman_root_no3      !Maximum root active nitrate uptake rate [gN/m3/s]
+     real(r8) :: sulman_root_nh4      !Maximum root active ammonium uptake rate [gN/m3/s]
+     real(r8) :: sulman_v_nh4         !Maximum NH4+ immobilization rate [s-1]
+     real(r8) :: sulman_v_no3         !Maximum NO3- immobilization rate [s-1]
+     real(r8) :: sulman_km_no3        !Half-saturation nitrate concentration for root active uptake [gN/m3]
+     real(r8) :: sulman_km_nh4        !Half-saturation nitrate concentration for root active uptake [g N m-3]
+     real(r8) :: sulman_k_scav_Ninorg  !Half-saturation inorganic N concentration for mycorrhizal uptake [g N m-3]
+     real(r8) :: sulman_v_scav        !Maximum N uptake rate by scavenging mycorrhizae [gN/m3/s]
+     real(r8) :: sulman_k_scav        !Half-saturation mycorrhizal biomass concentration for scavenging [g C m-3]
+     real(r8) :: sulman_km_mine       !Half-saturation mycorrhizal biomass concentration for scavenging [g C m-3]
      real(r8) :: sulman_vmax_ref_mine !Maximum decomposition rate at reference temperature for mycorrhizal mining [s-1]
      real(r8) :: sulman_rfix          !N fixation rate per unit symbiotic biomass [g N g biomass C-1 s-1]
-     real(r8) :: sulman_kgrowth       !Half-saturation of intermediate C pool for symbiotic growth [g C m -2]
-     real(r8) :: sulman_max_symb_growth !Maximum symbiont growth rate [g C m-2 s-1]
-     real(r8) :: sulman_tau_sym       !Fraction of symbiotic biomass turnover not used for maintenance respiration [fraction]
-     real(r8) :: sulman_growth_scav   !N scavenger growth efficiency [unitless]
-     real(r8) :: sulman_growth_mine   !N miner growth efficiency [unitless]
-     real(r8) :: sulman_growth_fix    !N fixer growth efficiency [unitless]
-     real(r8) :: sulman_tau_scav      !N scavenger turnover time [s-1]
-     real(r8) :: sulman_tau_mine      !N miner turnover time [s-1]
-     real(r8) :: sulman_tau_fix       !N fixer turnover time [s-1]
-     real(r8) :: sulman_cn_scav       !N scavenger C:N [unitless]
-     real(r8) :: sulman_cn_mine       !N miner C:N [unitless]
-     real(r8) :: sulman_cn_fix        !N fixer C:N [unitless]
      real(r8) :: sulman_tau_int       !Turnover time of intermediate C pool [s-1]
+     real(r8) :: sulman_r_rhiz        !Radius of the rhizosphere [m]
      real(r8) :: sulman_rup_veg       !Vegetation N uptake rate from intermediate N pool [s-1]
-     real(r8) :: sulman_fnalloc       !Fraction of NPP allocated to N uptake per unit N stress [fraction]
-     real(r8) :: symb_tau_somc        !Fraction symbiont necromass into soil organic matter pools
-     real(r8) :: symb_tau_soma
-     real(r8) :: symb_tau_somp
-     
+
   end type params_type
   !
   type(params_type), public :: params_inst
@@ -243,9 +221,9 @@ contains
     !-----------------------------------------------------------------------
 
     param_pref = 'mimics'
-    if (decomp_method == mimicsplus_decomp) then
-      param_pref = 'mimicsplus'
-    endif
+    !if (decomp_method == mimicsplus_decomp) then
+    !  param_pref = 'mimicsplus'
+    !endif
 
     ! Read off of netcdf file
     tString= trim(param_pref) // '_initial_Cstocks_depth'
@@ -403,81 +381,7 @@ contains
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%mimics_fi = tempr
 
-   
-    
-   ! Parameters specific for mimicsplus / mimics parameters that have updated values in mimicsplus
-   !ECW currently the normal mimics parameters are in use (even if they are edited in mimicsplus)
-    
-    if (decomp_method == mimicsplus_decomp) then 
 
-    tString='mimicsplus_k_myc_som'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%mimicsplus_k_myc_som = tempr
-
-    tString='mimicsplus_k_mo'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%mimicsplus_k_mo = tempr
-
-    tString='mimicsplus_vmax_myc'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%mimicsplus_vmax_myc = tempr
-
-    tString='mimicsplus_k_m_emyc'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%mimicsplus_k_m_emyc = tempr
-
-    tString='mimicsplus_mge_ecm'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%mimicsplus_mge_ecm = tempr
-
-    tString='mimicsplus_mge_am'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%mimicsplus_mge_am = tempr
-
-    tString='mimicsplus_fphys_ecm'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%mimicsplus_fphys_ecm = tempr
-
-    tString='mimicsplus_fchem_ecm'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%mimicsplus_fchem_ecm = tempr
-
-    tString='mimicsplus_tau_ecm'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%mimicsplus_tau_ecm = tempr
-
-    tString='mimicsplus_fphys_am'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%mimicsplus_fphys_am = tempr
-
-    tString='mimicsplus_fchem_am'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%mimicsplus_fchem_am = tempr
-
-    tString='mimicsplus_tau_am'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%mimicsplus_tau_am = tempr
-
-    tString='mimicsplus_cn_myc'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%mimicsplus_cn_myc = tempr
-
-    end if
-
-    
     ! Sulman et al. Parameters
     tString='sulman_v_nh4'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
@@ -488,21 +392,6 @@ contains
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%sulman_v_no3=tempr
-    
-    tString='sulman_vmax_denit'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%sulman_vmax_denit=tempr
-    
-    tString='sulman_fden'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%sulman_fden=tempr
-    
-    tString='sulman_kdenit'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%sulman_kdenit=tempr
     
     tString='sulman_root_no3'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
@@ -579,56 +468,16 @@ contains
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%sulman_max_symb_growth=tempr
     
-    tString='sulman_tau_sym'
+    tString='symbiont_necromass'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%sulman_tau_sym=tempr
+    params_inst%symbiont_necromass=tempr
 
-    tString='sulman_growth_scav'
+     tString='symbiont_mr'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%sulman_growth_scav=tempr
-
-    tString='sulman_growth_mine'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%sulman_growth_mine=tempr
-
-    tString='sulman_growth_fix'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%sulman_growth_fix=tempr
-    
-    tString='sulman_tau_scav'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%sulman_tau_scav=tempr
-
-    tString='sulman_tau_mine'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%sulman_tau_mine=tempr
-
-    tString='sulman_tau_fix'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%sulman_tau_fix=tempr
-    
-    tString='sulman_cn_scav'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%sulman_cn_scav=tempr
-
-    tString='sulman_cn_mine'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%sulman_cn_mine=tempr
-    
-    tString='sulman_cn_fix'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%sulman_cn_fix=tempr
-    
+    params_inst%symbiont_mr=tempr
+        
     tString='sulman_tau_int'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
@@ -638,41 +487,30 @@ contains
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%sulman_rup_veg=tempr
-    
-    tString='sulman_fnalloc'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%sulman_fnalloc=tempr
-
-    tString='symb_tau_somc'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%symb_tau_somc=tempr
-
-    tString='symb_tau_soma'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%symb_tau_soma=tempr
-
-    tString='symb_tau_somp'
-    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-    params_inst%symb_tau_somp=tempr
-
-
-    allocate(params_inst%sulman_cn_symbionts(4))
+   
+    allocate(params_inst%sulman_cn_symbionts(3))
     tString='sulman_cn_symbionts'
     call ncd_io(trim(tString), params_inst%sulman_cn_symbionts(:), 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
 
-    allocate(params_inst%sulman_initial_C_stocks(4))
+    allocate(params_inst%sulman_initial_C_stocks(3))
     tString='sulman_initial_C_stocks'
     call ncd_io(trim(tString), params_inst%sulman_initial_C_stocks(:), 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
 
-    allocate(params_inst%symb_tau_som(4))
-    tString='symb_tau_som'
-    call ncd_io(trim(tString), params_inst%symb_tau_som(:), 'read', ncid, readvar=readv)
+    allocate(params_inst%symbiont_CUE(3))
+    tString='symbiont_CUE'
+    call ncd_io(trim(tString), params_inst%symbiont_CUE(:), 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+
+    allocate(params_inst%symbiont_tau(3))
+    tString='symbiont_tau'
+    call ncd_io(trim(tString), params_inst%symbiont_tau(:), 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+
+    allocate(params_inst%symbiont_tau_som(3))
+    tString='symbiont_tau_som'
+    call ncd_io(trim(tString), params_inst%symbiont_tau_som(:), 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
 
   end subroutine readParams
@@ -1075,17 +913,7 @@ contains
       cascade_receiver_pool(i_m2s3) = i_phys_som
       nue_decomp_cascade(i_m2s3) = 1.0_r8
 
-    !  if (decomp_method == mimicsplus_decomp) then 
-     !    i_scavs1 = 15
-      !   decomp_cascade_con%cascade_step_name(i_scavs1) = 'SCAVS1'
-       !  cascade_donor_pool(i_scavs1) = i_scav
-        ! cascade_receiver_pool(i_scavs1) = i_avail
-        ! nue_decomp_cascade(i_scavs1) = 1.0_r8
-     ! end if
-
-      !ROSIE add option for mimicsplus
-      ! add Fixer, miner and scav pools 
-
+    
       if (.not. use_fates) then
          i_cwdl2 = 15
          decomp_cascade_con%cascade_step_name(i_cwdl2) = 'CWDL2'
@@ -1782,60 +1610,6 @@ contains
  end subroutine decomp_rates_mimics
 
  
-
- subroutine calc_myc_mining_rates(dz, cpool_som,cpool_myc, npool_som, fc_som2soma,fn_mining_som)
-
-   ! DESCRIPTION:
-   ! Calculates mining of ectomycorrhizal fungi for nitrogen in soil organic matter pools.
-   ! (only!) Ectomycorrhizal fungi can a allocate fraction of the incoming carbon from vegetation (not in this subroutine) to the avaliable SOM pool.
-   ! They mine for nitrogen in the chemmically and physically protected SOM pools and create nitrogen fluxes from theses to EcM.
-   ! During this process carbon is release from the chemmically and physically protected SOM pools which enters the avaliable SOM pool.
-
-   ! USES:
-   use clm_time_manager, only: get_step_size_real
-   ! ARGUMENTS:
-   real(r8), intent(in) :: cpool_som          ! SOM pool [gC/m3]
-   real(r8), intent(in) :: cpool_myc          ! Carbon pool of mycorrhiza [gC/m3]
-   real(r8), intent(in) :: npool_som          ! Nitrogen pool of soil [gC/m3]
-   real(r8), intent(in) :: dz                 ! layer thickness [m]
-   real(r8), intent(inout) :: fc_som2soma     ! carbon flux to available SOM pool [gC/m3/s]
-   real(r8), intent(inout) :: fn_mining_som   ! nitrogen mining flux [gN/m3/s]
-
-   ! LOCAL VARIABLES:
-   real(r8)            :: secphr = 60.0_r8 * 60.0_r8
-   real(r8), parameter :: small_value = 1.e-10_r8
-   real(r8)            :: dt
-   
-   dt = get_step_size_real()
-
-   ! SOM carbon flux
-   fc_som2soma = (params_inst%mimicsplus_k_mo / secphr) * dz * cpool_myc * cpool_som 
-   ! Nitrogen mining flux
-   if (fc_som2soma > small_value) then
-     if (npool_som > small_value) then
-     fn_mining_som = fc_som2soma * (npool_som / cpool_som )
-     else
-      fn_mining_som = 0.0_r8
-      fc_som2soma = 0.0_r8
-   endif
- else 
-   fn_mining_som = 0.0_r8
-   fc_som2soma = 0.0_r8
- endif
- ! we need to check that we do not take too much.
- if (cpool_som < fc_som2soma * dt) then
-   fn_mining_som = 0.0_r8
-   fc_som2soma = 0.0_r8
- endif
- ! same for nitrogen
- if (npool_som < fn_mining_som * dt) then
-   fn_mining_som = 0.0_r8
-   fc_som2soma = 0.0_r8
- endif
-
-end subroutine calc_myc_mining_rates
-
-
  !Moisture function, based on testbed code: https://github.com/wwieder/biogeochem_testbed/blob/957a5c634b9f2d0b4cdba0faa06b5a91216ace33/SOURCE_CODE/mimics_cycle.f90#L401-L419
  real(r8) function r_moist(h2osoi_liq,watsat, h2osoi_ice, dz) !As in testbed (and CLM) version of MIMICS            
    
