@@ -232,28 +232,28 @@ contains
                         !ECW add leftover root C into SOMa
                         cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som) = (cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som) &
                         
-                                                                                 + (cf_veg%C_mortality(c,j) * dt * symb_tau_soma) &
+                                                                                 + (symbiont_inst%C_mortality(c,j) * dt * symb_tau_soma) &
 
-                                                                                 + (cf_veg%root_exudate_C_col(c,j) * dt))
+                                                                                 + (symbiont_inst%root_exudate_C_col(c,j) * dt))
                         
                         cf_soil%decomp_cpools_sourcesink_col(c,j,i_chem_som) = (cf_soil%decomp_cpools_sourcesink_col(c,j,i_chem_som) &
 
-                                                                                 + (cf_veg%C_mortality(c,j) * dt * symb_tau_somc) &
+                                                                                 + (symbiont_inst%C_mortality(c,j) * dt * symb_tau_somc) &
 
-                                                                                 - (cf_veg%somc_cuptake_col(c,j) * dt))
+                                                                                 - (symbiont_inst%somc_cuptake_col(c,j) * dt))
 
                         cf_soil%decomp_cpools_sourcesink_col(c,j,i_phys_som) = (cf_soil%decomp_cpools_sourcesink_col(c,j,i_phys_som) &
 
-                                                                                 + (cf_veg%C_mortality(c,j) * dt * symb_tau_somp) &
+                                                                                 + (symbiont_inst%C_mortality(c,j) * dt * symb_tau_somp) &
 
-                                                                                 - (cf_veg%somp_cuptake_col(c,j) * dt))
+                                                                                 - (symbiont_inst%somp_cuptake_col(c,j) * dt))
 
                         ! Carbon send to SOMa due to mining
                         cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som) = (cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som) &
 
-                                                                                 + (cf_veg%somc_cuptake_col(c,j) * dt) &
+                                                                                 + (symbiont_inst%somc_cuptake_col(c,j) * dt) &
 
-                                                                                 + (cf_veg%somp_cuptake_col(c,j) * dt))
+                                                                                 + (symbiont_inst%somp_cuptake_col(c,j) * dt))
                                                                                  
                         ! add C enzyme fluxx here, if I ever make it symbiont_inst%C_enz_mine2soma_col(c,j)
 

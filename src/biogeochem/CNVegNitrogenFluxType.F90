@@ -292,11 +292,11 @@ module CNVegNitrogenFluxType
      real(r8), pointer :: nuptake_npp_fraction_patch                (:)     ! frac of npp spent on N acquisition(gN/m2/s)
    
      ! MIMICS+
-     real(r8), pointer :: N_mortality                        (:,:)
-     real(r8), pointer :: somc_nuptake_col                   (:,:)    
-     real(r8), pointer :: somp_nuptake_col                   (:,:)    
-     real(r8), pointer :: N_mine_somc2soma_col               (:,:)
-     real(r8), pointer :: N_mine_somp2soma_col               (:,:)
+     !real(r8), pointer :: N_mortality                        (:,:)
+     !real(r8), pointer :: somc_nuptake_col                   (:,:)    
+     !real(r8), pointer :: somp_nuptake_col                   (:,:)    
+     !real(r8), pointer :: N_mine_somc2soma_col               (:,:)
+     !real(r8), pointer :: N_mine_somp2soma_col               (:,:)
      
 
 	 ! Matrix
@@ -1073,11 +1073,11 @@ contains
     allocate(this%nuptake_npp_fraction_patch   (begp:endp)) ;    this%nuptake_npp_fraction_patch (:) = nan
 
 
-   allocate(this%N_mortality           (begc:endc,1:nlevdecomp)) ; this%N_mortality      (:,:) = nan
-   allocate(this%somc_nuptake_col      (begc:endc,1:nlevdecomp)) ; this%somc_nuptake_col      (:,:) = nan
-   allocate(this%somp_nuptake_col      (begc:endc,1:nlevdecomp)) ; this%somp_nuptake_col      (:,:) = nan
-   allocate(this%N_mine_somc2soma_col      (begc:endc,1:nlevdecomp)) ; this%N_mine_somc2soma_col      (:,:) = nan
-   allocate(this%N_mine_somp2soma_col      (begc:endc,1:nlevdecomp)) ; this%N_mine_somp2soma_col      (:,:) = nan
+   !allocate(this%N_mortality           (begc:endc,1:nlevdecomp)) ; this%N_mortality      (:,:) = nan
+   !allocate(this%somc_nuptake_col      (begc:endc,1:nlevdecomp)) ; this%somc_nuptake_col      (:,:) = nan
+   !allocate(this%somp_nuptake_col      (begc:endc,1:nlevdecomp)) ; this%somp_nuptake_col      (:,:) = nan
+   !allocate(this%N_mine_somc2soma_col      (begc:endc,1:nlevdecomp)) ; this%N_mine_somc2soma_col      (:,:) = nan
+   !allocate(this%N_mine_somp2soma_col      (begc:endc,1:nlevdecomp)) ; this%N_mine_somp2soma_col      (:,:) = nan
 
 	! Matrix
     if(use_matrixcn)then
@@ -2631,17 +2631,17 @@ contains
     end do
 
 
-   do fi = 1,num_column
-      i = filter_column(fi)
-     do j = 1, nlevdecomp
-          !MIMICS+
-         this%N_mortality(i,j)                      = value_column
-         this%somc_nuptake_col(i,j)                 = value_column
-         this%somp_nuptake_col(i,j)                 = value_column
-         this%N_mine_somc2soma_col(i,j)             = value_column
-         this%N_mine_somp2soma_col(i,j)             = value_column
-     end do
-   end do
+  ! do fi = 1,num_column
+  !    i = filter_column(fi)
+  !   do j = 1, nlevdecomp
+  !        !MIMICS+
+  !       this%N_mortality(i,j)                      = value_column
+  !       this%somc_nuptake_col(i,j)                 = value_column
+  !       this%somp_nuptake_col(i,j)                 = value_column
+  !       this%N_mine_somc2soma_col(i,j)             = value_column
+  !       this%N_mine_somp2soma_col(i,j)             = value_column
+  !   end do
+  ! end do
  
   end subroutine SetValues
 

@@ -75,7 +75,7 @@ contains
     ! These could become namelist items if we want them to change for different
     ! types of cases
     this%cwarning = 1.e-8_r8
-    this%nwarning = 1.e-7_r8
+    this%nwarning = 1.e-4_r8
     this%nerror   = 1.e-3_r8   ! higher error tolarace when working with MIMICS (recommended by NCAR, Katie) original value: 1.e-3_r8
     this%cerror   = 1.e-7_r8   ! higher error tolarace when working with MIMICS (recommended by NCAR, Katie) original value: 1.e-7_r8
   end subroutine Init
@@ -293,10 +293,10 @@ contains
          totcolc                 =>    soilbiogeochem_carbonstate_inst%totc_col          , & ! Input:  [real(r8) (:) ]  (gC/m2) total column carbon, incl veg and cpool
          fates_litter_flux       =>    soilbiogeochem_carbonflux_inst%fates_litter_flux  , &   ! Total carbon litter flux from FATES to CLM [gC/m2/s]
         
-         C_mortality          => cnveg_carbonflux_inst%C_mortality    , &     ! Symbiotic turnover per soil layer and column [gC/m3/s]
-         somc_cuptake_col     => cnveg_carbonflux_inst%somc_cuptake_col , &   ! Nitrogen uptake from SOMc via mining       [gC/m3/s]
-         somp_cuptake_col     => cnveg_carbonflux_inst%somp_cuptake_col , &   ! Nitrogen uptake from SOMp via mining       [gC/m3/s]
-         root_exudate_C_col   => cnveg_carbonflux_inst%root_exudate_C_col, &   ! Leftover C from allocation to symbionts    [gC/m3/s]
+         !C_mortality          => cnveg_carbonflux_inst%C_mortality    , &     ! Symbiotic turnover per soil layer and column [gC/m3/s]
+         !somc_cuptake_col     => cnveg_carbonflux_inst%somc_cuptake_col , &   ! Nitrogen uptake from SOMc via mining       [gC/m3/s]
+         !somp_cuptake_col     => cnveg_carbonflux_inst%somp_cuptake_col , &   ! Nitrogen uptake from SOMp via mining       [gC/m3/s]
+         !root_exudate_C_col   => cnveg_carbonflux_inst%root_exudate_C_col, &   ! Leftover C from allocation to symbionts    [gC/m3/s]
 
          symbiont_gr          => cnveg_carbonflux_inst%symbiont_gr_patch, &
          symbiont_mr          => cnveg_carbonflux_inst%symbiont_maint_patch, &
@@ -390,18 +390,18 @@ contains
 
       if (err_found) then
          c = err_index
-         if (decomp_method == mimicsplus_decomp) then
-            root_c_ex = 0.0_r8
-            cmort_myc = 0.0_r8
-            somc_cuptake = 0.0_r8
-            somp_cuptake = 0.0_r8
-            do j = 1,nlevdecomp
-               root_c_ex = root_c_ex + root_exudate_C_col(c,j)*col%dz(c,j)
-               cmort_myc = cmort_myc + C_mortality(c,j)*col%dz(c,j)
-               somc_cuptake = somc_cuptake + somc_cuptake_col(c,j)*col%dz(c,j)
-               somp_cuptake = somp_cuptake + somp_cuptake_col(c,j)*col%dz(c,j)
-            enddo
-         endif
+         !if (decomp_method == mimicsplus_decomp) then
+         !   root_c_ex = 0.0_r8
+         !   cmort_myc = 0.0_r8
+         !   somc_cuptake = 0.0_r8
+         !   somp_cuptake = 0.0_r8
+         !   do j = 1,nlevdecomp
+         !      root_c_ex = root_c_ex + root_exudate_C_col(c,j)*col%dz(c,j)
+         !      cmort_myc = cmort_myc + C_mortality(c,j)*col%dz(c,j)
+         !      somc_cuptake = somc_cuptake + somc_cuptake_col(c,j)*col%dz(c,j)
+         !      somp_cuptake = somp_cuptake + somp_cuptake_col(c,j)*col%dz(c,j)
+         !   enddo
+         !endif
 
          write(iulog,*)'column cbalance error    = ', col_errcb(c), c
          write(iulog,*)'is fates column?         = ', col%is_fates(c)
@@ -641,11 +641,11 @@ contains
          fates_litter_flux   => soilbiogeochem_nitrogenflux_inst%fates_litter_flux,  &   ! Total nitrogen litter flux from FATES to CLM [gN/m2/s]
          
          
-         N_mortality          => cnveg_nitrogenflux_inst%N_mortality    , &     ! Symbiotic turnover per soil layer and column [gN/m3/s]
-         somc_nuptake_col     => cnveg_nitrogenflux_inst%somc_nuptake_col , &   ! Nitrogen uptake from SOMc via mining         [gN/m3/s]
-         somp_nuptake_col     => cnveg_nitrogenflux_inst%somp_nuptake_col , &   ! Nitrogen uptake from SOMp via mining         [gN/m3/s]
-         N_mine_somc2soma_col    => cnveg_nitrogenflux_inst%N_mine_somc2soma_col, &   ! Leftover part of co-mineralized N, not taken up by miners  [gN/m3/s]
-         N_mine_somp2soma_col    => cnveg_nitrogenflux_inst%N_mine_somp2soma_col, &   ! Leftover part of co-mineralized N, not taken up by miners  [gN/m3/s]
+         !N_mortality          => cnveg_nitrogenflux_inst%N_mortality    , &     ! Symbiotic turnover per soil layer and column [gN/m3/s]
+         !somc_nuptake_col     => cnveg_nitrogenflux_inst%somc_nuptake_col , &   ! Nitrogen uptake from SOMc via mining         [gN/m3/s]
+         !somp_nuptake_col     => cnveg_nitrogenflux_inst%somp_nuptake_col , &   ! Nitrogen uptake from SOMp via mining         [gN/m3/s]
+         !N_mine_somc2soma_col    => cnveg_nitrogenflux_inst%N_mine_somc2soma_col, &   ! Leftover part of co-mineralized N, not taken up by miners  [gN/m3/s]
+         !N_mine_somp2soma_col    => cnveg_nitrogenflux_inst%N_mine_somp2soma_col, &   ! Leftover part of co-mineralized N, not taken up by miners  [gN/m3/s]
        
          n_to_plant_mimicsplus => cnveg_nitrogenflux_inst%n_to_plant_mimicsplus_patch, & ! Output:[real(r8) (:)]  nitrogen sent to plant from symbionts (gN/m2/s)
          sminn_to_symbiont_nh4  => soilbiogeochem_nitrogenflux_inst%sminn_to_symbiont_mimicsplus_nh4_vr_col     , & ! Output: (:,:) (gN/m2/s) Total layer soil N uptake of MIMICSplus 
@@ -714,12 +714,6 @@ contains
 
          col_noutputs(c) = denit(c)
 
-         write(iulog,*), 'denit=', denit(c)
-         write(iulog,*), 'smin_no3_leached=', smin_no3_leached(c)
-         write(iulog,*), 'smin_no3_runoff=', smin_no3_runoff(c)
-         write(iulog,*), 'f_n2o_nit=', f_n2o_nit(c)
-
-
          if( .not.col%is_fates(c) ) then
             
             col_noutputs(c) = col_noutputs(c) + col_fire_nloss(c) + gru_conv_nflux(c)
@@ -780,23 +774,23 @@ contains
       if (err_found) then
          c = err_index
 
-           if (decomp_method == mimicsplus_decomp) then
-               nmort_myc = 0.0_r8
-               somc_nuptake = 0.0_r8
-               somp_nuptake = 0.0_r8
-               n_somc2soma = 0.0_r8
-               n_somp2soma = 0.0_r8
-               n_from_soil = 0.0_r8
+           !if (decomp_method == mimicsplus_decomp) then
+           !    nmort_myc = 0.0_r8
+           !    somc_nuptake = 0.0_r8
+           !    somp_nuptake = 0.0_r8
+           !    n_somc2soma = 0.0_r8
+           !    n_somp2soma = 0.0_r8
+           !    n_from_soil = 0.0_r8
 
-               do j = 1,nlevdecomp
-                  nmort_myc = nmort_myc + N_mortality(c,j)*col%dz(c,j)
-                  somc_nuptake = somc_nuptake + somc_nuptake_col(c,j)*col%dz(c,j)
-                  somp_nuptake = somp_nuptake + somp_nuptake_col(c,j)*col%dz(c,j)
-                  n_somc2soma = n_somc2soma + N_mine_somc2soma_col(c,j)*col%dz(c,j)
-                  n_somp2soma = n_somp2soma + N_mine_somp2soma_col(c,j)*col%dz(c,j)
-                  n_from_soil = n_from_soil + (sminn_to_symbiont_nh4(c,j) + sminn_to_symbiont_no3(c,j)) *col%dz(c,j)
-               enddo
-             endif
+           !    do j = 1,nlevdecomp
+           !       nmort_myc = nmort_myc + N_mortality(c,j)*col%dz(c,j)
+           !       somc_nuptake = somc_nuptake + somc_nuptake_col(c,j)*col%dz(c,j)
+           !       somp_nuptake = somp_nuptake + somp_nuptake_col(c,j)*col%dz(c,j)
+           !       n_somc2soma = n_somc2soma + N_mine_somc2soma_col(c,j)*col%dz(c,j)
+           !       n_somp2soma = n_somp2soma + N_mine_somp2soma_col(c,j)*col%dz(c,j)
+           !       n_from_soil = n_from_soil + (sminn_to_symbiont_nh4(c,j) + sminn_to_symbiont_no3(c,j)) *col%dz(c,j)
+           !    enddo
+           !  endif
 
          write(iulog,*)'column nbalance error    = ',col_errnb(c), c
          write(iulog,*)'Latdeg,Londeg            = ',grc%latdeg(col%gridcell(c)),grc%londeg(col%gridcell(c))

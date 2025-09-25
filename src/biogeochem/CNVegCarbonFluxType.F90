@@ -435,10 +435,10 @@ module CNVegCarbonFluxType
      integer,  pointer :: matrix_fitransfer_receiver_patch          (:)      ! A-matrix_fire non-zero indices (row indices)
 
      !MIMICS+ fluxes
-     real(r8), pointer :: C_mortality                        (:,:)
-     real(r8), pointer :: somc_cuptake_col                   (:,:)    
-     real(r8), pointer :: somp_cuptake_col                   (:,:)    
-     real(r8), pointer :: root_exudate_C_col                 (:,:)    
+     !real(r8), pointer :: C_mortality                        (:,:)
+     !real(r8), pointer :: somc_cuptake_col                   (:,:)    
+     !real(r8), pointer :: somp_cuptake_col                   (:,:)    
+     !real(r8), pointer :: root_exudate_C_col                 (:,:)    
      
 
     
@@ -1189,10 +1189,10 @@ contains
     allocate(this%soilc_change_patch      (begp:endp)) ; this%soilc_change_patch      (:) = nan
 
     !MIMICS+
-   allocate(this%C_mortality           (begc:endc,1:nlevdecomp)) ; this%C_mortality      (:,:) = nan
-   allocate(this%somc_cuptake_col      (begc:endc,1:nlevdecomp)) ; this%somc_cuptake_col      (:,:) = nan
-   allocate(this%somp_cuptake_col      (begc:endc,1:nlevdecomp)) ; this%somp_cuptake_col      (:,:) = nan
-   allocate(this%root_exudate_C_col    (begc:endc,1:nlevdecomp)) ; this%root_exudate_C_col      (:,:) = nan
+   !allocate(this%C_mortality           (begc:endc,1:nlevdecomp)) ; this%C_mortality      (:,:) = nan
+   !allocate(this%somc_cuptake_col      (begc:endc,1:nlevdecomp)) ; this%somc_cuptake_col      (:,:) = nan
+   !allocate(this%somp_cuptake_col      (begc:endc,1:nlevdecomp)) ; this%somp_cuptake_col      (:,:) = nan
+   !allocate(this%root_exudate_C_col    (begc:endc,1:nlevdecomp)) ; this%root_exudate_C_col      (:,:) = nan
 
 
     ! Allocate Matrix data
@@ -4831,13 +4831,13 @@ contains
           this%xsmrpool_to_atm_col(i)  = value_column
        end if
 
-       do j = 1, nlevdecomp
-          !MIMICS+
-         this%C_mortality(i,j)                      = value_column
-         this%somc_cuptake_col(i,j)                 = value_column
-         this%somp_cuptake_col(i,j)                 = value_column
-         this%root_exudate_C_col(i,j)               = value_column
-       end do
+       !do j = 1, nlevdecomp
+       !   !MIMICS+
+       !  this%C_mortality(i,j)                      = value_column
+       !  this%somc_cuptake_col(i,j)                 = value_column
+       !  this%somp_cuptake_col(i,j)                 = value_column
+       !  this%root_exudate_C_col(i,j)               = value_column
+       !end do
  
 
 
