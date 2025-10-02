@@ -688,6 +688,7 @@ contains
          ! calculate the total column-level nitrogen storage, for mass conservation check
          col_endnb(c) = totcoln(c)
 
+         !ECWN DO I HAVE nfix_to_sminn when mimics is active, shouldn't thi sbe in an if statement
          ! calculate total column-level inputs
          col_ninputs(c) = ndep_to_sminn(c) + nfix_to_sminn(c) + supplement_to_sminn(c)
 
@@ -763,10 +764,10 @@ contains
          end if
          
          if (abs(col_errnb(c)) > this%nwarning) then
-            write(iulog,*) 'nbalance warning at c =', c, col_errnb(c), col_endnb(c)
-            write(iulog,*)'inputs,ffix,nfix,ndep = ',ffix_to_sminn(c)*dt,nfix_to_sminn(c)*dt,ndep_to_sminn(c)*dt
-            write(iulog,*)'inputs,nfix_mimicsplus = ',nfix_to_sminn_mimicsplus(c)*dt
-            write(iulog,*)'outputs,lch,roff,dnit = ',smin_no3_leached(c)*dt, smin_no3_runoff(c)*dt,f_n2o_nit(c)*dt
+            !write(iulog,*) 'nbalance warning at c =', c, col_errnb(c), col_endnb(c)
+            !write(iulog,*)'inputs,ffix,nfix,ndep = ',ffix_to_sminn(c)*dt,nfix_to_sminn(c)*dt,ndep_to_sminn(c)*dt
+            !write(iulog,*)'inputs,nfix_mimicsplus = ',nfix_to_sminn_mimicsplus(c)*dt
+            !write(iulog,*)'outputs,lch,roff,dnit = ',smin_no3_leached(c)*dt, smin_no3_runoff(c)*dt,f_n2o_nit(c)*dt
          end if
 
       end do ! end of columns loop

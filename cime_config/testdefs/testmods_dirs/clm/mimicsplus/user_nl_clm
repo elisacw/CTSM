@@ -2,3 +2,55 @@ soil_decomp_method = 'MIMICSplusAas2023'
 !paramfile = "/cluster/projects/nn2806k/elisacw/parameters/clm_params_mimicsplus_sulman_netcdf5_14.05.2025.nc"
 
 use_fun = .false.
+
+soil_decomp_method = 'MIMICSplusAas2023'
+
+! To get output from every timestep in files per day:
+hist_nhtfrq = 1, 1, 1,1      ! output every day 1 (per timestep)
+hist_mfilt  = 48,48,48,48    ! high enough to not truncate output
+hist_empty_htapes = .true.   ! general output is onlt on first hist tape
+
+
+ 
+
+! OUTPUT VARIABLES
+ hist_fincl1 = 'AVAILC', 'NPP', 'CPOOL', 'GPP', 'MR', 'LEAFC', 'FROOTC', 
+							 'LIVESTEMC', 'DEADSTEMC',  'FROOTN_STORAGE', 'LEAFN_STORAGE', 'LEAFN', 'LIVECROOTN_STORAGE', 'LIVECROOTN', 
+							 'LIVESTEMN_STORAGE','LIVESTEMN'
+							 							 
+! OUTPUT VARIABLES FOR MIMICSplus
+ hist_fincl2 = 'SYM_FIX_C', 'SYM_FIX_C_INTER', 'SYM_FIX_N', 'SYM_FIX_N_INTER',
+              'SYM_SCAV_C', 'SYM_SCAV_C_INTER', 'SYM_SCAV_N', 'SYM_SCAV_N_INTER',
+              'SYM_MINE_C', 'SYM_MINE_C_INTER', 'SYM_MINE_N', 'SYM_MINE_N_INTER'
+              
+! OUTPUT Variables from MIMICS / CTSM
+hist_fincl3 = 'LIT_MET_C_vr', 'LIT_STR_C_vr', 'SOM_AVL_C_vr', 
+							'SOM_CHEM_C_vr', 'SOM_PHYS_C_vr', 'MIC_COP_C_vr', 'MIC_OLI_C_vr',
+							
+							'LIT_MET_N_vr', 'LIT_STR_N_vr', 'SOM_AVL_N_vr', 
+							'SOM_CHEM_N_vr', 'SOM_PHYS_N_vr', 'MIC_COP_N_vr', 'MIC_OLI_N_vr'
+
+ 
+ ! Fluxes in MIMICSplus
+ hist_fincl4 = 'SYM_FIX_C_GROWTH', 'SYM_SCAV_C_GROWTH', 'SYM_MINE_C_GROWTH', 
+ 
+							 'N_SYM_FIX_UPTAKE', 'N_SYM_SCAV_UPTAKE', 'N_SYM_MINE_UPTAKE',
+							 'N_TO_PLANT_MIMICSPLUS', 'SMINN_TO_SYMB_MIMICSPLUS', 
+							 'SMINN_TO_SYMB_MIMICSPLUS_NO3', 'SMINN_TO_SYMB_MIMICSPLUS_NH4',
+							 
+							 'N_MINE_SOMC_TO_SOMA_MIMICSPLUS', 'N_MINE_SOMP_TO_SOMA_MIMICSPLUS', 
+							 'N_MINE_UPTAKE_SOMC_MIMICSPLUS', 'N_MINE_UPTAKE_SOMP_MIMICSPLUS', 
+							 'C_MINE_UPTAKE_SOMC_MIMICSPLUS', 'C_MINE_UPTAKE_SOMP_MIMICSPLUS', 
+							 
+							 'C_ALLOC_TO_FIX_FROM_PLANT', 'C_ALLOC_TO_SCAV_FROM_PLANT', 'C_ALLOC_TO_MINE_FROM_PLANT',
+							 
+							 'ROOT_EXUDATE_C_MIMICSPLUS', 
+							 'C_MORTALITY_SYMB_MIMICSPLUS', 'N_MORTALITY_SYMB_MIMICSPLUS',
+							 
+							 'C_FIX_TURNOVER', 'C_SCAV_TURNOVER', 'C_MINE_TURNOVER',
+							 'N_FIX_TURNOVER', 'N_SCAV_TURNOVER', 'N_MINE_TURNOVER',
+
+                      'N_FROM_SCAV_TO_PLANT', 'N_FROM_MINE_TO_PLANT', 'N_FROM_FIX_TO_PLANT',
+							 
+													 
+							 'SYMBIONT_GR', 'SYMBIONT_MAINT'
