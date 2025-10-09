@@ -83,7 +83,7 @@ module CNSoilVegMIMICSplus
   
   real(r8), pointer           :: symb_eff              (:,:) ! [patch,n_symb] Symbiont efficiency when biomass 0  [gC/gN]
   real(r8), pointer           :: symb_growth           (:,:) ! [patch,n_symb] Symbiotic biomass growth rate       [gC/m2/s]
-  real(r8), pointer           :: N_symb_up             (:,:) ! Symbiont nitrogen uptake                    [gN/m3/s]
+  real(r8), pointer           :: N_symb_up             (:,:) ! Symbiont nitrogen uptake                    [gN/m3/s], fixers: [gN/m2/s]
   real(r8), pointer           :: N_to_plant            (:,:) ! Nitrogen send to plant                      [gN/m2/s]
   real(r8), pointer           :: C_alloc               (:,:) ! Carbon allocation from plant to symbiont    [gC/m2/s]
   real(r8), pointer           :: C_mortality           (:,:) ! [col,nlevdecomp]Turnover of symbionts per layer and column [gC/m3/s]
@@ -806,6 +806,8 @@ contains
       c = patch%column(p)
 
       ! Carbon provided, to be used for either growth or Nitrogen uptake
+      ! Calculate N demand, what should be spend on N aqu.
+      
       availc_alloc(p)           = availc(p)        *  0.5_r8
 
       C_allocation_to_N_acq(p)  = availc_alloc(p)
@@ -943,12 +945,17 @@ contains
    do fp = 1,num_soilp
       p = filter_soilp(fp)
       c = patch%column(p)
+      ! Amount of nitrogen fixed by fixer biomass
+      N_fixation(p) = C_biomass(p,i_fixer) * sulman_rfix ! units: gN/m2/s
+
       do j = 1,nlevdecomp
          N_reservoir(p,i_miner) =  N_reservoir(p,i_miner) + ((somc_nuptake(p,j) * dt + somp_nuptake(p,j) * dt) * col%dz(c,j))
          N_reservoir(p,i_scav) =  N_reservoir(p,i_scav) + ((no3_scav_up(p,j) * dt + nh4_scav_up(p,j) * dt) * col%dz(c,j))
+         ! T dependence of N fixation from Houlton et al. (2008) Nature paper (normalized to peak at 1.0)
+         ! a=-3.62, b=0.27, c=25.15, T effect = exp(-0.5*b*c+b*Ts*(1-0.5*Ts/c))
+         ! Could be used as if statement: if(N_fix_Tdep_Houlton) 
+         N_fixation(p) = N_fixation(p) * exp(-0.5*0.27*25.15 + 0.27*(t_soisno(c,j)-273.15)*(1.0-0.5*(t_soisno(c,j)-273.15)/25.15))
       enddo
-      ! Amount of nitrogen fixed by fixer biomass
-      N_fixation(p) = C_biomass(p,i_fixer) * sulman_rfix ! units: gN/m2/s
       N_reservoir(p,i_fixer) = N_reservoir(p,i_fixer) + (N_fixation(p) * dt)
    enddo
 
@@ -1042,8 +1049,7 @@ contains
        symb_growth(p,i_fixer) = symb_growth_gross(p,i_fixer) * symbiont_CUE(i_fixer) !C30
    
        ! Fixation has to be done at the biomas update, since it is reduced by the growth
-       ! will use later N_fixation=N_fixation*exp(-0.5*0.27*25.15 + 0.27*(soilT-273.15)*(1.0-0.5*(soilT-273.15)/25.15))
-  
+
        total_symbiont_turnover_C(p,i_fixer) = C_biomass(p,i_fixer) * symbiont_tau(i_fixer)
        total_symbiont_turnover_N(p,i_fixer) = N_biomass(p,i_fixer) * symbiont_tau(i_fixer)
 
