@@ -80,6 +80,9 @@ module CNSoilVegMIMICSplus
   real(r8), pointer           :: N_biomass             (:,:) ! [patch,n_symb] Nitrogen biomass                    [gN/m2]
   real(r8), pointer           :: C_reservoir           (:,:) ! [patch,n_symb] Carbon intermediate pool biomass    [gC/m2]
   real(r8), pointer           :: N_reservoir           (:,:) ! [patch,n_symb] Nitrogen intermediate pool biomass  [gN/m2]
+
+  real(r8), pointer           :: N_stress                (:) ! N demand of plant, based on current N amount in plant  [-]
+  real(r8), pointer           :: C_allocation_to_N_acq   (:) ! [patch] C allocated to N acquisition                     [gC/m2/s]
   
   real(r8), pointer           :: symb_eff              (:,:) ! [patch,n_symb] Symbiont efficiency when biomass 0  [gC/gN]
   real(r8), pointer           :: symb_growth           (:,:) ! [patch,n_symb] Symbiotic biomass growth rate       [gC/m2/s]
@@ -190,6 +193,9 @@ contains
     allocate(this%N_biomass(begp:endp,1:n_symb)) ; this%N_biomass(begp:endp,1:n_symb)     = 0.0_r8
     allocate(this%C_reservoir(begp:endp,1:n_symb)) ; this%C_reservoir(begp:endp,1:n_symb) = 0.0_r8
     allocate(this%N_reservoir(begp:endp,1:n_symb)) ; this%N_reservoir(begp:endp,1:n_symb) = 0.0_r8
+
+    allocate(this%N_stress(begp:endp))             ; this%N_stress(begp:endp)             = 0.0_r8
+    allocate(this%C_allocation_to_N_acq(begp:endp)) ; this%C_allocation_to_N_acq(begp:endp) = 0.0_r8
 
     allocate(this%symb_eff(begp:endp,1:n_symb)) ; this%symb_eff(begp:endp,1:n_symb)       = 0.0_r8
     allocate(this%symb_growth(begp:endp,1:n_symb)) ; this%symb_growth(begp:endp,1:n_symb) = 0.0_r8
@@ -343,6 +349,17 @@ contains
          call hist_addfld2d (fname='ROOT_EXUDATE_C_MIMICSPLUS', units='gC/m3/s', type2d='levsoi', &
          avgflag='A', long_name='Leftover root exudate C from symbiont allocation', &
          ptr_col=this%root_exudate_C_col, set_spec=spval, default='inactive')
+
+         this%N_stress(begp:endp) = spval
+         call hist_addfld1d (fname='N_STRESS', units='-', &
+         avgflag='A', long_name='N stress of plant', &
+         ptr_patch=this%N_stress)
+
+         this%C_allocation_to_N_acq(begp:endp) = spval
+         call hist_addfld1d (fname='C_ALLOC_TO_N_ACQ', units='-', &
+         avgflag='A', long_name='C allocated from plant to recive N', &
+         ptr_patch=this%C_allocation_to_N_acq)
+
 
    end subroutine InitHistory
 
@@ -573,10 +590,15 @@ contains
    integer :: p, fp, c, fc, j, k, l, s, i, g
    integer :: begp, endp, begc, endc
    
+   real(r8), parameter :: N_stress_max = 2.0_r8             ! Maximum N demand of plant, based on current N amount in plant []
+   real(r8), parameter :: N_stress_min = 0.05_r8            ! Miminmum value of N_stress
+   real(r8), parameter :: sulman_fnalloc = 0.05       ! Fraction of NPP allocated to N uptake per unit N stress [fraction] 
+
    real(r8) :: root_dens_sum                                            ! Fine root C per layer             [gC/m2]
    real(r8) :: t_soi_degC                                               ! Soil temperature                  [degrees Celcius]
    real(r8) :: availc_alloc(bounds%begp:bounds%endp)                    ! The avaible C pool for allocation [gC/m2/s]
-   real(r8) :: C_allocation_to_N_acq(bounds%begp:bounds%endp)           ! C allocated to N acquisition      [gC/m2/s]
+   real(r8) :: plantCN(bounds%begp:bounds%endp)                         ! plant C:N
+   real(r8) :: npp_growth_potential(bounds%begp:bounds%endp) 
    real(r8) :: root_dens_frac(bounds%begp:bounds%endp,1:nlevdecomp)     ! Fraction of root density          [-]
 
    ! VARIABLES FOR LOCAL BALANCE CHECK
@@ -631,6 +653,11 @@ contains
    real(r8) :: scale_N_to_plant(bounds%begp:bounds%endp)       ! Scale factor to scale N uptake to plant if it is bigger that the uptake capazitiy of plant
 
    real(r8) :: norm_froot_prof(bounds%begp:bounds%endp,1:nlevdecomp)    ! normalized fine root profile
+
+   ! Nstress
+   real(r8) :: N_demand(bounds%begp:bounds%endp)
+   real(r8) :: total_N(bounds%begp:bounds%endp)
+   real(r8) :: potential_stored_N(bounds%begp:bounds%endp)
    
    begp = bounds%begp; endp= bounds%endp
    dt   = get_step_size_real()
@@ -670,11 +697,14 @@ contains
    frootn_storage       => cnveg_nitrogenstate_inst%frootn_storage_patch     , & ! Input:   (:) (gN/m2) fine root N storage                       
    livecrootn           => cnveg_nitrogenstate_inst%livecrootn_patch         , & ! Input:   (:) (gN/m2) live coarse root N                        
    livecrootn_storage   => cnveg_nitrogenstate_inst%livecrootn_storage_patch , & ! Input:   (:) (gN/m2) live coarse root N storage                
+   livestemn            => cnveg_nitrogenstate_inst%livestemn_patch          , & ! Input:   [real(r8)  (:)] (gN/m2) live stem N
+   livestemn_storage    => cnveg_nitrogenstate_inst%livestemn_storage_patch  , & ! Input:  [real(r8) (:)     ]  (gN/m2) live stem N storage
    h2osoi_liq           => waterstatebulk_inst%h2osoi_liq_col                , & ! Output:(:,:) (kg/m2) liquid water (new)  
    t_soisno             => temperature_inst%t_soisno_col                     , & ! Input: (:,:) (Kelvin) soil temperature     
-   plantCN              => cnveg_state_inst%plantCN_patch                    , & ! Input:   (:)  Plant C:N used by FUN
    availc               => cnveg_carbonflux_inst%availc_patch                , & ! Output:  (:) (gC/m2/s) C flux available for allocation 
    npp_growth           => cnveg_carbonflux_inst%npp_growth_patch            , & ! Output:  (:) (gC/m2/s) Total C u for growth in FUN / MIMICSplus
+   c_allometry          => cnveg_state_inst%c_allometry_patch                , & ! Output: [real(r8) (:)   ]  C allocation index (DIM)
+   n_allometry          => cnveg_state_inst%n_allometry_patch                , & ! Output: [real(r8) (:)   ]  N allocation index (DIM)
   
    sminn_to_symbiont_vr     => cnveg_nitrogenflux_inst%sminn_to_symbiont_mimicsplus_vr_patch    , & ! Output: (:,:) (gN/m2/s) Total layer soil N uptake of MIMICSplus 
    smin_no3_to_symbiont_vr  => cnveg_nitrogenflux_inst%smin_no3_to_symbiont_mimicsplus_vr_patch , & ! Output: (:,:) (gN/m2/s) Total layer soil NO3 uptake of MIMICSplus 
@@ -714,7 +744,11 @@ contains
    somp_nuptake_col     => symbiont_inst%somp_nuptake_col , &   ! Nitrogen uptake from SOMp via mining         [gN/m3/s]
    n_mine_somc2soma_col    => symbiont_inst%n_mine_somc2soma_col, &   ! Leftover part of co-mineralized N, not taken up by miners  [gN/m3/s]
    n_mine_somp2soma_col    => symbiont_inst%n_mine_somp2soma_col, &   ! Leftover part of co-mineralized N, not taken up by miners  [gN/m3/s]
-  
+
+   N_stress    => symbiont_inst%N_stress, &  
+   C_allocation_to_N_acq    => symbiont_inst%C_allocation_to_N_acq, &  
+
+   
    n_to_plant_mimicsplus => cnveg_nitrogenflux_inst%n_to_plant_mimicsplus_patch, & ! Output:[real(r8) (:)]  nitrogen sent to plant from symbionts (gN/m2/s)
    N_fixation            => cnveg_nitrogenflux_inst%Nfix_patch                   , & ! Output:  [real(r8) (:) ]  Symbiotic BNF (gN/m2/s)
    nfix_to_sminn_mimicsplus  => soilbiogeochem_nitrogenflux_inst%nfix_to_sminn_mimicsplus_col   , & ! Output:  [real(r8) (:)] symbiotic/asymbiotic N fixation to soil mineral N (gN/m2/s)
@@ -796,22 +830,86 @@ contains
 
    !-----------------------------------------------------------------------
 
-   C_allocation_to_N_acq(bounds%begp:bounds%endp)                 = 0.0_r8
    maint_resp                                                     = 0.0_r8
    symbiont_turnover_C_to_som(bounds%begp:bounds%endp, 1:n_symb)  = 0.0_r8
    symbiont_turnover_N_to_som(bounds%begp:bounds%endp, 1:n_symb)  = 0.0_r8
+   npp_growth(bounds%begp:bounds%endp)                            = 0.0_r8
+   plantCN(bounds%begp:bounds%endp)                               = 0.0_r8
+   N_demand(bounds%begp:bounds%endp)                  = 0.0_r8
+   total_N(bounds%begp:bounds%endp)                   = 0.0_r8
+   potential_stored_N(bounds%begp:bounds%endp)        = 0.0_r8
+   npp_growth_potential(bounds%begp:bounds%endp)      = 0.0_r8
+  
+
+   ! Calculation of N_stress: N stress indicates the nitrogen content in a plant and is used to calculate how much carbon 
+   ! the plant allocates belowground = the higher N stress, the higher is the carbon allocation belowground
+   
 
    do fp = 1,num_soilp
       p = filter_soilp(fp)
       c = patch%column(p)
 
+      ! After talking with Terje, inspiered by FUN
+
+      plantCN(p) = max(1._r8, c_allometry(p) / max(n_allometry(p), tiny(1._r8)))
+      
+      npp_growth_potential(p) = n_to_plant_mimicsplus(p) * plantCN(p)
+      
+      ! Limit growth by available C, taking the smaller value
+      npp_growth(p) = min(availc(p), npp_growth_potential(p))
+      
+      C_allocation_to_N_acq(p) = availc(p) - npp_growth(p)
+
+
+      !if (n_allometry(p).gt.0._r8) then 
+      !   plantCN(p)  = c_allometry(p) / n_allometry(p)
+      !else
+      !   plantCN(p)  = 0._r8 
+      !end if
+
+      !npp_growth(p) = n_to_plant_mimicsplus(p)  *  plantCN(p)
+
+      !C_allocation_to_N_acq(p)  = availc(p) - npp_growth(p)
+
+
+
+      !N_demand(p) = (n_allometry(p) / c_allometry(p)) * availc(p) * dt ! check if * dt [gN/m2]
+
+      !total_N(p) = leafn(p) + frootn(p) + livestemn(p) + livecrootn(p) &
+      !             + livestemn_storage(p) + leafn_storage(p) + frootn_storage(p) + livecrootn_storage(p) ![gN/m2]
+
+      
+      !potential_stored_N(p) = total_N(p) - N_demand(p) - livestemn(p) - livestemn_storage(p) ![gN/m2]
+      
+      !if (N_demand(p) > 0.0_r8) then 
+      !   N_stress(p) = (N_stress_max * N_demand(p) - potential_stored_N(p)) / N_demand(p) ![-]
+      !else 
+      !   N_stress(p) =  0.0_r8
+      !end if 
+                  
+      
+
+      ! Calculate the amount of C transferent to N aquisation
+      ! Dynamic allocation of a fraction of NPP to root exudation
+
+      !if (availc(p) > 1.e-12_r8) then
+      !   C_allocation_to_N_acq(p) = max(availc(p), 0.0_r8) * sulman_fnalloc * N_demand(p)
+      !   npp_growth(p) = availc(p) - C_allocation_to_N_acq(p)
+      !else 
+      !   C_allocation_to_N_acq(p)  = 0.0_r8
+      !   npp_growth(p) = 0.0_r8
+      !end if
+
+   
+      !-----------------------------------------------------------------------------------
       ! Carbon provided, to be used for either growth or Nitrogen uptake
       ! Calculate N demand, what should be spend on N aqu.
       
-      availc_alloc(p)           = availc(p)        *  0.5_r8
+      !availc_alloc(p)           = availc(p)        *  0.5_r8
 
-      C_allocation_to_N_acq(p)  = availc_alloc(p)
-      npp_growth(p) = availc(p)        *  0.5_r8
+      !C_allocation_to_N_acq(p)  = availc_alloc(p)
+      !npp_growth(p) = availc(p)        *  0.5_r8
+      !-----------------------------------------------------------------------------------
 
    end do
 
@@ -950,6 +1048,7 @@ contains
 
       do j = 1,nlevdecomp
          N_reservoir(p,i_miner) =  N_reservoir(p,i_miner) + ((somc_nuptake(p,j) * dt + somp_nuptake(p,j) * dt) * col%dz(c,j))
+         C_reservoir(p,i_miner) =  C_reservoir(p,i_miner) + ((somc_cuptake(p,j) * dt + somp_cuptake(p,j) * dt) * col%dz(c,j))
          N_reservoir(p,i_scav) =  N_reservoir(p,i_scav) + ((no3_scav_up(p,j) * dt + nh4_scav_up(p,j) * dt) * col%dz(c,j))
          ! T dependence of N fixation from Houlton et al. (2008) Nature paper (normalized to peak at 1.0)
          ! a=-3.62, b=0.27, c=25.15, T effect = exp(-0.5*b*c+b*Ts*(1-0.5*Ts/c))
@@ -1129,7 +1228,7 @@ contains
 
     call roi_symbionts(filter_soilp, filter_bgc_soilc, num_soilp, num_bgc_soilc, &
                         bounds, symbiont_inst, root_N_active_uptake, root_N_to_plant,  &
-                        C_allocation_to_N_acq(bounds%begp:bounds%endp), root_exudate_C(bounds%begp:bounds%endp))
+                        root_exudate_C(bounds%begp:bounds%endp))
 
    do fp = 1,num_soilp
       p = filter_soilp(fp)
@@ -1139,16 +1238,16 @@ contains
       
       ! Updating C reservoirs with allocated plant C (calculated with ROI)
        C_reservoir(p,i_scav) = C_reservoir(p,i_scav) + (C_alloc(p,i_scav) * dt)
-       C_reservoir(p,i_miner) = C_reservoir(p,i_miner) + (C_alloc(p,i_miner) * dt) 
+       C_reservoir(p,i_miner) = C_reservoir(p,i_miner) + (C_alloc(p,i_miner) * dt)
        C_reservoir(p,i_fixer) = C_reservoir(p,i_fixer) + (C_alloc(p,i_fixer) * dt)
 
       ! Updating N reservoirs
-      N_reservoir(p,i_scav) = N_reservoir(p,i_scav) - (N_to_plant(p,i_scav) * dt)
-      N_reservoir(p,i_miner) = N_reservoir(p,i_miner) - (N_to_plant(p,i_miner) * dt)
-      N_reservoir(p,i_fixer) = N_reservoir(p,i_fixer) - (N_to_plant(p,i_fixer) * dt)
-       
-       ! Total nitrogen uptake by plant from intermediate symbiont pools gN/m2/s
-      n_to_plant_mimicsplus(p) = N_to_plant(p,i_scav) + N_to_plant(p,i_miner) + N_to_plant(p,i_fixer) + root_N_to_plant(p)
+       N_reservoir(p,i_scav) = N_reservoir(p,i_scav) - (N_to_plant(p,i_scav) * dt)
+       N_reservoir(p,i_miner) = N_reservoir(p,i_miner) - (N_to_plant(p,i_miner) * dt)
+       N_reservoir(p,i_fixer) = N_reservoir(p,i_fixer) - (N_to_plant(p,i_fixer) * dt)
+        
+      ! Total nitrogen uptake by plant from intermediate symbiont pools gN/m2/s
+       n_to_plant_mimicsplus(p) = N_to_plant(p,i_scav) + N_to_plant(p,i_miner) + N_to_plant(p,i_fixer) + root_N_to_plant(p)
     
 
       ! THIS IS NOT OKE
@@ -1793,7 +1892,7 @@ contains
    
   subroutine roi_symbionts(filter_soilp, filter_bgc_soilc, num_soilp, num_bgc_soilc,  &
                               bounds, symbiont_inst, root_N_active_uptake, root_N_to_plant,  &
-                              C_allocation_to_N_acq, root_exudate_C)
+                              root_exudate_C)
   
    ! ARGUMENTS
    integer                        , intent(in)     :: filter_soilp(:)     ! filter for soil patches
@@ -1803,7 +1902,6 @@ contains
    type(bounds_type)              , intent(in)     :: bounds              
    type(symbiont_type)            , intent(inout)  :: symbiont_inst       
   
-   real(r8), intent(in)    :: C_allocation_to_N_acq(bounds%begp:bounds%endp) ! Carbon allocated to nitrogen acquisition    [gC/m2/s]
    real(r8), intent(inout) :: root_exudate_C(bounds%begp:bounds%endp)        ! Leftover C from allocation to symbionts     [gC/m2/s]
    real(r8), intent(in)    :: root_N_active_uptake(bounds%begp:bounds%endp)  ! active root N uptake                        [gN/m2/s]
    real(r8), intent(in)    :: root_N_to_plant(bounds%begp:bounds%endp)       ! total (active + passive) root N uptake      [gN/m2/s]
@@ -1833,7 +1931,9 @@ contains
    C_biomass              => symbiont_inst%C_biomass                           , & ! Carbon biomass of symbiont [gC/m2]
    symb_eff               => symbiont_inst%symb_eff                            , & ! Symbiont efficiency N uptake per unit of mycorrhizal C biomass  [gN/gC]
    C_alloc                => symbiont_inst%C_alloc                             , & ! Carbon allocation to symbionts based on ROI [gC/m2/s]
-   N_to_plant             => symbiont_inst%N_to_plant                            &
+   N_to_plant             => symbiont_inst%N_to_plant                          , &
+   C_allocation_to_N_acq  => symbiont_inst%C_allocation_to_N_acq                 &
+   
    )
 
    !--------------------------------------------------------------------------------------------------------------------------------

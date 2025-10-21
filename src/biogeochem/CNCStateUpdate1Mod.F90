@@ -249,11 +249,11 @@ contains
                                                                                  - (symbiont_inst%somp_cuptake_col(c,j) * dt))
 
                         ! Carbon send to SOMa due to mining
-                        cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som) = (cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som) &
+                        !cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som) = (cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som) &
 
-                                                                                 + (symbiont_inst%somc_cuptake_col(c,j) * dt) &
+                         !                                                       + (symbiont_inst%somc_cuptake_col(c,j) * dt) &
 
-                                                                                 + (symbiont_inst%somp_cuptake_col(c,j) * dt))
+                          !                                                       + (symbiont_inst%somp_cuptake_col(c,j) * dt))
                                                                                  
                         ! add C enzyme fluxx here, if I ever make it symbiont_inst%C_enz_mine2soma_col(c,j)
 
@@ -435,7 +435,7 @@ contains
            cs_veg%cpool_patch(p) = cs_veg%cpool_patch(p) -  cf_veg%cpool_to_resp_patch(p)*dt
 
           if(decomp_method == mimicsplus_decomp) then 
-            cs_veg%cpool_patch(p)= cs_veg%cpool_patch(p) - cf_veg%availc_patch(p) * 0.5_r8  *dt 
+            cs_veg%cpool_patch(p)= cs_veg%cpool_patch(p) - symbiont_inst%C_allocation_to_N_acq(p)  *dt 
           else           
            !RF Add in the carbon spent on uptake respiration. 
            cs_veg%cpool_patch(p)= cs_veg%cpool_patch(p) - cf_veg%soilc_change_patch(p)*dt
