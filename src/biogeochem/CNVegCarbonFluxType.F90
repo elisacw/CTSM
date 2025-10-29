@@ -37,6 +37,7 @@ module CNVegCarbonFluxType
   use dynSubgridControlMod               , only : get_for_testing_allow_non_annual_changes, get_do_grossunrep
   use abortutils                         , only : endrun
   use SparseMatrixMultiplyMod            , only : sparse_matrix_type, diag_matrix_type, vector_type
+  use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, mimicsplus_decomp, decomp_method
   ! 
   ! !PUBLIC TYPES:
   implicit none
@@ -2288,11 +2289,6 @@ contains
                avgflag='A', long_name='Total C used by N uptake in FUN',  &
                ptr_patch=this%npp_Nuptake_patch)
 
-          this%npp_growth_patch(begp:endp) = spval
-          call hist_addfld1d (fname='NPP_GROWTH', units='gC/m^2/s',      &
-               avgflag='A', long_name='Total C used for growth in FUN/MIMICSplus',  &
-               ptr_patch=this%npp_growth_patch)
-
           this%leafc_change_patch(begp:endp) = spval
           call hist_addfld1d (fname='LEAFC_CHANGE', units='gC/m^2/s',     &
                avgflag='A', long_name='C change in leaf',                 &
@@ -2303,6 +2299,13 @@ contains
                avgflag='A', long_name='C change in soil',                 &
                ptr_patch=this%soilc_change_patch)
       end if
+
+      if (use_fun .or. decomp_method == mimicsplus_decomp) then
+          this%npp_growth_patch(begp:endp) = spval
+          call hist_addfld1d (fname='NPP_GROWTH', units='gC/m^2/s',      &
+               avgflag='A', long_name='Total C used for growth in FUN/MIMICSplus',  &
+               ptr_patch=this%npp_growth_patch)
+      end if 
 ! FUN Ends 
 
     end if  ! end of if-c12

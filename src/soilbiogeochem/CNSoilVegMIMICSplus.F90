@@ -296,7 +296,7 @@ contains
          avgflag='A', long_name=('Turnover (necromass & maintainance respiration) of symbionts '//this%symb_name(i)), &
          ptr_patch=data1dptr, set_spec=spval, default='inactive')
 
-          this%total_symbiont_turnover_N(begp:endp,i) = spval
+         this%total_symbiont_turnover_N(begp:endp,i) = spval
          data1dptr => this%total_symbiont_turnover_N(:,i)
          call hist_addfld1d (fname=trim('N_'//this%symb_hist_name(i))//'_TURNOVER', units='gN/m2/s', &
          avgflag='A', long_name=('Turnover (necromass & maintainance respiration) of symbionts '//this%symb_name(i)), &
@@ -442,6 +442,7 @@ contains
      logical                           :: readvar      ! determine if variable is on initial file
      character(len=128)                :: varname      ! temporary
      real(r8), pointer                 :: data1dptr (:)
+     real(r8), pointer                 :: data2dptr (:,:)
      
      !-----------------------------------------------------------------------
    do i = 1,n_symb
@@ -478,7 +479,7 @@ contains
              errMsg(sourcefile, __LINE__))
       endif
 
-      data1dptr => this%symb_eff(:,i)
+      data1dptr => this%symb_eff(:,i) !ecw does this need to be added above?
       call restartvar(ncid=ncid, flag=flag, varname=trim('_efficiency'//this%symb_name(i)), xtype=ncd_double,  &
       dim1name='pft', long_name=('Symbiont'//this%symb_name(i)//' efficiency'), units='g/m2', &
       interpinic_flag='interp', readvar=readvar, data=data1dptr)
@@ -486,7 +487,162 @@ contains
          call endrun(msg = "ERROR: Efficiency "//this%symb_name(i)// " is not on the restart file."// & 
              errMsg(sourcefile, __LINE__))
       endif
+
+      data1dptr => this%symb_growth(:,i)
+      call restartvar(ncid=ncid, flag=flag, varname=trim('symb_growth_'//this%symb_name(i)), xtype=ncd_double,  &
+         dim1name='pft', long_name=('Carbon growth flux of symbiont '//this%symb_name(i)), units='gC/m2/s', &
+         interpinic_flag='interp', readvar=readvar, data=data1dptr)
+      if (flag == 'read' .and. (.not. readvar)) then
+         call endrun(msg = "ERROR: symb_growth "//this%symb_name(i)//" missing from restart."//errMsg(sourcefile, __LINE__))
+      endif
+      
+      data1dptr => this%N_symb_up(:,i)
+      call restartvar(ncid=ncid, flag=flag, varname=trim('N_symb_up_'//this%symb_name(i)), xtype=ncd_double,  &
+         dim1name='pft', long_name=('Nitrogen uptake flux of symbiont '//this%symb_name(i)), units='gN/m2/s', &
+         interpinic_flag='interp', readvar=readvar, data=data1dptr)
+      if (flag == 'read' .and. (.not. readvar)) then
+         call endrun(msg = "ERROR: N_symb_up "//this%symb_name(i)//" missing from restart."//errMsg(sourcefile, __LINE__))
+      endif
+      
+      data1dptr => this%N_to_plant(:,i)
+      call restartvar(ncid=ncid, flag=flag, varname=trim('N_to_plant_'//this%symb_name(i)), xtype=ncd_double,  &
+         dim1name='pft', long_name=('Nitrogen flux from symbiont to plant '//this%symb_name(i)), units='gN/m2/s', &
+         interpinic_flag='interp', readvar=readvar, data=data1dptr)
+      if (flag == 'read' .and. (.not. readvar)) then
+         call endrun(msg = "ERROR: N_to_plant "//this%symb_name(i)//" missing from restart."//errMsg(sourcefile, __LINE__))
+      endif
+      
+      data1dptr => this%C_alloc(:,i)
+      call restartvar(ncid=ncid, flag=flag, varname=trim('C_alloc_'//this%symb_name(i)), xtype=ncd_double,  &
+         dim1name='pft', long_name=('Carbon allocated from plant to symbiont '//this%symb_name(i)), units='gC/m2/s', &
+         interpinic_flag='interp', readvar=readvar, data=data1dptr)
+      if (flag == 'read' .and. (.not. readvar)) then
+         call endrun(msg = "ERROR: C_alloc "//this%symb_name(i)//" missing from restart."//errMsg(sourcefile, __LINE__))
+      endif
+      
+      data1dptr => this%total_symbiont_turnover_C(:,i)
+      call restartvar(ncid=ncid, flag=flag, varname=trim('symb_turnover_C_'//this%symb_name(i)), xtype=ncd_double,  &
+         dim1name='pft', long_name=('Carbon turnover (necromass + maintenance) of symbiont '//this%symb_name(i)), units='gC/m2/s', &
+         interpinic_flag='interp', readvar=readvar, data=data1dptr)
+      if (flag == 'read' .and. (.not. readvar)) then
+         call endrun(msg = "ERROR: symb_turnover_C "//this%symb_name(i)//" missing from restart."//errMsg(sourcefile, __LINE__))
+      endif
+      
+      data1dptr => this%total_symbiont_turnover_N(:,i)
+      call restartvar(ncid=ncid, flag=flag, varname=trim('symb_turnover_N_'//this%symb_name(i)), xtype=ncd_double,  &
+         dim1name='pft', long_name=('Nitrogen turnover (necromass + maintenance) of symbiont '//this%symb_name(i)), units='gN/m2/s', &
+         interpinic_flag='interp', readvar=readvar, data=data1dptr)
+      if (flag == 'read' .and. (.not. readvar)) then
+         call endrun(msg = "ERROR: symb_turnover_N "//this%symb_name(i)//" missing from restart."//errMsg(sourcefile, __LINE__))
+      endif
+       
    enddo
+
+      data1dptr => this%N_stress
+      call restartvar(ncid=ncid, flag=flag, varname='N_STRESS', xtype=ncd_double, &
+           dim1name='pft', long_name='N stress of plant', units='-', &
+           interpinic_flag='interp', readvar=readvar, data=data1dptr)
+      if (flag == 'read' .and. (.not. readvar)) then
+         call endrun(msg = "ERROR: N_STRESS not on restart file."//errMsg(sourcefile, __LINE__))
+      endif
+      
+      data1dptr => this%C_allocation_to_N_acq
+      call restartvar(ncid=ncid, flag=flag, varname='C_ALLOC_TO_N_ACQ', xtype=ncd_double, &
+           dim1name='pft', long_name='C allocated from plant to receive N', units='gC/m2/s', &
+           interpinic_flag='interp', readvar=readvar, data=data1dptr)
+      if (flag == 'read' .and. (.not. readvar)) then
+         call endrun(msg = "ERROR: C_ALLOC_TO_N_ACQ not on restart file."//errMsg(sourcefile, __LINE__))
+      endif
+
+      data2dptr => this%C_mortality
+      call restartvar(ncid=ncid, flag=flag, varname='C_MORTALITY_SYMB_MIMICSPLUS', xtype=ncd_double, &
+           dim1name='column', dim2name='levsoi',  switchdim=.true., &
+           long_name='Symbiotic C turnover per soil layer and column', units='gC/m3/s', &
+           scale_by_thickness=.false., &
+           interpinic_flag='interp', readvar=readvar, data=data2dptr)
+      if (flag == 'read' .and. (.not. readvar)) then
+         call endrun(msg="ERROR: C_MORTALITY_SYMB_MIMICSPLUS not on restart file."//errMsg(sourcefile,__LINE__))
+      endif
+
+      data2dptr => this%N_mortality
+      call restartvar(ncid=ncid, flag=flag, varname='N_MORTALITY_SYMB_MIMICSPLUS', xtype=ncd_double, &
+           dim1name='column', dim2name='levsoi', switchdim=.true., &
+           long_name='Symbiotic N turnover per soil layer and column', units='gN/m3/s', &
+           scale_by_thickness=.false., &
+           interpinic_flag='interp', readvar=readvar, data=data2dptr)
+      if (flag == 'read' .and. (.not. readvar)) then
+         call endrun(msg="ERROR: N_MORTALITY_SYMB_MIMICSPLUS not on restart file."//errMsg(sourcefile,__LINE__))
+      endif
+      
+      data2dptr => this%N_mine_somc2soma_col
+      call restartvar(ncid=ncid, flag=flag, varname='N_MINE_SOMC_TO_SOMA_MIMICSPLUS', xtype=ncd_double, &
+           dim1name='column', dim2name='levsoi', switchdim=.true., &
+           long_name='Leftover N from SOMc mineralization (not taken up by miners)', units='gN/m3/s', &
+           scale_by_thickness=.false., &
+           interpinic_flag='interp', readvar=readvar, data=data2dptr)
+      if (flag == 'read' .and. (.not. readvar)) then
+         call endrun(msg="ERROR: N_MINE_SOMC_TO_SOMA_MIMICSPLUS not on restart file."//errMsg(sourcefile,__LINE__))
+      endif
+      
+      data2dptr => this%N_mine_somp2soma_col
+      call restartvar(ncid=ncid, flag=flag, varname='N_MINE_SOMP_TO_SOMA_MIMICSPLUS', xtype=ncd_double, &
+           dim1name='column', dim2name='levsoi', switchdim=.true., &
+           long_name='Leftover N from SOMp mineralization (not taken up by miners)', units='gN/m3/s', &
+           scale_by_thickness=.false., &
+           interpinic_flag='interp', readvar=readvar, data=data2dptr)
+      if (flag == 'read' .and. (.not. readvar)) then
+         call endrun(msg="ERROR: N_MINE_SOMP_TO_SOMA_MIMICSPLUS not on restart file."//errMsg(sourcefile,__LINE__))
+      endif
+      
+      data2dptr => this%somc_nuptake_col
+      call restartvar(ncid=ncid, flag=flag, varname='N_MINE_UPTAKE_SOMC_MIMICSPLUS', xtype=ncd_double, &
+           dim1name='column', dim2name='levsoi', switchdim=.true., &
+           long_name='N uptake from SOMc pool via mining', units='gN/m3/s', &
+           scale_by_thickness=.false., &
+           interpinic_flag='interp', readvar=readvar, data=data2dptr)
+      if (flag == 'read' .and. (.not. readvar)) then
+         call endrun(msg="ERROR: N_MINE_UPTAKE_SOMC_MIMICSPLUS not on restart file."//errMsg(sourcefile,__LINE__))
+      endif
+      
+      data2dptr => this%somp_nuptake_col
+      call restartvar(ncid=ncid, flag=flag, varname='N_MINE_UPTAKE_SOMP_MIMICSPLUS', xtype=ncd_double, &
+           dim1name='column', dim2name='levsoi', switchdim=.true., &
+           long_name='N uptake from SOMp pool via mining', units='gN/m3/s', &
+           scale_by_thickness=.false., &
+           interpinic_flag='interp', readvar=readvar, data=data2dptr)
+      if (flag == 'read' .and. (.not. readvar)) then
+         call endrun(msg="ERROR: N_MINE_UPTAKE_SOMP_MIMICSPLUS not on restart file."//errMsg(sourcefile,__LINE__))
+      endif
+      
+      data2dptr => this%somc_cuptake_col
+      call restartvar(ncid=ncid, flag=flag, varname='C_MINE_UPTAKE_SOMC_MIMICSPLUS', xtype=ncd_double, &
+           dim1name='column', dim2name='levsoi', switchdim=.true., &
+           long_name='co-decomposed C from SOMc pool during mining', units='gC/m3/s', &
+           scale_by_thickness=.false., &
+           interpinic_flag='interp', readvar=readvar, data=data2dptr)
+      if (flag == 'read' .and. (.not. readvar)) then
+         call endrun(msg="ERROR: C_MINE_UPTAKE_SOMC_MIMICSPLUS not on restart file."//errMsg(sourcefile,__LINE__))
+      endif
+      
+      data2dptr => this%somp_cuptake_col
+      call restartvar(ncid=ncid, flag=flag, varname='C_MINE_UPTAKE_SOMP_MIMICSPLUS', xtype=ncd_double, &
+           dim1name='column', dim2name='levsoi', switchdim=.true., &
+           long_name='co-decomposed C from SOMp pool during mining', units='gC/m3/s', &
+           scale_by_thickness=.false., &
+           interpinic_flag='interp', readvar=readvar, data=data2dptr)
+      if (flag == 'read' .and. (.not. readvar)) then
+         call endrun(msg="ERROR: C_MINE_UPTAKE_SOMP_MIMICSPLUS not on restart file."//errMsg(sourcefile,__LINE__))
+      endif
+      
+      data2dptr => this%root_exudate_C_col
+      call restartvar(ncid=ncid, flag=flag, varname='ROOT_EXUDATE_C_MIMICSPLUS', xtype=ncd_double, &
+           dim1name='column', dim2name='levsoi', switchdim=.true., &
+           long_name='Leftover root exudate C from symbiont allocation', units='gC/m3/s', &
+           scale_by_thickness=.false., &
+           interpinic_flag='interp', readvar=readvar, data=data2dptr)
+      if (flag == 'read' .and. (.not. readvar)) then
+         call endrun(msg="ERROR: ROOT_EXUDATE_C_MIMICSPLUS not on restart file."//errMsg(sourcefile,__LINE__))
+      endif
       
    end subroutine Restart
 
@@ -849,16 +1005,7 @@ contains
       p = filter_soilp(fp)
       c = patch%column(p)
 
-      ! After talking with Terje, inspiered by FUN
 
-      plantCN(p) = max(1._r8, c_allometry(p) / max(n_allometry(p), tiny(1._r8)))
-      
-      npp_growth_potential(p) = n_to_plant_mimicsplus(p) * plantCN(p)
-      
-      ! Limit growth by available C, taking the smaller value
-      npp_growth(p) = min(availc(p), npp_growth_potential(p))
-      
-      C_allocation_to_N_acq(p) = availc(p) - npp_growth(p)
 
 
       !if (n_allometry(p).gt.0._r8) then 
@@ -928,6 +1075,7 @@ contains
    N_fixation(begp:endp)                                    = 0.0_r8
    root_N_active_uptake(begp:endp)                          = 0.0_r8
    root_N_to_plant(begp:endp)                               = 0.0_r8
+   n_to_plant_mimicsplus(bounds%begp:bounds%endp)           = 0.0_r8
    
 
    ! Scavenging (AM-style)
@@ -1222,7 +1370,37 @@ contains
        ! Maintainance respiration as fraction of turnover [gC/m2/s]             
        symbiont_maint_patch(p) = params_inst%symbiont_mr * &
                                  (total_symbiont_turnover_C(p,i_miner) + total_symbiont_turnover_C(p,i_scav) + total_symbiont_turnover_C(p,i_fixer))
+      ! Scavengers
+   if (is_active(p,i_scav)) then 
+      N_to_plant(p,i_scav) = N_reservoir(p,i_scav) * params_inst%sulman_rup_veg
+   else
+      N_to_plant(p,i_scav) = 0.0_r8
+   endif
+   if (is_active(p,i_miner)) then 
+      N_to_plant(p,i_miner) = N_reservoir(p,i_miner) * params_inst%sulman_rup_veg
+   else
+      N_to_plant(p,i_miner) = 0.0_r8
+   endif
+      if (is_active(p,i_fixer)) then 
+      N_to_plant(p,i_fixer) = N_reservoir(p,i_fixer) * params_inst%sulman_rup_veg
+   else
+      N_to_plant(p,i_fixer) = 0.0_r8
+   endif
+
+   ! Total nitrogen uptake by plant from intermediate symbiont pools gN/m2/s
+   n_to_plant_mimicsplus(p) = N_to_plant(p,i_scav) + N_to_plant(p,i_miner) + N_to_plant(p,i_fixer) + root_N_to_plant(p)
    
+
+   ! Calculating Plant-Microbe C-N exchange
+   plantCN(p) = max(1._r8, c_allometry(p) / max(n_allometry(p), (1.e-12_r8)))
+      
+   npp_growth_potential(p) = n_to_plant_mimicsplus(p) * plantCN(p)
+      
+   ! Limit growth by available C, taking the smaller value
+   npp_growth(p) = min(availc(p), npp_growth_potential(p))
+      
+   C_allocation_to_N_acq(p) = availc(p) - npp_growth(p)
+
    end do
       !----------------------------------------------------------------------------------------------------------------------------
 
@@ -1246,10 +1424,7 @@ contains
        N_reservoir(p,i_miner) = N_reservoir(p,i_miner) - (N_to_plant(p,i_miner) * dt)
        N_reservoir(p,i_fixer) = N_reservoir(p,i_fixer) - (N_to_plant(p,i_fixer) * dt)
         
-      ! Total nitrogen uptake by plant from intermediate symbiont pools gN/m2/s
-       n_to_plant_mimicsplus(p) = N_to_plant(p,i_scav) + N_to_plant(p,i_miner) + N_to_plant(p,i_fixer) + root_N_to_plant(p)
-    
-
+     
       ! THIS IS NOT OKE
       ! if (N_to_plant_mimicsplus(p) + root_N_to_plant(p) > C_allocation_to_N_acq(p) / plantCN(p)) then
       !    scale_N_to_plant(p) = (C_allocation_to_N_acq(p) / plantCN(p) - root_N_to_plant(p)) /  (N_to_plant_mimicsplus(p))
@@ -1946,7 +2121,7 @@ contains
 
    ! Scavengers
    if (is_active(p,i_scav)) then 
-      N_to_plant(p,i_scav) = N_reservoir(p,i_scav) * params_inst%sulman_rup_veg
+      !N_to_plant(p,i_scav) = N_reservoir(p,i_scav) * params_inst%sulman_rup_veg
       if (C_biomass(p,i_scav) > 0.0_r8) then  ! or (C_biomass(p,i_scav) < 0.0_r8)
           scav_roi(p) = (max(0.0_r8, N_to_plant(p,i_scav)))  / (C_biomass(p,i_scav) * params_inst%symbiont_CUE(i_scav) * (params_inst%symbiont_tau(i_scav)))
       else 
@@ -1954,13 +2129,17 @@ contains
       scav_roi(p) = symb_eff(p,i_scav) / (params_inst%symbiont_CUE(i_scav) * (params_inst%symbiont_tau(i_scav) * dt))
       end if 
    else
-      N_to_plant(p,i_scav) = 0.0_r8 ; scav_roi = 0.0_r8
+      scav_roi = 0.0_r8
    end if 
 
 
    ! Miners
+
+   ! N_to_plant needs to be in a new routione / in CNveg routine
+   ! ROI stays in roi routien
+
    if (is_active(p,i_miner)) then
-      N_to_plant(p,i_miner) = N_reservoir(p,i_miner) * params_inst%sulman_rup_veg 
+      !N_to_plant(p,i_miner) = N_reservoir(p,i_miner) * params_inst%sulman_rup_veg 
       if (C_biomass(p,i_miner) > 0.0_r8) then 
          mine_roi(p) = ((max(0.0_r8, N_to_plant(p,i_miner))) / (C_biomass(p,i_miner))) * params_inst%symbiont_CUE(i_miner) / (params_inst%symbiont_tau(i_miner))
       else 
@@ -1968,7 +2147,7 @@ contains
          mine_roi(p) = symb_eff(p,i_miner) / (params_inst%symbiont_CUE(i_miner) * (params_inst%symbiont_tau(i_miner) * dt))
       end if 
    else
-      N_to_plant(p,i_miner) = 0.0_r8 ; mine_roi(p) = 0.0_r8
+       mine_roi(p) = 0.0_r8
    end if 
 
    if (C_allocation_to_N_acq(p) > 0.0_r8) then
@@ -1980,14 +2159,14 @@ contains
 
    ! Nitrogen Fixers
    if (is_active(p,i_fixer)) then
-      N_to_plant(p,i_fixer) = N_reservoir(p,i_fixer) * params_inst%sulman_rup_veg
+      !N_to_plant(p,i_fixer) = N_reservoir(p,i_fixer) * params_inst%sulman_rup_veg
       if (C_biomass(p,i_fixer) > 0.0_r8) then 
          fix_roi(p) = ((N_to_plant(p,i_fixer)) / (C_biomass(p,i_fixer))) * params_inst%symbiont_CUE(i_fixer) / (params_inst%symbiont_tau(i_fixer))
       else 
          fix_roi(p) =  params_inst%sulman_rfix / params_inst%symbiont_CUE(i_fixer) * params_inst%symbiont_tau(i_fixer)
       end if 
    else
-      N_to_plant(p,i_fixer) = 0.0_r8 ; fix_roi = 0.0_r8
+     fix_roi = 0.0_r8
    end if 
 
    
