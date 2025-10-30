@@ -2335,38 +2335,6 @@ contains
      end if
 ! End BACKWARDS_COMPATIBILITY(wrw, 2018-06-28) re. issue #426
 
-     if (decomp_method == mimicsplus_decomp) then
-
-        call restartvar(ncid=ncid, flag=flag, varname='n_to_plant_mimicsplus_patch', xtype=ncd_double,            &
-             dim1name='pft', &
-             long_name='Total soil N uptake of MIMICSPLUS to plant', units='gN/m^2/s', &
-             interpinic_flag='interp', readvar=readvar, data=this%n_to_plant_mimicsplus_patch)
-        call set_missing_vals_to_constant(this%n_to_plant_mimicsplus_patch, 0._r8)
-
-        call restartvar(ncid=ncid, flag=flag, varname='sminn_to_symbiont_mimicsplus_vr_patch', xtype=ncd_double, &
-              dim1name='pft', dim2name='levsoi', switchdim=.true., &
-             long_name='Total soil symbiont N uptake', units='gN/m^2/s', &
-             scale_by_thickness=.false., &
-             interpinic_flag='interp', readvar=readvar, data=this%sminn_to_symbiont_mimicsplus_vr_patch)
-        call set_missing_vals_to_constant(this%sminn_to_symbiont_mimicsplus_vr_patch, 0._r8)
-        
-        call restartvar(ncid=ncid, flag=flag, varname='smin_no3_to_symbiont_mimicsplus_vr_patch', xtype=ncd_double, &
-             dim1name='pft', dim2name='levsoi', switchdim=.true., &
-             long_name='Symbiont soil nitrate N uptake', units='gN/m^2/s', &
-             scale_by_thickness=.false., &
-             interpinic_flag='interp', readvar=readvar, data=this%smin_no3_to_symbiont_mimicsplus_vr_patch)
-        call set_missing_vals_to_constant(this%smin_no3_to_symbiont_mimicsplus_vr_patch, 0._r8)
-        
-        call restartvar(ncid=ncid, flag=flag, varname='smin_nh4_to_symbiont_mimicsplus_vr_patch', xtype=ncd_double, &
-             dim1name='pft', dim2name='levsoi', switchdim=.true., &
-             long_name='Symbiont soil ammonium N uptake', units='gN/m^2/s', &
-             scale_by_thickness=.false., &
-             interpinic_flag='interp', readvar=readvar, data=this%smin_nh4_to_symbiont_mimicsplus_vr_patch)
-        call set_missing_vals_to_constant(this%smin_nh4_to_symbiont_mimicsplus_vr_patch, 0._r8)
-
-     end if 
-
-
   end subroutine Restart
 
   !-----------------------------------------------------------------------

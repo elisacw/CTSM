@@ -602,6 +602,10 @@ contains
             totvegc_col=bgc_vegetation_inst%get_totvegc_col(bounds))
 
        call crop_inst%restart(bounds, ncid, bgc_vegetation_inst%cnveg_state_inst, flag=flag)
+
+       if (decomp_method == mimicsplus_decomp) then
+         call symbiont_inst%Restart(bounds, ncid, flag=flag)
+       endif
     end if
 
     if (decomp_method /= no_soil_decomp) then
