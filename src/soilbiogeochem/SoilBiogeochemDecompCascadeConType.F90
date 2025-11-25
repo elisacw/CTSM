@@ -122,12 +122,14 @@ contains
           decomp_method = mimics_decomp
        case( 'MIMICSplusAas2023' )
           decomp_method = mimicsplus_decomp
+
        case default
           call endrun('Bad soil_decomp_method = '//soil_decomp_method )
        end select
     endif
     ! Broadcast namelist items to all processors
     call shr_mpi_bcast(decomp_method, mpicom)
+
     ! Don't do anything if neither FATES or BGC is on
     if ( use_cn ) then
        if ( decomp_method == no_soil_decomp )then

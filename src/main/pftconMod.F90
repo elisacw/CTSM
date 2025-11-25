@@ -277,6 +277,7 @@ module pftconMod
      real(r8), allocatable :: kn_nonmyc     (:)   ! A non-mycorrhizal uptake parameter
      real(r8), allocatable :: kr_resorb     (:)   ! A retrasnlcation parameter
      real(r8), allocatable :: perecm        (:)   ! The fraction of ECM-associated PFT 
+     real(r8), allocatable :: myc_symbiont  (:)   ! The fraction of ECM-associated PFT MIMICS+
      real(r8), allocatable :: fun_cn_flex_a (:)   ! Parameter a of FUN-flexcn link code (def 5)
      real(r8), allocatable :: fun_cn_flex_b (:)   ! Parameter b of FUN-flexcn link code (def 200)
      real(r8), allocatable :: fun_cn_flex_c (:)   ! Parameter b of FUN-flexcn link code (def 80)         
@@ -494,6 +495,7 @@ contains
     allocate( this%kn_nonmyc     (0:mxpft) )
     allocate( this%kr_resorb     (0:mxpft) )
     allocate( this%perecm        (0:mxpft) )
+    allocate( this%myc_symbiont  (0:mxpft) )
     allocate( this%fun_cn_flex_a (0:mxpft) )
     allocate( this%fun_cn_flex_b (0:mxpft) )
     allocate( this%fun_cn_flex_c (0:mxpft) )
@@ -904,6 +906,9 @@ contains
     if ( .not. readv ) call endrun(msg=' ERROR: error in reading in pft data'//errMsg(sourcefile, __LINE__))
 
     call ncd_io('perecm', this%perecm, 'read', ncid, readvar=readv,         posNOTonfile=.true.)
+    if ( .not. readv ) call endrun(msg=' ERROR: error in reading in pft data'//errMsg(sourcefile, __LINE__))
+
+    call ncd_io('myc_symbiont', this%myc_symbiont, 'read', ncid, readvar=readv,posNOTonfile=.true.)
     if ( .not. readv ) call endrun(msg=' ERROR: error in reading in pft data'//errMsg(sourcefile, __LINE__))
 
     call ncd_io('fun_cn_flex_a', this%fun_cn_flex_a, 'read', ncid, readvar=readv,         posNOTonfile=.true.)
@@ -1588,6 +1593,7 @@ contains
     deallocate( this%kn_nonmyc)
     deallocate( this%kr_resorb)
     deallocate( this%perecm)
+    deallocate( this%myc_symbiont)
     deallocate( this%fun_cn_flex_a)
     deallocate( this%fun_cn_flex_b)
     deallocate( this%fun_cn_flex_c)

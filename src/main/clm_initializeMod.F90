@@ -64,9 +64,10 @@ contains
     use initGridCellsMod     , only: initGridCells
     use UrbanParamsType      , only: IsSimpleBuildTemp
     use dynSubgridControlMod , only: dynSubgridControl_init
-    use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_par_init
+    use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_par_init,decomp_method,mimicsplus_decomp
     use CropReprPoolsMod     , only: crop_repr_pools_init
     use HillslopeHydrologyMod, only: hillslope_properties_init
+    use CNMRespMod           , only: CNMRespReadNML
     !
     ! !ARGUMENTS
     integer, intent(in) :: dtime    ! model time step (seconds)
@@ -113,6 +114,12 @@ contains
 
     call clm_varpar_init(actual_maxsoil_patches, actual_numpft, actual_numcft, actual_nlevurb)
     call decomp_cascade_par_init( NLFilename )
+    if (decomp_method == mimicsplus_decomp) then
+       ! MIMICS plus uses cnmresp namelist as well as fun, 
+       ! but in controlMod we do not know the decomposition method yet.
+       ! We have to call the CNMRespReadNML again here
+       call CNMRespReadNML( NLFilename )
+    endif
     call clm_varcon_init( IsSimpleBuildTemp() )
     call landunit_varcon_init()
     if (masterproc) call control_print()

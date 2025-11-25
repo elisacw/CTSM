@@ -3845,7 +3845,7 @@ sub setup_logic_cnmresp {
   #
   if ( $nl_flags->{'bgc_mode'} ne "sp" ) {
     # When FUN is on get a default value
-    if ( &value_is_true( $nl->get_value('use_fun') ) ) {
+    if ( &value_is_true( $nl->get_value('use_fun')) || ($nl_flags->{'soil_decomp_method'} eq "MIMICSplusAas2023") ) {
        add_default($opts, $nl_flags->{'inputdata_rootdir'}, $definition, $defaults,
                    $nl, 'br_root', 'phys'=>$nl_flags->{'phys'},
                    'use_fun'=>$nl->get_value('use_fun'),

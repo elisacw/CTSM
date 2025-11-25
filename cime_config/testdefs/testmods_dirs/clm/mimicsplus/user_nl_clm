@@ -2,6 +2,8 @@ soil_decomp_method = 'MIMICSplusAas2023'
 
 use_fun = .false.
 
+br_root=0.83d-06
+
 ! To get output from every timestep in files per day:
 ! hist_nhtfrq = 1, 1, 1,1      ! output every day 1 (per timestep)
 ! hist_mfilt  = 48,48,48,48    ! high enough to not truncate output

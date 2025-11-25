@@ -2016,6 +2016,7 @@ contains
                 this%sminn_to_plant_fun_vr_patch(p,j)       = 0._r8
                 this%sminn_to_plant_fun_no3_vr_patch(p,j)   = 0._r8
                 this%sminn_to_plant_fun_nh4_vr_patch(p,j)   = 0._r8
+                this%plant_nalloc_patch(p)         = 0._r8
              end do 
           end if
        end if
