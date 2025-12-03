@@ -436,8 +436,8 @@ contains
             endif
            
             if (this%is_active(p,i)) then
-               this%C_biomass(p,i) = params_inst%sulman_initial_C_stocks(i) * 0.1_r8
-               this%C_reservoir(p,i) = params_inst%sulman_initial_C_stocks(i) * 0.1_r8
+               this%C_biomass(p,i) = params_inst%sulman_initial_C_stocks(i)
+               this%C_reservoir(p,i) = params_inst%sulman_initial_C_stocks(i)
                if (params_inst%sulman_cn_symbionts(i) == 0.0_r8) then
                   this%N_biomass(p,i) = 0.0_r8
                   this%N_reservoir(p,i) = 0.0_r8
@@ -709,7 +709,7 @@ contains
    sulman_kgrowth       => params_inst%sulman_kgrowth         , &   ! Half-saturation of intermediate C pool for symbiotic growth      [gC/m2]
    sulman_max_symb_growth => params_inst%sulman_max_symb_growth, &  ! Maximum symbiont growth rate                                   [gC/m2/s]
    symbiont_necromass     => params_inst%symbiont_necromass  , &    ! Fraction of symbiotic biomass turnover into SOM as necromass [-]
-   symbiont_mr            => params_inst%symbiont_mr         , &    ! Fraction of symbiotic biomass turnover not used for maintenance respiration [-]
+   symbiont_mr            => params_inst%symbiont_mr         , &    ! Fraction of symbiotic biomass turnover used for maintenance respiration [-]
   
    symbiont_CUE         => params_inst%symbiont_CUE           , &   ! Symbiont growth efficiency / CUE [-]
    symbiont_tau         => params_inst%symbiont_tau           , &   ! Turnover of symbionts         [s-1]
@@ -1025,11 +1025,11 @@ contains
 
        ! Net symbiotic growth [gC/m2/s]
        symb_growth(p,i_scav) =  symb_growth_gross(p,i_scav) *  symbiont_CUE(i_scav)
-    
+
        ! Maintainance respiration [gC/m2]
        maint_resp = min(C_biomass(p,i_scav) * (symbiont_tau(i_scav) * dt) * symbiont_mr, symb_growth(p,i_scav) * dt)
        !Nitrogen limitation
-       if (symb_growth(p,i_scav) * dt > sulman_cn_symbionts(i_scav) * N_reservoir(p,i_scav) * 0.9_r8 + maint_resp)  then
+       if ((symb_growth(p,i_scav) * dt) - maint_resp > sulman_cn_symbionts(i_scav) * N_reservoir(p,i_scav) * 0.9_r8)  then
           ! Not enough nitrogen to support growth. Limit to available N, and leave a little bit left over for plant
         symb_growth(p,i_scav) = (sulman_cn_symbionts(i_scav) * N_reservoir(p,i_scav) * 0.9_r8 + maint_resp) / dt
         ! Growth respiration updated in case of N limitation [gC/m2/s]
@@ -1074,7 +1074,8 @@ contains
        symb_growth(p,i_miner) = symb_growth_gross(p,i_miner) * symbiont_CUE(i_miner)
        
        maint_resp = min(C_biomass(p,i_miner) * (symbiont_tau(i_miner) * dt) * symbiont_mr, symb_growth(p,i_miner) * dt)
-       if (symb_growth(p,i_miner) * dt > sulman_cn_symbionts(i_miner) * N_reservoir(p,i_miner) * 0.9_r8 + maint_resp) then
+
+       if ((symb_growth(p,i_miner) * dt) - maint_resp > sulman_cn_symbionts(i_miner) * N_reservoir(p,i_miner) * 0.9_r8) then
            symb_growth(p,i_miner) = (sulman_cn_symbionts(i_miner) * N_reservoir(p,i_miner) * 0.9_r8 + maint_resp) / dt
            growth_resp(p,i_miner) = symb_growth(p,i_miner) * (1.0 - symbiont_CUE(i_miner)) / symbiont_CUE(i_miner)
        end if
