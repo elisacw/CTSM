@@ -1396,8 +1396,8 @@ contains
    function Vmax_myc(soil_T)
       real(r8), intent(in)   :: soil_T                 ! Soil temperature in Kelvin
       real(r8), parameter    :: Tref=293.15            ! Reference Temperature in Kelvin
-      !real(r8), parameter    :: Ea=37000_r8           ! Activation energy (kJ/mol) Sulman et al. (2019)
-      real(r8), parameter    :: Ea=54000_r8            ! Activation energy (J/mol) ELIN
+      real(r8), parameter    :: Ea=37000_r8            ! Activation energy (kJ/mol) Sulman et al. (2019)
+      !real(r8), parameter    :: Ea=54000_r8           ! Activation energy (J/mol) ELIN
       real(r8), parameter    :: R_gas = 8.314472       ! Universal gas constant, J/mol*K
       real(r8)               :: alpha                  ! Scaling factor that normalizes the exponential temperature response to match a specified reference value. [s]
       real(r8)               :: Vmax_myc               ! [s-1]
@@ -1426,8 +1426,8 @@ contains
       real(r8), parameter  :: enzyme_frac=0.1_r8                  ! Relative amount of enzymes produced by microbes     [-]
       real(r8), parameter  :: substrate_diffusion_exp = 3.0_r8    ! Exponent for theta dependence at low theta. See Davison et al DAMM model paper
       real(r8), parameter  :: gas_diffusion_exp = 2.5_r8          ! Exponent for gas diffusion power law dependence on theta See Meslin et al 2010, SSAJ
-      real(r8), parameter  :: min_anaerobic_resp_factor = 0.0_r8  ! Minimum for high soil moisture Resp limitation CHECK [-]
-      real(r8), parameter  :: min_dry_resp_factor       = 0.0_r8  ! Minimum for low soil moisture Resp limitation CHECK  [-]
+      real(r8), parameter  :: min_anaerobic_resp_factor = 0.0_r8  ! Minimum for high soil moisture Resp limitation [-]
+      real(r8), parameter  :: min_dry_resp_factor       = 0.0_r8  ! Minimum for low soil moisture Resp limitation  [-]
 
       real(r8) :: enzymes                                      ! Enzymes released by mycorrhiza based on biomass     [gC/m3]
 
@@ -1442,20 +1442,21 @@ contains
       theta_resp_max = substrate_diffusion_exp/(gas_diffusion_exp*(1.0_r8 +substrate_diffusion_exp/gas_diffusion_exp))
 
       aerobic_max=theta_resp_max**substrate_diffusion_exp*(1.0_r8 - theta_resp_max)**gas_diffusion_exp !ECW
-
+      
       ! Functional dependence on soil moisture, normalized so max is 1
       theta_func=(wliq**substrate_diffusion_exp)*(wair**gas_diffusion_exp)/aerobic_max
-      
-      ! On the wet side of the function, make sure it does not go below min_anaerobic_resp_factor
-      if(wliq>theta_resp_max .and. theta_func<min_anaerobic_resp_factor) theta_func=min_anaerobic_resp_factor
-      ! On the dry side of the function, make sure it does not go below min_dry_resp_factor
-      if(wliq<theta_resp_max .and. theta_func<min_dry_resp_factor) theta_func=min_dry_resp_factor
 
-      enzymes = myc_biomass_layer * enzyme_frac      
-     
+      ! On the wet side of the function, make sure it does not go below min_anaerobic_resp_factor
+      if(wliq>theta_resp_max .and. theta_func<min_anaerobic_resp_factor) theta_func=max(theta_func,min_anaerobic_resp_factor)
+
+      ! On the dry side of the function, make sure it does not go below min_dry_resp_factor
+      if(wliq<theta_resp_max .and. theta_func<min_dry_resp_factor) theta_func=max(theta_func, min_dry_resp_factor)
+
+      enzymes = myc_biomass_layer * enzyme_frac
+
       ! If there is carbon avaliable, calculate mycorrhizal repiration     
       if (soil_carbon > 0.0_r8 .and. wliq > 0.0_r8) then 
-         resp_myc = Vmax_myc(soil_T) * soil_carbon * enzymes / (soil_carbon * params_inst%sulman_km_mine + enzymes) * theta_func
+         !resp_myc = Vmax_myc(soil_T) * soil_carbon * enzymes / (soil_carbon * params_inst%sulman_km_mine + enzymes) * theta_func ! not unit consitent
          resp_myc = Vmax_myc(soil_T) * enzymes * (soil_carbon / (soil_carbon + params_inst%sulman_km_mine)) * theta_func
       else 
          resp_myc = 0.0_r8
@@ -1730,18 +1731,20 @@ contains
                myc_biomass_layer(p,j) = C_biomass(p,i_miner) * norm_froot_prof(p,j) / col%dz(c,j)
 
                ! this is necessary for miners when they somehow all die.
-               !if (C_biomass(p,i_miner) <= 0.0_r8) then ! ==
-               !   myc_biomass_layer(p,j) = 0.01_r8 * norm_froot_prof(p,j) / col%dz(c,j)
-               !endif 
+               if (C_biomass(p,i_miner) <= 0.0_r8) then ! ==
+                  myc_biomass_layer(p,j) = 0.01_r8 * norm_froot_prof(p,j) / col%dz(c,j)
+               endif 
 
-               if (myc_biomass_layer(p,j) > 0.0_r8) then               
+               if (myc_biomass_layer(p,j) > 0.0_r8) then              
+                  ! real(r8), pointer :: h2osoi_liq_col         (:,:) ! col liquid water (kg/m2) (new) (-nlevsno+1:nlevgrnd)    
+                  ! real(r8), pointer :: h2osoi_ice_col         (:,:) ! col ice lens (kg/m2) (new) (-nlevsno+1:nlevgrnd)     
 
-                  wliq = h2osoi_liq(c,j) / col%dz(c,j) * denh2o
-                  wice = h2osoi_ice(c,j) / col%dz(c,j) * denice
+                  wliq = h2osoi_liq(c,j) / (denh2o * col%dz(c,j))   ! denh2o: density of liquid water [kg/m3]
+                  wice = h2osoi_ice(c,j) / (denice * col%dz(c,j))   ! denice: density of ice [kg/m3]
                   wliq = min(1.0_r8, wliq/watsat(c,j))            ! fraction of liquid water-filled pore space (0.0 - 1.0)
                   wice = min(1.0_r8, wice/watsat(c,j))            ! fraction of frozen water-filled pore space (0.0 - 1.0)
                   wair = max(0.0_r8, 1.0_r8 - wliq- wice)         ! fraction of air-filled pore space (0.0 - 1.0)
-            
+
                   ! N uptake by mineres from SOMc & SOMp
                   somc_nuptake(p,j) = miner_nuptake(decomp_cpools_vr(c,j,i_chem_som), decomp_npools_vr(c,j,i_chem_som), &
                                        myc_biomass_layer(p,j), t_soisno(c,j), wliq, wair)
