@@ -135,7 +135,6 @@ contains
     use CNVegNitrogenFluxType , only : cnveg_nitrogenflux_type
     use CNSharedParamsMod     , only : use_fun
     use shr_infnan_mod        , only : shr_infnan_isnan
-    use SoilBiogeochemDecompCascadeConType , only : decomp_method, mimicsplus_decomp, use_soil_matrixcn
     
 
     !

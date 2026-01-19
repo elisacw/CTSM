@@ -253,7 +253,7 @@ contains
 
                          !                                                       + (symbiont_inst%somc_cuptake_col(c,j) * dt) &
 
-                          !                                                       + (symbiont_inst%somp_cuptake_col(c,j) * dt))
+                           !                                                     + (symbiont_inst%somp_cuptake_col(c,j) * dt))
                                                                                  
                         ! add C enzyme fluxx here, if I ever make it symbiont_inst%C_enz_mine2soma_col(c,j)
 
@@ -367,11 +367,11 @@ contains
               end do
            end if
 
-         ! phenology: litterfall fluxes
+          ! phenology: litterfall fluxes
            cs_veg%leafc_patch(p) = cs_veg%leafc_patch(p) - cf_veg%leafc_to_litter_patch(p)*dt
            cs_veg%frootc_patch(p) = cs_veg%frootc_patch(p) - cf_veg%frootc_to_litter_patch(p)*dt
          
-         ! livewood turnover fluxes
+          ! livewood turnover fluxes
            if (woody(ivt(p)) == 1._r8) then
               cs_veg%livestemc_patch(p)  = cs_veg%livestemc_patch(p)  - cf_veg%livestemc_to_deadstemc_patch(p)*dt
               cs_veg%deadstemc_patch(p)  = cs_veg%deadstemc_patch(p)  + cf_veg%livestemc_to_deadstemc_patch(p)*dt
@@ -432,10 +432,10 @@ contains
            end if
          
          
-           cs_veg%cpool_patch(p) = cs_veg%cpool_patch(p) -  cf_veg%cpool_to_resp_patch(p)*dt
+           cs_veg%cpool_patch(p) = cs_veg%cpool_patch(p) -  cf_veg%cpool_to_resp_patch(p) * dt
 
           if(decomp_method == mimicsplus_decomp) then 
-            cs_veg%cpool_patch(p)= cs_veg%cpool_patch(p) - symbiont_inst%C_allocation_to_N_acq(p)  *dt 
+            cs_veg%cpool_patch(p)= cs_veg%cpool_patch(p) - symbiont_inst%C_allocation_to_N_acq(p)  * dt ! ECWBUG HERE I SUBSTRACT
           else           
            !RF Add in the carbon spent on uptake respiration. 
            cs_veg%cpool_patch(p)= cs_veg%cpool_patch(p) - cf_veg%soilc_change_patch(p)*dt
@@ -473,6 +473,7 @@ contains
          else
            ! NOTE: The equivalent changes for matrix code are in CNPhenology EBK (11/26/2019)
          end if !not use_matrixcn
+
          if (woody(ivt(p)) == 1._r8) then
             if (carbon_resp_opt == 1) then
                cf_veg%cpool_to_livecrootc_patch(p) = cf_veg%cpool_to_livecrootc_patch(p) - cf_veg%cpool_to_livecrootc_resp_patch(p)

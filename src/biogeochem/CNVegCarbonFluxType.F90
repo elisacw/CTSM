@@ -5078,6 +5078,7 @@ contains
           this%ar_patch(p) = this%ar_patch(p) + this%soilc_change_patch(p)
        end if
 
+      ! I don't add C_allocation_to_N_acq here, because in FUN soilc_change_patch dosen't actually go to mycorrhiza pools, it is just respiered?
         if (decomp_method == mimicsplus_decomp) then
           this%ar_patch(p) = this%ar_patch(p) + this%symbiont_gr_patch(p) + this%symbiont_maint_patch(p) 
        end if

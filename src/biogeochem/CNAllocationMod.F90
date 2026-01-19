@@ -26,6 +26,8 @@ module CNAllocationMod
   use CropReprPoolsMod     , only : nrepr
   use CNPhenologyMod       , only : CropPhase
   use CNSharedParamsMod    , only : use_fun
+  use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, decomp_method, mimicsplus_decomp
+  
   !
   implicit none
   private
@@ -434,6 +436,8 @@ contains
   !-----------------------------------------------------------------------
   subroutine calc_allometry(num_soilp, filter_soilp, &
        cnveg_carbonflux_inst, cnveg_state_inst)
+
+    
     !
     ! !DESCRIPTION:
     ! Calculate c_allometry and n_allometry terms based on allocation fractions
@@ -510,7 +514,7 @@ contains
 
        ! based on available C, use constant allometric relationships to
        ! determine N requirements
-       if (.not. use_fun) then
+       if (.not. (use_fun .or. decomp_method == mimicsplus_decomp)) then
           g1a = g1
        else
           g1a = 0._r8

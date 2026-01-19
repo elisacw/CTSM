@@ -436,8 +436,8 @@ contains
             endif
            
             if (this%is_active(p,i)) then
-               this%C_biomass(p,i) = params_inst%sulman_initial_C_stocks(i)
-               this%C_reservoir(p,i) = params_inst%sulman_initial_C_stocks(i)
+               this%C_biomass(p,i) = 0.01_r8 !params_inst%sulman_initial_C_stocks(i)
+               this%C_reservoir(p,i) = 0.01_r8 !params_inst%sulman_initial_C_stocks(i)
                if (params_inst%sulman_cn_symbionts(i) == 0.0_r8) then
                   this%N_biomass(p,i) = 0.0_r8
                   this%N_reservoir(p,i) = 0.0_r8
@@ -629,7 +629,7 @@ contains
    
    real(r8), parameter :: N_stress_max = 2.0_r8             ! Maximum N demand of plant, based on current N amount in plant []
    real(r8), parameter :: N_stress_min = 0.05_r8            ! Miminmum value of N_stress
-   real(r8), parameter :: sulman_fnalloc = 0.05       ! Fraction of NPP allocated to N uptake per unit N stress [fraction] 
+   real(r8), parameter :: sulman_fnalloc = 0.05_r8       ! Fraction of NPP allocated to N uptake per unit N stress [fraction] 
 
    real(r8) :: root_dens_sum                                            ! Fine root C per layer             [gC/m2]
    real(r8) :: t_soi_degC                                               ! Soil temperature                  [degrees Celcius]
@@ -707,6 +707,7 @@ contains
    sulman_vmax_ref_mine => params_inst%sulman_vmax_ref_mine   , &   ! Maximum decomposition rate at reference temp for mycorrhizal mining  [s]
    sulman_rfix          => params_inst%sulman_rfix            , &   ! N fixation rate per unit symbiotic biomass                     [gN/gC/s]
    sulman_kgrowth       => params_inst%sulman_kgrowth         , &   ! Half-saturation of intermediate C pool for symbiotic growth      [gC/m2]
+   !CKECK IF sulman_kgrowth IS ACTUALLY gC/m2 and not gm/m3
    sulman_max_symb_growth => params_inst%sulman_max_symb_growth, &  ! Maximum symbiont growth rate                                   [gC/m2/s]
    symbiont_necromass     => params_inst%symbiont_necromass  , &    ! Fraction of symbiotic biomass turnover into SOM as necromass [-]
    symbiont_mr            => params_inst%symbiont_mr         , &    ! Fraction of symbiotic biomass turnover used for maintenance respiration [-]
@@ -736,7 +737,8 @@ contains
    npp_growth           => cnveg_carbonflux_inst%npp_growth_patch            , & ! Output:  (:) (gC/m2/s) Total C u for growth in FUN / MIMICSplus
    c_allometry          => cnveg_state_inst%c_allometry_patch                , & ! Output: [real(r8) (:)   ]  C allocation index (DIM)
    n_allometry          => cnveg_state_inst%n_allometry_patch                , & ! Output: [real(r8) (:)   ]  N allocation index (DIM)
-  
+   plant_ndemand          => cnveg_nitrogenflux_inst%plant_ndemand_patch     , & ! Iutput:  [real(r8) (:)]  N flux required to support initial GPP (gN/m2/s)
+
    sminn_to_symbiont_vr     => cnveg_nitrogenflux_inst%sminn_to_symbiont_mimicsplus_vr_patch    , & ! Output: (:,:) (gN/m2/s) Total layer soil N uptake of MIMICSplus 
    smin_no3_to_symbiont_vr  => cnveg_nitrogenflux_inst%smin_no3_to_symbiont_mimicsplus_vr_patch , & ! Output: (:,:) (gN/m2/s) Total layer soil NO3 uptake of MIMICSplus 
    smin_nh4_to_symbiont_vr  => cnveg_nitrogenflux_inst%smin_nh4_to_symbiont_mimicsplus_vr_patch , & ! Output: (:,:) (gN/m2/s) Total layer soil NH4 uptake of MIMICSplus
@@ -1190,30 +1192,37 @@ contains
       N_to_plant(p,i_fixer) = 0.0_r8
    endif
 
+   ! C ALLOCATION CALCULATION ------------------------------------------------------------------------------------------------------
+
    ! Total nitrogen uptake by plant from intermediate symbiont pools gN/m2/s
    n_to_plant_mimicsplus(p) = N_to_plant(p,i_scav) + N_to_plant(p,i_miner) + N_to_plant(p,i_fixer) + root_N_to_plant(p)
-   
 
    ! Calculating Plant-Microbe C-N exchange
    plantCN(p) = max(1._r8, c_allometry(p) / max(n_allometry(p), (1.e-12_r8)))
-      
-   npp_growth_potential(p) = n_to_plant_mimicsplus(p) * plantCN(p)
-      
-   ! Limit growth by available C, taking the smaller value
-   npp_growth(p) = min(availc(p), npp_growth_potential(p))
-      
+   if (n_allometry(p).gt.0._r8) then 
+         plantCN(p)  = c_allometry(p)/n_allometry(p) !changed RF.
+   else
+         plantCN(p)  = 0._r8 
+   end if
+   
+   ! C needed to use the N provided from symbionts
+   npp_growth_potential(p) =  (n_to_plant_mimicsplus(p)) * plantCN(p)
+   
+   ! npp_growth_potential can't be bigger than availc
+   ! only 90% of avail C should be used for growth
+   npp_growth(p) = min(availc(p) * 0.9_r8, npp_growth_potential(p))
+
    C_allocation_to_N_acq(p) = availc(p) - npp_growth(p)
-   ! C_allocation_to_N_acq(p) = min(availc(p) *0.1, availc(p) - npp_growth(p))
-   ! npp_growth(p) = availc - C_allocation_to_N_acq(p) 
+   !C_allocation_to_N_acq(p) = max(availc(p) * 0.1_r8,availc(p) - npp_growth(p))
+   
+   
+   !  ------------------------------------------------------------------------------------------------------
 
    
    
-   ! Limit C allocation to be only 10 % of avaliable C, the rest goes to growth
-   C_allocation_to_N_acq(p) =  C_allocation_to_N_acq(p) * 0.1_r8
-
-   npp_growth(p) = npp_growth(p) + C_allocation_to_N_acq(p) * 0.9_r8
-
-   
+   !somoothing
+   ! what would happen if they have more avail C
+   ! maybe sopp should not only get C from avail c, but also from winter c pool storage of plant, to buildt up biomass for spring  
    
    end do
       !----------------------------------------------------------------------------------------------------------------------------
@@ -1240,24 +1249,24 @@ contains
         
      
       ! THIS IS NOT OKE
-      ! if (N_to_plant_mimicsplus(p) + root_N_to_plant(p) > C_allocation_to_N_acq(p) / plantCN(p)) then
-      !    scale_N_to_plant(p) = (C_allocation_to_N_acq(p) / plantCN(p) - root_N_to_plant(p)) /  (N_to_plant_mimicsplus(p))
-      ! else
-      !   scale_N_to_plant(p) = 1.0_r8
-      ! endif
+      if (N_to_plant_mimicsplus(p) + root_N_to_plant(p) > C_allocation_to_N_acq(p) / plantCN(p)) then
+         scale_N_to_plant(p) = (C_allocation_to_N_acq(p) / plantCN(p) - root_N_to_plant(p)) /  (N_to_plant_mimicsplus(p))
+      else
+        scale_N_to_plant(p) = 1.0_r8
+      endif
 
       ! Nitrogen uptake to plant
-      !N_to_plant(p,i_scav) = N_to_plant(p,i_scav) * scale_N_to_plant(p)
-      !N_to_plant(p,i_miner) = N_to_plant(p,i_miner) * scale_N_to_plant(p)
-      !N_to_plant(p,i_fixer)  = N_to_plant(p,i_fixer) * scale_N_to_plant(p)
+      N_to_plant(p,i_scav) = N_to_plant(p,i_scav) * scale_N_to_plant(p)
+      N_to_plant(p,i_miner) = N_to_plant(p,i_miner) * scale_N_to_plant(p)
+      N_to_plant(p,i_fixer)  = N_to_plant(p,i_fixer) * scale_N_to_plant(p)
         
       ! Scale uptake and return leftovers to reservoirs
-      !N_reservoir(p,i_scav)  = N_reservoir(p,i_scav)  + (N_to_plant(p,i_scav) * dt) * (1.0_r8 - scale_N_to_plant(p))
-      !N_reservoir(p,i_miner) = N_reservoir(p,i_miner) + (N_to_plant(p,i_miner) * dt) * (1.0_r8 - scale_N_to_plant(p))
-      !N_reservoir(p,i_fixer) = N_reservoir(p,i_fixer) + (N_to_plant(p,i_fixer) * dt)  * (1.0_r8 - scale_N_to_plant(p))
+      N_reservoir(p,i_scav)  = N_reservoir(p,i_scav)  + (N_to_plant(p,i_scav) * dt) * (1.0_r8 - scale_N_to_plant(p))
+      N_reservoir(p,i_miner) = N_reservoir(p,i_miner) + (N_to_plant(p,i_miner) * dt) * (1.0_r8 - scale_N_to_plant(p))
+      N_reservoir(p,i_fixer) = N_reservoir(p,i_fixer) + (N_to_plant(p,i_fixer) * dt)  * (1.0_r8 - scale_N_to_plant(p))
        
       ! Since this variable is what plant actually gets, add root nitrogen here
-      !N_to_plant_mimicsplus(p) = N_to_plant_mimicsplus(p) * scale_N_to_plant(p) + root_N_to_plant(p)
+      N_to_plant_mimicsplus(p) = N_to_plant_mimicsplus(p) * scale_N_to_plant(p) !+ root_N_to_plant(p)
 
       !----------------------------------------------------------------------------------------------------------------------------
        N_symb_up(p,i_scav)  = 0._r8

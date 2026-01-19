@@ -467,7 +467,7 @@ module CNFUNMod
   real(r8) :: total_c_spent_retrans
   real(r8) :: total_c_accounted_retrans
 
-  
+
   !------end of not_use_nitrif_denitrif------!
   !--------------------------------------------------------------------
   !------------
