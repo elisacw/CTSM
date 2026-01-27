@@ -160,10 +160,12 @@ contains
         if (pftcon%FUN_fracfixers(iveg) > 0.0_r8) then  ! PFTs have a "fixer fraction" that determines the fraction of C that can be used for fixation.     
          local_active(p,i_fixer) = .true.               ! FUN_fracfixers is a placeholder
         endif
-        if (pftcon%myc_symbiont(iveg) == 1.0_r8) then
+        !if (pftcon%myc_symbiont(iveg) == 1.0_r8) then
+        if (pftcon%perecm(iveg) == 1.0_r8) then
          local_active(p,i_miner) = .true.
          local_active(p,i_scav) = .false.
-        elseif (pftcon%myc_symbiont(iveg) == 0.0_r8) then
+        !elseif (pftcon%myc_symbiont(iveg) == 0.0_r8) then
+        elseif (pftcon%perecm(iveg) == 0.0_r8) then
          local_active(p,i_miner) = .false.
          local_active(p,i_scav) = .true.
         else
@@ -436,8 +438,8 @@ contains
             endif
            
             if (this%is_active(p,i)) then
-               this%C_biomass(p,i) = 0.01_r8 !params_inst%sulman_initial_C_stocks(i)
-               this%C_reservoir(p,i) = 0.01_r8 !params_inst%sulman_initial_C_stocks(i)
+               this%C_biomass(p,i) = 100.0_r8 !params_inst%sulman_initial_C_stocks(i)
+               this%C_reservoir(p,i) = 100.0_r8 !params_inst%sulman_initial_C_stocks(i)
                if (params_inst%sulman_cn_symbionts(i) == 0.0_r8) then
                   this%N_biomass(p,i) = 0.0_r8
                   this%N_reservoir(p,i) = 0.0_r8
@@ -626,6 +628,7 @@ contains
    ! !LOCAL VARIABLES
    integer :: p, fp, c, fc, j, k, l, s, i, g
    integer :: begp, endp, begc, endc
+   integer :: iveg
    
    real(r8), parameter :: N_stress_max = 2.0_r8             ! Maximum N demand of plant, based on current N amount in plant []
    real(r8), parameter :: N_stress_min = 0.05_r8            ! Miminmum value of N_stress
@@ -793,6 +796,8 @@ contains
    N_fixation            => cnveg_nitrogenflux_inst%Nfix_patch                   , & ! Output:  [real(r8) (:) ]  Symbiotic BNF (gN/m2/s)
    nfix_to_sminn_mimicsplus  => soilbiogeochem_nitrogenflux_inst%nfix_to_sminn_mimicsplus_col   , & ! Output:  [real(r8) (:)] symbiotic/asymbiotic N fixation to soil mineral N (gN/m2/s)
   
+   ivt                    => patch%itype                         , & ! Input: (:) patch vegetation type    [-]
+
    somc_cuptake_col     => symbiont_inst%somc_cuptake_col   , &   ! Nitrogen uptake from SOMc via mining       [gC/m3/s]
    somp_cuptake_col     => symbiont_inst%somp_cuptake_col   , &   ! Nitrogen uptake from SOMp via mining       [gC/m3/s]
    root_exudate_C_col   => symbiont_inst%root_exudate_C_col , &   ! Leftover C from allocation to symbionts    [gC/m3/s]
@@ -995,8 +1000,9 @@ contains
    do fp = 1,num_soilp
       p = filter_soilp(fp)
       c = patch%column(p)
+     !iveg = patch%itype(p)
       ! Amount of nitrogen fixed by fixer biomass
-      N_fixation(p) = C_biomass(p,i_fixer) * sulman_rfix ! units: gN/m2/s
+      N_fixation(p) = C_biomass(p,i_fixer) * sulman_rfix  * pftcon%FUN_fracfixers(iveg)! units: gN/m2/s
 
       do j = 1,nlevdecomp
          N_reservoir(p,i_miner) =  N_reservoir(p,i_miner) + ((somc_nuptake(p,j) * dt + somp_nuptake(p,j) * dt) * col%dz(c,j))
@@ -1198,23 +1204,27 @@ contains
    n_to_plant_mimicsplus(p) = N_to_plant(p,i_scav) + N_to_plant(p,i_miner) + N_to_plant(p,i_fixer) + root_N_to_plant(p)
 
    ! Calculating Plant-Microbe C-N exchange
-   plantCN(p) = max(1._r8, c_allometry(p) / max(n_allometry(p), (1.e-12_r8)))
+   !plantCN(p) = max(1._r8, c_allometry(p) / max(n_allometry(p), (1.e-12_r8)))
    if (n_allometry(p).gt.0._r8) then 
          plantCN(p)  = c_allometry(p)/n_allometry(p) !changed RF.
    else
          plantCN(p)  = 0._r8 
    end if
    
-   ! C needed to use the N provided from symbionts
-   npp_growth_potential(p) =  (n_to_plant_mimicsplus(p)) * plantCN(p)
+   if (availc(p) > 0.0_r8) then
+      ! C needed to use the N provided from symbionts
+      npp_growth_potential(p) =  (n_to_plant_mimicsplus(p)) * plantCN(p) 
+      
+      ! npp_growth_potential can't be bigger than availc
+      ! only 90% of avail C should be used for growth
+      npp_growth(p) = min(availc(p) * 0.9_r8 / (1.0_r8 + pftcon%grperc(ivt(p))), npp_growth_potential(p))
    
-   ! npp_growth_potential can't be bigger than availc
-   ! only 90% of avail C should be used for growth
-   npp_growth(p) = min(availc(p) * 0.9_r8, npp_growth_potential(p))
-
-   C_allocation_to_N_acq(p) = availc(p) - npp_growth(p)
-   !C_allocation_to_N_acq(p) = max(availc(p) * 0.1_r8,availc(p) - npp_growth(p))
-   
+      C_allocation_to_N_acq(p) = availc(p) - npp_growth(p)*(1.0_r8 + pftcon%grperc(ivt(p)))
+      !C_allocation_to_N_acq(p) = max(availc(p) * 0.1_r8,availc(p) - npp_growth(p))
+   else
+      C_allocation_to_N_acq(p) = 0.0_r8
+      npp_growth(p)=0.0_r8
+   endif
    
    !  ------------------------------------------------------------------------------------------------------
 
@@ -1249,24 +1259,24 @@ contains
         
      
       ! THIS IS NOT OKE
-      if (N_to_plant_mimicsplus(p) + root_N_to_plant(p) > C_allocation_to_N_acq(p) / plantCN(p)) then
-         scale_N_to_plant(p) = (C_allocation_to_N_acq(p) / plantCN(p) - root_N_to_plant(p)) /  (N_to_plant_mimicsplus(p))
-      else
-        scale_N_to_plant(p) = 1.0_r8
-      endif
+      !if (N_to_plant_mimicsplus(p) + root_N_to_plant(p) > C_allocation_to_N_acq(p) / plantCN(p)) then
+      !   scale_N_to_plant(p) = (C_allocation_to_N_acq(p) / plantCN(p) - root_N_to_plant(p)) /  (N_to_plant_mimicsplus(p))
+      !else
+      !  scale_N_to_plant(p) = 1.0_r8
+      !endif
 
       ! Nitrogen uptake to plant
-      N_to_plant(p,i_scav) = N_to_plant(p,i_scav) * scale_N_to_plant(p)
-      N_to_plant(p,i_miner) = N_to_plant(p,i_miner) * scale_N_to_plant(p)
-      N_to_plant(p,i_fixer)  = N_to_plant(p,i_fixer) * scale_N_to_plant(p)
+      !N_to_plant(p,i_scav) = N_to_plant(p,i_scav) * scale_N_to_plant(p)
+      !N_to_plant(p,i_miner) = N_to_plant(p,i_miner) * scale_N_to_plant(p)
+      !N_to_plant(p,i_fixer)  = N_to_plant(p,i_fixer) * scale_N_to_plant(p)
         
       ! Scale uptake and return leftovers to reservoirs
-      N_reservoir(p,i_scav)  = N_reservoir(p,i_scav)  + (N_to_plant(p,i_scav) * dt) * (1.0_r8 - scale_N_to_plant(p))
-      N_reservoir(p,i_miner) = N_reservoir(p,i_miner) + (N_to_plant(p,i_miner) * dt) * (1.0_r8 - scale_N_to_plant(p))
-      N_reservoir(p,i_fixer) = N_reservoir(p,i_fixer) + (N_to_plant(p,i_fixer) * dt)  * (1.0_r8 - scale_N_to_plant(p))
+      !N_reservoir(p,i_scav)  = N_reservoir(p,i_scav)  + (N_to_plant(p,i_scav) * dt) * (1.0_r8 - scale_N_to_plant(p))
+      !N_reservoir(p,i_miner) = N_reservoir(p,i_miner) + (N_to_plant(p,i_miner) * dt) * (1.0_r8 - scale_N_to_plant(p))
+      !N_reservoir(p,i_fixer) = N_reservoir(p,i_fixer) + (N_to_plant(p,i_fixer) * dt)  * (1.0_r8 - scale_N_to_plant(p))
        
       ! Since this variable is what plant actually gets, add root nitrogen here
-      N_to_plant_mimicsplus(p) = N_to_plant_mimicsplus(p) * scale_N_to_plant(p) !+ root_N_to_plant(p)
+      !N_to_plant_mimicsplus(p) = N_to_plant_mimicsplus(p) * scale_N_to_plant(p) !+ root_N_to_plant(p)
 
       !----------------------------------------------------------------------------------------------------------------------------
        N_symb_up(p,i_scav)  = 0._r8
@@ -1998,6 +2008,7 @@ contains
    
    ! Calculate relative fractions
    if (scav_roi(p) + mine_roi(p) + fix_roi(p) + root_roi(p) > 0.0_r8) then
+   !if (scav_roi(p) + mine_roi(p) + fix_roi(p) > 0.0_r8) then
       roi(p) = scav_roi(p) + mine_roi(p) + fix_roi(p) + root_roi(p)
 
       scav_roi_frac = scav_roi(p) / roi(p)
