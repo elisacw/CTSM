@@ -226,6 +226,7 @@ contains
     real(r8), allocatable :: h2osno_col(:)
     real(r8), allocatable :: snow_depth_col(:)
     real(r8), allocatable :: exice_init_conc_col(:) ! initial coldstart excess ice concentration (from the stream file or 0.0) (-)
+    real(r8), allocatable :: froot_carbon(:) ! fine root carbon for mycorrhiza coldstart with mimicsplus_decomp
     type(excessicestream_type)  :: exice_stream
 
     integer :: dummy_to_make_pgi_happy
@@ -423,7 +424,6 @@ contains
        else if (decomp_method == mimicsplus_decomp) then
          call init_decompcascade_mimics(bounds, soilbiogeochem_state_inst, &
                                          soilstate_inst)
-         call symbiont_inst%Init(bounds)
        end if
 
       ! call symbiont_inst%Init(bounds)
@@ -466,6 +466,14 @@ contains
     ! Note - always call Init for bgc_vegetation_inst: some pieces need to be initialized always
     ! Even for a FATES simulation, we call this to initialize product pools
     call bgc_vegetation_inst%Init(bounds, nlfilename, GetBalanceCheckSkipSteps(), params_ncid )
+    
+    if (decomp_method == mimicsplus_decomp) then 
+      allocate(froot_carbon(begp:endp))
+      froot_carbon(begp:endp)=0.0_r8
+      froot_carbon = bgc_vegetation_inst%get_froot_carbon_patch(bounds)
+      call symbiont_inst%Init(bounds,froot_carbon(begp:endp))
+      deallocate(froot_carbon)
+    end if 
 
     if (use_cn .or. use_fates) then
        call crop_inst%Init(bounds)

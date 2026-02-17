@@ -448,13 +448,9 @@ contains
            sminn_to_npool(p) = plant_ndemand(p) * fpg(c)
          endif
 
-         !ECW I don't have retranslocation, maybe if statement here, to avoid it
-         ! Write a warning for if retransn_to_npool(p) is more than 0 and mimicsplus is active
-         if (decomp_method == mimicsplus_decomp) then
-            plant_nalloc(p) = sminn_to_npool(p)
-         else
-            plant_nalloc(p) = sminn_to_npool(p) + retransn_to_npool(p)
-         endif
+         plant_nalloc(p) = sminn_to_npool(p) + retransn_to_npool(p)
+         
+         !endif
          if(use_matrixcn)then
             associate( &
               matrix_Ninput => cnveg_nitrogenflux_inst%matrix_Ninput_patch & ! N input of matrix
@@ -1500,6 +1496,20 @@ contains
          availc                => cnveg_carbonflux_inst%availc_patch                , & ! Input:  [real(r8) (:)   ]  C flux available for allocation (gC/m2/s)        
          leafn                 => cnveg_nitrogenstate_inst%leafn_patch              , & ! Input:  [real(r8) (:)   ]  (gN/m2) leaf N
          plant_ndemand         => cnveg_nitrogenflux_inst%plant_ndemand_patch       , & ! Output: [real(r8) (:)   ]  N flux required to support initial GPP (gN/m2/s)
+         n_stress              => cnveg_nitrogenflux_inst%n_stress_patch            , &
+         leafn_storage         => cnveg_nitrogenstate_inst%leafn_storage_patch              , & ! Input:  [real(r8) (:)   ]  (gN/m2) leaf N
+         frootn_storage        => cnveg_nitrogenstate_inst%frootn_storage_patch              , & ! Input:  [real(r8) (:)   ]  (gN/m2) leaf N
+         npool                 => cnveg_nitrogenstate_inst%npool_patch                      , & ! Input:  [real(r8) (:)   ]  (gN/m2) temporary plant N pool
+         woody                 => pftcon%woody                                 , & ! Input:  binary flag for woody lifeform (1=woody, 0=not woody)
+         livestemn_storage     =>    cnveg_nitrogenstate_inst%livestemn_storage_patch  , &
+         deadstemn             =>    cnveg_nitrogenstate_inst%deadstemn_patch  , &
+         deadstemn_storage     =>    cnveg_nitrogenstate_inst%deadstemn_storage_patch  , &
+         
+         livecrootn            =>    cnveg_nitrogenstate_inst%livecrootn_patch , & ! Input:  [real(r8) (:)   ]  (gN/m2) live coarse root N                        
+         livecrootn_storage    =>    cnveg_nitrogenstate_inst%livecrootn_storage_patch , & 
+         deadcrootn            =>    cnveg_nitrogenstate_inst%deadcrootn_patch , & 
+         deadcrootn_storage    =>    cnveg_nitrogenstate_inst%deadcrootn_storage_patch , & 
+
          avail_retransn        => cnveg_nitrogenflux_inst%avail_retransn_patch      , & ! Output: [real(r8) (:)   ]  N flux available from retranslocation pool (gN/m2/s)
          retransn_to_npool     => cnveg_nitrogenflux_inst%retransn_to_npool_patch   , & ! Output: [real(r8) (:)   ]  deployment of retranslocated N (gN/m2/s)
          leafn_to_retransn     => cnveg_nitrogenflux_inst%leafn_to_retransn_patch   , & ! Output: [real(r8) (:)   ]
@@ -1554,8 +1564,31 @@ contains
          temp_scalar=t_scalar(c,1)
          temp_scalar = min( max(0.0_r8, temp_scalar), 1.0_r8 )
 
+         
+         n_stress(p) = 0.05_r8
+         if (woody(ivt(p)) == 1._r8) then
+            if ((leafn(p) + frootn(p) + livestemn(p) + deadstemn(p) + livecrootn(p) + deadcrootn(p)) > 0.0_r8) then
+                n_stress(p) = (2.0_r8 * (leafn(p) + frootn(p) + livestemn(p) + deadstemn(p) + livecrootn(p) + deadcrootn(p))  &
+                              - (leafn_storage(p) + frootn_storage(p) + livestemn_storage(p) + deadstemn_storage(p) + livecrootn_storage(p) & 
+                              + deadcrootn_storage(p) + npool(p)))                          &
+                              / (leafn(p) + frootn(p) + livestemn(p) + deadstemn(p) + livecrootn(p) + deadcrootn(p)) 
+            end if 
+             if (n_stress(p) < 0.0_r8) then
+                n_stress(p) = 0.05_r8
+             end if 
+         else 
+            if ((leafn(p) + frootn(p)) > 0.0_r8) then
+               n_stress(p) = (2.0_r8 *(leafn(p) + frootn(p)) - (leafn_storage(p) + frootn_storage(p) + npool(p))) / (leafn(p) + frootn(p))
+            end if 
+            if (n_stress(p) < 0.0_r8) then
+                n_stress(p) = 0.05_r8
+            end if 
+         end if        
+
+
          if(use_fun .or. decomp_method == mimicsplus_decomp)then ! in FUN, plant_ndemand is just used as a maximum draw on soil N pools. !ECWS
              plant_ndemand(p) = availc(p)*(n_allometry(p)/c_allometry(p))
+
          else !FUN
             if (laisun(p)+laisha(p) > 0.0_r8) then
                Vmax_N = 2.7E-8_r8

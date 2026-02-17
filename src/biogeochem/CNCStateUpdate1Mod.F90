@@ -435,7 +435,7 @@ contains
            cs_veg%cpool_patch(p) = cs_veg%cpool_patch(p) -  cf_veg%cpool_to_resp_patch(p) * dt
 
           if(decomp_method == mimicsplus_decomp) then 
-            cs_veg%cpool_patch(p)= cs_veg%cpool_patch(p) - symbiont_inst%C_allocation_to_N_acq(p)  * dt ! ECWBUG HERE I SUBSTRACT
+            cs_veg%cpool_patch(p)= cs_veg%cpool_patch(p) - symbiont_inst%C_allocation_to_N_acq(p)  * dt
           else           
            !RF Add in the carbon spent on uptake respiration. 
            cs_veg%cpool_patch(p)= cs_veg%cpool_patch(p) - cf_veg%soilc_change_patch(p)*dt

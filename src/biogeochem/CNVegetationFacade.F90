@@ -1561,7 +1561,7 @@ contains
     ! !ARGUMENTS:
     class(cn_vegetation_type), intent(in) :: this
     type(bounds_type), intent(in) :: bounds
-    real(r8)         , intent(in) :: tlai( bounds%begp: )
+    real(r8), intent(in), optional :: tlai( bounds%begp: )
     real(r8) :: froot_carbon_patch(bounds%begp:bounds%endp)  ! function result: (gC/m2)
     !
     ! !LOCAL VARIABLES:

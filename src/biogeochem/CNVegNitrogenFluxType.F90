@@ -286,19 +286,12 @@ module CNVegNitrogenFluxType
      real(r8), pointer :: sminn_to_symbiont_mimicsplus_vr_patch     (:,:)   ! Total layer soil N uptake of MIMICSplus    (gN/m2/s)
      real(r8), pointer :: smin_no3_to_symbiont_mimicsplus_vr_patch  (:,:)   ! Total layer no3 uptake of MIMICSplus       (gN/m2/s)
      real(r8), pointer :: smin_nh4_to_symbiont_mimicsplus_vr_patch  (:,:)   ! Total layer nh4 uptake of MIMICSplus       (gN/m2/s)
+     real(r8), pointer :: n_stress_patch                            (:)     ! 
      real(r8), pointer :: cost_nfix_patch                           (:)     ! Average cost of fixation          (gN/m2/s)
      real(r8), pointer :: cost_nactive_patch                        (:)     ! Average cost of active uptake     (gN/m2/s)
      real(r8), pointer :: cost_nretrans_patch                       (:)     ! Average cost of retranslocation   (gN/m2/s)
-     real(r8), pointer :: nuptake_npp_fraction_patch                (:)     ! frac of npp spent on N acquisition(gN/m2/s)
-   
-     ! MIMICS+
-     !real(r8), pointer :: N_mortality                        (:,:)
-     !real(r8), pointer :: somc_nuptake_col                   (:,:)    
-     !real(r8), pointer :: somp_nuptake_col                   (:,:)    
-     !real(r8), pointer :: N_mine_somc2soma_col               (:,:)
-     !real(r8), pointer :: N_mine_somp2soma_col               (:,:)
+     real(r8), pointer :: nuptake_npp_fraction_patch                (:)     ! frac of npp spent on N acquisition(gN/m2/s)    
      
-
 	 ! Matrix
      real(r8), pointer :: matrix_nalloc_patch                       (:,:)   ! B-matrix for nitrogen allocation
      real(r8), pointer :: matrix_Ninput_patch                       (:)     ! I-matrix for nitrogen input
@@ -1064,6 +1057,7 @@ contains
     allocate(this%sminn_to_plant_fun_no3_vr_patch (begp:endp,1:nlevdecomp_full));  this%sminn_to_plant_fun_no3_vr_patch      (:,:) = nan
     allocate(this%sminn_to_plant_fun_nh4_vr_patch (begp:endp,1:nlevdecomp_full)); this%sminn_to_plant_fun_nh4_vr_patch      (:,:) = nan
     allocate(this%n_to_plant_mimicsplus_patch    (begp:endp)); this%n_to_plant_mimicsplus_patch(:) = nan
+    allocate(this%n_stress_patch    (begp:endp)); this%n_stress_patch(:) = nan
     allocate(this%sminn_to_symbiont_mimicsplus_vr_patch (begp:endp,1:nlevdecomp_full)); this%sminn_to_symbiont_mimicsplus_vr_patch(:,:) = nan
     allocate(this%smin_no3_to_symbiont_mimicsplus_vr_patch (begp:endp,1:nlevdecomp_full)); this%smin_no3_to_symbiont_mimicsplus_vr_patch(:,:) = nan
     allocate(this%smin_nh4_to_symbiont_mimicsplus_vr_patch (begp:endp,1:nlevdecomp_full)); this%smin_nh4_to_symbiont_mimicsplus_vr_patch(:,:) = nan
@@ -1072,12 +1066,6 @@ contains
     allocate(this%cost_nretrans_patch          (begp:endp)) ;    this%cost_nretrans_patch        (:) = nan
     allocate(this%nuptake_npp_fraction_patch   (begp:endp)) ;    this%nuptake_npp_fraction_patch (:) = nan
 
-
-   !allocate(this%N_mortality           (begc:endc,1:nlevdecomp)) ; this%N_mortality      (:,:) = nan
-   !allocate(this%somc_nuptake_col      (begc:endc,1:nlevdecomp)) ; this%somc_nuptake_col      (:,:) = nan
-   !allocate(this%somp_nuptake_col      (begc:endc,1:nlevdecomp)) ; this%somp_nuptake_col      (:,:) = nan
-   !allocate(this%N_mine_somc2soma_col      (begc:endc,1:nlevdecomp)) ; this%N_mine_somc2soma_col      (:,:) = nan
-   !allocate(this%N_mine_somp2soma_col      (begc:endc,1:nlevdecomp)) ; this%N_mine_somp2soma_col      (:,:) = nan
 
 	! Matrix
     if(use_matrixcn)then
@@ -1830,7 +1818,7 @@ contains
           call hist_addfld1d (fname='NECM_NH4', units='gN/m^2/s',      &
                avgflag='A', long_name='ECM-associated N uptake flux',  &
                ptr_patch=this%Necm_nh4_patch)   
-       end if 
+         end if 
 
        this%Npassive_patch(begp:endp) = spval
        call hist_addfld1d (fname='NPASSIVE', units='gN/m^2/s',        &
@@ -1887,14 +1875,14 @@ contains
             avgflag='A', long_name='Cost of retranslocation',       &
             ptr_patch=this%cost_nretrans_patch)
             
-      this%nuptake_npp_fraction_patch(begp:endp)     = spval
-       call hist_addfld1d (fname='NUPTAKE_NPP_FRACTION', units='-',            &
-            avgflag='A', long_name='frac of NPP used in N uptake',       &
-            ptr_patch=this%nuptake_npp_fraction_patch)
+       this%nuptake_npp_fraction_patch(begp:endp)     = spval
+        call hist_addfld1d (fname='NUPTAKE_NPP_FRACTION', units='-',            &
+             avgflag='A', long_name='frac of NPP used in N uptake',       &
+             ptr_patch=this%nuptake_npp_fraction_patch)
                   
-    end if
+       end if
 
-    if (decomp_method == mimicsplus_decomp) then
+   if (decomp_method == mimicsplus_decomp) then
 
     this%n_to_plant_mimicsplus_patch(begp:endp) = spval
     call hist_addfld1d (fname='N_TO_PLANT_MIMICSPLUS', units='gN/m^2/s', &
@@ -1911,12 +1899,17 @@ contains
          avgflag='A', long_name='Symbiont soil nitrate N uptake', &
          ptr_patch=this%smin_no3_to_symbiont_mimicsplus_vr_patch)
    
-   this%smin_nh4_to_symbiont_mimicsplus_vr_patch(begp:endp,1:nlevdecomp_full) = spval
-    call hist_addfld2d (fname='SMINN_TO_SYMB_MIMICSPLUS_NH4', units='gN/m^2/s', type2d='levsoi', &
-         avgflag='A', long_name='Symbiont soil ammonium N uptake', &
-         ptr_patch=this%smin_nh4_to_symbiont_mimicsplus_vr_patch)
+    this%smin_nh4_to_symbiont_mimicsplus_vr_patch(begp:endp,1:nlevdecomp_full) = spval
+     call hist_addfld2d (fname='SMINN_TO_SYMB_MIMICSPLUS_NH4', units='gN/m^2/s', type2d='levsoi', &
+          avgflag='A', long_name='Symbiont soil ammonium N uptake', &
+          ptr_patch=this%smin_nh4_to_symbiont_mimicsplus_vr_patch)
 
-    end if 
+   end if 
+
+   this%n_stress_patch(begp:endp)     = spval
+      call hist_addfld1d (fname='N_STRESS', units='gN/gC',            &
+        avgflag='A', long_name='Nitrogen stress of plant based in N storage', & 
+        ptr_patch=this%n_stress_patch)
 
   end subroutine InitHistory
 
@@ -2022,6 +2015,8 @@ contains
        end if
 
        this%n_to_plant_mimicsplus_patch(p)   = 0._r8 !ECW suspicious
+       this%n_stress_patch(p)                = 0._r8
+
        do j = 1, nlevdecomp
           this%sminn_to_symbiont_mimicsplus_vr_patch(p,j)       = 0._r8
           this%smin_no3_to_symbiont_mimicsplus_vr_patch(p,j)   = 0._r8
@@ -2632,17 +2627,6 @@ contains
     end do
 
 
-  ! do fi = 1,num_column
-  !    i = filter_column(fi)
-  !   do j = 1, nlevdecomp
-  !        !MIMICS+
-  !       this%N_mortality(i,j)                      = value_column
-  !       this%somc_nuptake_col(i,j)                 = value_column
-  !       this%somp_nuptake_col(i,j)                 = value_column
-  !       this%N_mine_somc2soma_col(i,j)             = value_column
-  !       this%N_mine_somp2soma_col(i,j)             = value_column
-  !   end do
-  ! end do
  
   end subroutine SetValues
 
