@@ -741,6 +741,8 @@ contains
 
             ! Note that for high CN ratio stress the plant part does not retranslocate nitrogen as the plant part will need the N
             ! if high leaf CN ratio (i.e., high leaf C compared to N) then turnover extra C
+
+
             if (this%actual_storage_leafcn(p) > leafcn_max) then
 
                frac_resp =  (this%actual_storage_leafcn(p) - leafcn_max) / 10.0_r8
@@ -1564,13 +1566,14 @@ contains
          temp_scalar=t_scalar(c,1)
          temp_scalar = min( max(0.0_r8, temp_scalar), 1.0_r8 )
 
-         
+         ! Adding Npool or not to Nstress actually makes no difference
          n_stress(p) = 0.05_r8
          if (woody(ivt(p)) == 1._r8) then
             if ((leafn(p) + frootn(p) + livestemn(p) + deadstemn(p) + livecrootn(p) + deadcrootn(p)) > 0.0_r8) then
                 n_stress(p) = (2.0_r8 * (leafn(p) + frootn(p) + livestemn(p) + deadstemn(p) + livecrootn(p) + deadcrootn(p))  &
                               - (leafn_storage(p) + frootn_storage(p) + livestemn_storage(p) + deadstemn_storage(p) + livecrootn_storage(p) & 
-                              + deadcrootn_storage(p) + npool(p)))                          &
+                              + deadcrootn_storage(p) ))                          &
+                              !+ deadcrootn_storage(p) + npool(p)))                          &
                               / (leafn(p) + frootn(p) + livestemn(p) + deadstemn(p) + livecrootn(p) + deadcrootn(p)) 
             end if 
              if (n_stress(p) < 0.0_r8) then
@@ -1578,7 +1581,8 @@ contains
              end if 
          else 
             if ((leafn(p) + frootn(p)) > 0.0_r8) then
-               n_stress(p) = (2.0_r8 *(leafn(p) + frootn(p)) - (leafn_storage(p) + frootn_storage(p) + npool(p))) / (leafn(p) + frootn(p))
+               n_stress(p) = (2.0_r8 *(leafn(p) + frootn(p)) - (leafn_storage(p) + frootn_storage(p))) / (leafn(p) + frootn(p))
+               !  n_stress(p) = (2.0_r8 *(leafn(p) + frootn(p)) - (leafn_storage(p) + frootn_storage(p) + npool(p))) / (leafn(p) + frootn(p))
             end if 
             if (n_stress(p) < 0.0_r8) then
                 n_stress(p) = 0.05_r8
@@ -1718,7 +1722,7 @@ contains
             retransn_to_npool(p) = plant_ndemand(p)
          end if
 
-         if ( .not. use_fun ) then
+         if ( .not. (use_fun .or. decomp_method == mimicsplus_decomp)) then
             plant_ndemand(p) = plant_ndemand(p) - retransn_to_npool(p)
          end if
 

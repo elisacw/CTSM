@@ -514,6 +514,10 @@ contains
 
        ! based on available C, use constant allometric relationships to
        ! determine N requirements
+       !ECW here we might be able to change the code so that we don't use grperc in mimics+, and rather use it here
+       ! if (decomp_method == mimicsplus_decomp) then
+          ! g1a = g1
+       ! end if 
        if (.not. (use_fun .or. decomp_method == mimicsplus_decomp)) then
           g1a = g1
        else

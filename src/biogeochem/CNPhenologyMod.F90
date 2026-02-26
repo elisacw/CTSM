@@ -3370,6 +3370,7 @@ contains
     
     use CNSharedParamsMod, only : use_fun
     use clm_varctl       , only : CNratio_floating, crop_residue_removal_frac
+    use SoilBiogeochemDecompCascadeConType , only : decomp_method, mimicsplus_decomp
     !
     ! !ARGUMENTS:
     integer                       , intent(in)    :: num_soilp       ! number of soil patches in filter
@@ -3717,7 +3718,7 @@ contains
                end if !use_matrixcn
             end if
             
-            if ( use_fun ) then
+            if ( use_fun .or. (decomp_method == mimicsplus_decomp)) then
                if(leafc_to_litter(p)*dt.gt.leafc(p))then
                    leafc_to_litter(p) = leafc(p)/dt + cpool_to_leafc(p)
                   if (use_matrixcn) then
