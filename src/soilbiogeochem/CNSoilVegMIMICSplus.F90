@@ -153,6 +153,7 @@ contains
     this%symb_hist_name(i_fixer) = 'FIX'
     this%symb_hist_name(i_scav)  = 'SCAV'
     this%symb_hist_name(i_miner) = 'MINE'
+
     
     do p = bounds%begp,bounds%endp
       iveg = patch%itype(p)
@@ -880,8 +881,8 @@ contains
    n_to_plant_mimicsplus(bounds%begp:bounds%endp)           = 0.0_r8
    
 
-   ! Scavenging (AM-style)
-   if (is_active(p,i_scav)) then  
+   ! Scavenging (AM-style) - subroutine loops over all patches internally
+   if (any(is_active(bounds%begp:bounds%endp, i_scav))) then  
       call myc_scavenger_N_uptake(filter_soilp, filter_bgc_soilc, num_soilp, num_bgc_soilc, &
                                     bounds, symbiont_inst, norm_froot_prof(begp:endp,1:nlevdecomp), &
                                     smin_no3_avail(begp:endp,1:nlevdecomp), smin_nh4_avail(begp:endp,1:nlevdecomp), &
@@ -889,14 +890,14 @@ contains
    end if
 
    ! Mycorrhizal N mining (ECM-style)
-   if (is_active(p,i_miner)) then 
+   if (any(is_active(bounds%begp:bounds%endp, i_miner))) then 
       call myc_miner_N_uptake(filter_soilp, filter_bgc_soilc, num_soilp, num_bgc_soilc, &
-                                bounds, symbiont_inst, temperature_inst, soilstate_inst, waterstatebulk_inst, &
-                                soilbiogeochem_carbonstate_inst, soilbiogeochem_nitrogenstate_inst, &
-                                norm_froot_prof(begp:endp,1:nlevdecomp), &
-                                somc_nuptake(begp:endp,1:nlevdecomp), somp_nuptake(begp:endp,1:nlevdecomp), &
-                                somc_cuptake(begp:endp,1:nlevdecomp), somp_cuptake(begp:endp,1:nlevdecomp), &
-                                N_mine_somc2soma(begp:endp,1:nlevdecomp), N_mine_somp2soma(begp:endp,1:nlevdecomp))
+                              bounds, symbiont_inst, temperature_inst, soilstate_inst, waterstatebulk_inst, &
+                              soilbiogeochem_carbonstate_inst, soilbiogeochem_nitrogenstate_inst, &
+                              norm_froot_prof(begp:endp,1:nlevdecomp), &
+                              somc_nuptake(begp:endp,1:nlevdecomp), somp_nuptake(begp:endp,1:nlevdecomp), &
+                              somc_cuptake(begp:endp,1:nlevdecomp), somp_cuptake(begp:endp,1:nlevdecomp), &
+                              N_mine_somc2soma(begp:endp,1:nlevdecomp), N_mine_somp2soma(begp:endp,1:nlevdecomp))
    end if
 
    ! Active root uptake 
@@ -1145,14 +1146,14 @@ contains
 
              if (N_reservoir(p,i) .eq. 0._r8) then
                 write(iulog,*) 'WARNING: N_res_'//trim(symb_name(i))//' is 0'
-             else if (C_reservoir(p,i) < 0._r8) then 
+             else if (N_reservoir(p,i) < 0._r8) then 
                 call endrun(msg = 'ERROR: N_res_'//trim(symb_name(i))//' is negative' // &
                     errMsg(sourcefile, __LINE__))
              endif
        
-             if (C_biomass(p,i) .eq. 0._r8) then
+             if (N_biomass(p,i) .eq. 0._r8) then
                 write(iulog,*) 'WARNING: N_bio_'//trim(symb_name(i))//' is 0'
-             else if (C_biomass(p,i) < 0._r8) then 
+             else if (N_biomass(p,i) < 0._r8) then 
                 call endrun(msg = 'ERROR: N_bio_'//trim(symb_name(i))//' is negative' // &
                     errMsg(sourcefile, __LINE__))
              endif
@@ -1189,7 +1190,7 @@ contains
       else
          N_to_plant(p,i_miner) = 0.0_r8
       endif
-         if (is_active(p,i_fixer)) then 
+      if (is_active(p,i_fixer)) then 
          N_to_plant(p,i_fixer) = N_reservoir(p,i_fixer) * params_inst%sulman_rup_veg
       else
          N_to_plant(p,i_fixer) = 0.0_r8
@@ -1973,7 +1974,7 @@ contains
    if (is_active(p,i_miner)) then
       !N_to_plant(p,i_miner) = N_reservoir(p,i_miner) * params_inst%sulman_rup_veg 
       if (C_biomass(p,i_miner) > 0.0_r8) then 
-         mine_roi(p) = ((max(0.0_r8, N_to_plant(p,i_miner))) / (C_biomass(p,i_miner))) * params_inst%symbiont_CUE(i_miner) / (params_inst%symbiont_tau(i_miner))
+         mine_roi(p) = (max(0.0_r8, N_to_plant(p,i_miner))) / (C_biomass(p,i_miner) * params_inst%symbiont_CUE(i_miner) * (params_inst%symbiont_tau(i_miner)))
       else 
          ! mine is calculated in one of the mining routines under myc_efficiency
          mine_roi(p) = symb_eff(p,i_miner) / (params_inst%symbiont_CUE(i_miner) * (params_inst%symbiont_tau(i_miner) * dt))
@@ -1993,7 +1994,7 @@ contains
    if (is_active(p,i_fixer)) then
       !N_to_plant(p,i_fixer) = N_reservoir(p,i_fixer) * params_inst%sulman_rup_veg
       if (C_biomass(p,i_fixer) > 0.0_r8) then 
-         fix_roi(p) = ((N_to_plant(p,i_fixer)) / (C_biomass(p,i_fixer))) * params_inst%symbiont_CUE(i_fixer) / (params_inst%symbiont_tau(i_fixer))
+         fix_roi(p) = ((N_to_plant(p,i_fixer)) / (C_biomass(p,i_fixer))) * params_inst%symbiont_CUE(i_fixer) * (params_inst%symbiont_tau(i_fixer))
       else 
          fix_roi(p) =  params_inst%sulman_rfix / params_inst%symbiont_CUE(i_fixer) * params_inst%symbiont_tau(i_fixer)
       end if 
