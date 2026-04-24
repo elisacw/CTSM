@@ -105,6 +105,7 @@ contains
     
      use CNSharedParamsMod               , only : use_fun
      use CNSoilVegMIMICSplus             , only : symbiont_type
+     use SoilBiogeochemDecompCascadeMIMICSMod, only : params_inst
     !
     ! !DESCRIPTION:
     ! On the radiation time step, update all the prognostic nitrogen state
@@ -128,16 +129,14 @@ contains
     integer :: fp,fc     ! lake filter indices
     real(r8):: dt        ! radiation time step (seconds)
 
-    real(r8), parameter :: symb_tau_soma = 0.2_r8 !ECW Flux in SOMc & SOMp pools is higher, as mycorrhizal necromass is harder to decompose
-    real(r8), parameter :: symb_tau_somc = 0.4_r8
-    real(r8), parameter :: symb_tau_somp = 0.4_r8
     !-----------------------------------------------------------------------
 
-
-
     associate(                                                                   & 
-         ivt                   => patch%itype                                    , & ! Input:  [integer  (:)     ]  patch vegetation type                                
+         ivt                   => patch%itype                                  , & ! Input:  [integer  (:)     ]  patch vegetation type                                
          mimics_fi             => pftcon%mimics_fi                             , & ! Input:  MIMICS parameter fi
+         symb_tau_soma         => params_inst%symbiont_tau_som(1)              , & ! Fraction symbiont necromass into SOM pools, 
+         symb_tau_somc         => params_inst%symbiont_tau_som(2)              , & ! Flux in SOMc & SOMp pools is higher, as mycorrhizal necromass is harder to decompose [-]
+         symb_tau_somp         => params_inst%symbiont_tau_som(3)              , &
          woody                 => pftcon%woody                                 , & ! Input:  binary flag for woody lifeform (1=woody, 0=not woody)
          nf_veg                => cnveg_nitrogenflux_inst                      , & ! Input:
          ns_veg                => cnveg_nitrogenstate_inst                     , & ! Output:

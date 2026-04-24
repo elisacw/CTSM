@@ -1573,7 +1573,6 @@ contains
                 n_stress(p) = (2.0_r8 * (leafn(p) + frootn(p) + livestemn(p) + deadstemn(p) + livecrootn(p) + deadcrootn(p))  &
                               - (leafn_storage(p) + frootn_storage(p) + livestemn_storage(p) + deadstemn_storage(p) + livecrootn_storage(p) & 
                               + deadcrootn_storage(p) ))                          &
-                              !+ deadcrootn_storage(p) + npool(p)))                          &
                               / (leafn(p) + frootn(p) + livestemn(p) + deadstemn(p) + livecrootn(p) + deadcrootn(p)) 
             end if 
              if (n_stress(p) < 0.0_r8) then

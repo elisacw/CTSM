@@ -282,6 +282,8 @@ module pftconMod
      real(r8), allocatable :: fun_cn_flex_b (:)   ! Parameter b of FUN-flexcn link code (def 200)
      real(r8), allocatable :: fun_cn_flex_c (:)   ! Parameter b of FUN-flexcn link code (def 80)         
      real(r8), allocatable :: FUN_fracfixers(:)   ! Fraction of C that can be used for fixation.    
+     real(r8), allocatable :: fixer_symbiont(:)   ! Fraction of C that can be used for fixation.    
+
 
 
    contains
@@ -500,6 +502,7 @@ contains
     allocate( this%fun_cn_flex_b (0:mxpft) )
     allocate( this%fun_cn_flex_c (0:mxpft) )
     allocate( this%FUN_fracfixers(0:mxpft) )
+    allocate( this%fixer_symbiont(0:mxpft) )
     
     allocate( this%dbh           (0:mxpft) )
     allocate( this%fbw           (0:mxpft) )
@@ -921,6 +924,9 @@ contains
     if ( .not. readv ) call endrun(msg=' ERROR: error in reading in pft data'//errMsg(sourcefile, __LINE__))
   
     call ncd_io('FUN_fracfixers', this%FUN_fracfixers, 'read', ncid, readvar=readv,         posNOTonfile=.true.)
+    if ( .not. readv ) call endrun(msg=' ERROR: error in reading in pft data'//errMsg(sourcefile, __LINE__))
+
+    call ncd_io('fixer_symbiont', this%fixer_symbiont, 'read', ncid, readvar=readv,         posNOTonfile=.true.)
     if ( .not. readv ) call endrun(msg=' ERROR: error in reading in pft data'//errMsg(sourcefile, __LINE__))
 
     call ncd_io('manunitro', this%manunitro, 'read', ncid, readvar=readv, posNOTonfile=.true.)
@@ -1598,6 +1604,7 @@ contains
     deallocate( this%fun_cn_flex_b)
     deallocate( this%fun_cn_flex_c)
     deallocate( this%FUN_fracfixers)
+    deallocate( this%fixer_symbiont)
     
     deallocate( this%dbh)
     deallocate( this%fbw)

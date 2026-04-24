@@ -153,7 +153,6 @@ module SoilBiogeochemDecompCascadeMIMICSMod
      real(r8), allocatable :: mimics_tau_r(:)
      real(r8), allocatable :: mimics_tau_k(:)
 
-     real(r8), allocatable :: sulman_initial_C_stocks(:) !Initial carbon stocks of fixers, miners, scavengers as an array
      real(r8), allocatable :: symbiont_CUE(:)            !Symbiont growth efficiency / CUE [-]
      real(r8), allocatable :: symbiont_tau(:)            ! Turnover of symbionts [s-1]
 
@@ -491,11 +490,6 @@ contains
     allocate(params_inst%sulman_cn_symbionts(3))
     tString='sulman_cn_symbionts'
     call ncd_io(trim(tString), params_inst%sulman_cn_symbionts(:), 'read', ncid, readvar=readv)
-    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
-
-    allocate(params_inst%sulman_initial_C_stocks(3))
-    tString='sulman_initial_C_stocks'
-    call ncd_io(trim(tString), params_inst%sulman_initial_C_stocks(:), 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
 
     allocate(params_inst%symbiont_CUE(3))

@@ -7,7 +7,7 @@
 ./xmlchange DATM_PRESNDEP=SSP3-7.0
 ./xmlchange DATM_PRESO3=SSP3-7.0
 # Explicitly set the MPI library to mpi-serial so won't have the build/run complexity of a full MPI library
-./xmlchange MPILIB=mpi-serial
+#./xmlchange MPILIB=mpi-serial
 # Set years to run forcing data over
 ./xmlchange DATM_YR_ALIGN=2018,DATM_YR_END=2021,DATM_YR_START=2018
 #

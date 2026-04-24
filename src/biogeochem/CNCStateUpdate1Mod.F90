@@ -151,6 +151,8 @@ contains
     use clm_varctl    , only : carbon_resp_opt
     use CNVegMatrixMod, only : matrix_update_phc
     use CNSoilVegMIMICSplus, only: symbiont_type
+    use SoilBiogeochemDecompCascadeMIMICSMod, only : params_inst
+
     ! !ARGUMENTS:
     integer                              , intent(in)    :: num_soilc       ! number of soil columns filter
     integer                              , intent(in)    :: filter_soilc(:) ! filter for soil columns
@@ -160,7 +162,7 @@ contains
     type(cnveg_carbonflux_type)          , intent(inout) :: cnveg_carbonflux_inst ! See note below for xsmrpool_to_atm_patch
     type(cnveg_carbonstate_type)         , intent(inout) :: cnveg_carbonstate_inst
     type(soilbiogeochem_carbonflux_type) , intent(inout) :: soilbiogeochem_carbonflux_inst
-    type(symbiont_type)                  , intent(inout) :: symbiont_inst 
+    type(symbiont_type)                  , intent(inout) :: symbiont_inst
     
     logical                              , intent(in)    :: dribble_crophrv_xsmrpool_2atm
     type(hlm_fates_interface_type)       , intent(inout) :: clm_fates
@@ -173,14 +175,14 @@ contains
     real(r8) :: check_cpool
     real(r8) :: cpool_delta
     real(r8), parameter :: kprod05 = 1.44e-7_r8   ! decay constant for 0.5-year product pool (1/s) (lose ~90% over a half year)
-    real(r8), parameter :: symb_tau_soma = 0.2_r8 !ECW Flux in SOMc & SOMp pools is higher, as mycorrhizal necromass is harder to decompose
-    real(r8), parameter :: symb_tau_somc = 0.4_r8
-    real(r8), parameter :: symb_tau_somp = 0.4_r8
-    !-----------------------------------------------------------------------
+    !---------------------------------------------------------------------
 
     associate(                                                               & 
          ivt                   => patch%itype                              , & ! Input:  [integer  (:)     ]  patch vegetation type                                
          mimics_fi             => pftcon%mimics_fi                         , & ! Input: MIMICSplus parameter fi        
+         symb_tau_soma         => params_inst%symbiont_tau_som(1)          , & ! Fraction symbiont necromass into SOM pools, 
+         symb_tau_somc         => params_inst%symbiont_tau_som(2)          , & ! Flux in SOMc & SOMp pools is higher, as mycorrhizal necromass is harder to decompose [-]
+         symb_tau_somp         => params_inst%symbiont_tau_som(3)          , &
          woody                 => pftcon%woody                             , & ! Input:  binary flag for woody lifeform (1=woody, 0=not woody)
          cascade_donor_pool    => decomp_cascade_con%cascade_donor_pool    , & ! Input:  [integer  (:)     ]  which pool is C taken from for a given decomposition step
          cascade_receiver_pool => decomp_cascade_con%cascade_receiver_pool , & ! Input:  [integer  (:)     ]  which pool is C added to for a given decomposition step
