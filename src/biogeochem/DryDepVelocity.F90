@@ -58,6 +58,7 @@ Module DryDepVelocity
   use shr_kind_mod         , only : r8 => shr_kind_r8
   use abortutils           , only : endrun
   use clm_time_manager     , only : get_nstep, get_curr_date, get_curr_time
+  use clm_varcon           , only : ispval
   use spmdMod              , only : masterproc
   use shr_drydep_mod       , only : n_drydep, drydep_list
   use shr_drydep_mod       , only : index_o3=>o3_ndx, index_o3a=>o3a_ndx, index_so2=>so2_ndx, index_h2=>h2_ndx
@@ -84,7 +85,8 @@ Module DryDepVelocity
 
      real(r8), pointer, public  :: velocity_patch (:,:) ! Dry Deposition Velocity
      real(r8), pointer, private :: rs_drydep_patch (:)  ! Stomatal resistance associated with dry deposition velocity for Ozone
-
+     integer ,  pointer :: wesley_veg_index_patch   (:)   ! Wesley PFT index for FATES dry deposition calculations
+     integer ,  pointer :: wesley_season_index_patch (:)   ! Season for dry deposition calculations
    contains
 
      procedure , public  :: Init
@@ -136,8 +138,11 @@ CONTAINS
 
     ! Dry Deposition Velocity
     if ( n_drydep > 0 )then
-       allocate(this%velocity_patch(begp:endp, n_drydep));  this%velocity_patch(:,:) = nan
-       allocate(this%rs_drydep_patch(begp:endp))         ;  this%rs_drydep_patch(:)  = nan
+       allocate(this%velocity_patch(begp:endp, n_drydep))    ;  this%velocity_patch(:,:) = nan
+       allocate(this%rs_drydep_patch(begp:endp))             ;  this%rs_drydep_patch(:)  = nan
+       allocate(this%wesley_veg_index_patch   (begp:endp))   ;  this%wesley_veg_index_patch(:) = ispval
+       allocate(this%wesley_season_index_patch   (begp:endp));  this%wesley_season_index_patch(:) = ispval
+       
     end if
 
   end subroutine InitAllocate
@@ -206,8 +211,9 @@ CONTAINS
     use pftconMod      , only : nbrdlf_evr_shrub, nbrdlf_dcd_tmp_shrub
     use pftconMod      , only : nbrdlf_dcd_brl_shrub,nc3_arctic_grass
     use pftconMod      , only : nc3_nonarctic_grass, nc4_grass, nc3crop
-    use pftconMod      , only : nc3irrig, npcropmin, npcropmax
+    use pftconMod      , only : nc3irrig, is_prognostic_crop
     use clm_varcon     , only : spval
+    use clm_varctl     , only : use_fates
 
     !
     ! !ARGUMENTS:
@@ -309,7 +315,9 @@ CONTAINS
          annlai     =>    canopystate_inst%annlai_patch         , & ! Input:  [real(r8) (:,:) ] 12 months of monthly lai from input data set
 
          velocity   =>    drydepvel_inst%velocity_patch         , & ! Output: [real(r8) (:,:) ] cm/sec
-         rs_drydep  =>    drydepvel_inst%rs_drydep_patch          & ! Output: [real(r8) (:)   ]  stomatal resistance associated with Ozone dry deposition velocity (s/m)
+         rs_drydep  =>    drydepvel_inst%rs_drydep_patch        ,  & ! Output: [real(r8) (:)   ]  stomatal resistance associated with Ozone dry deposition velocity (s/m)
+         wesley_veg_index    =>  drydepvel_inst%wesley_veg_index_patch , &  ! Input:  [integer (:)   ] wesely vegegation index if calculated elsewhere (f.e. in FATES)
+         wesley_season_index =>  drydepvel_inst%wesley_season_index_patch & ! Input:  [integer (:)   ] wesely season index if calculated elsewhere (f.e. in FATES)
          )
 
       !_________________________________________________________________
@@ -329,36 +337,55 @@ CONTAINS
             solar_flux = forc_solad(c,1)
             lat        = grc%latdeg(g)
             lon        = grc%londeg(g)
-            clmveg     = patch%itype(pi)
+            
             soilw      = h2osoi_vol(c,1)
 
             !map CLM veg type into Wesely veg type
             wesveg = wveg_unset
-            if (clmveg == noveg                               ) wesveg = 8
-            if (clmveg == ndllf_evr_tmp_tree                  ) wesveg = 5
-            if (clmveg == ndllf_evr_brl_tree                  ) wesveg = 5
-            if (clmveg == ndllf_dcd_brl_tree                  ) wesveg = 5
-            if (clmveg == nbrdlf_evr_trp_tree                 ) wesveg = 4
-            if (clmveg == nbrdlf_evr_tmp_tree                 ) wesveg = 4
-            if (clmveg == nbrdlf_dcd_trp_tree                 ) wesveg = 4
-            if (clmveg == nbrdlf_dcd_tmp_tree                 ) wesveg = 4
-            if (clmveg == nbrdlf_dcd_brl_tree                 ) wesveg = 4
-            if (clmveg == nbrdlf_evr_shrub                    ) wesveg = 11
-            if (clmveg == nbrdlf_dcd_tmp_shrub                ) wesveg = 11
-            if (clmveg == nbrdlf_dcd_brl_shrub                ) wesveg = 11
-            if (clmveg == nc3_arctic_grass                    ) wesveg = 3
-            if (clmveg == nc3_nonarctic_grass                 ) wesveg = 3
-            if (clmveg == nc4_grass                           ) wesveg = 3
-            if (clmveg == nc3crop                             ) wesveg = 2
-            if (clmveg == nc3irrig                            ) wesveg = 2
-            if (clmveg >= npcropmin .and. clmveg <= npcropmax ) wesveg = 2
+            clmveg     = patch%itype(pi) ! this will be spval if fates is on.
+            if (patch%is_fates(pi))then
+               wesveg = wesley_veg_index(pi)
+            else
+               if (clmveg == noveg                               ) wesveg = 8
+               if (clmveg == ndllf_evr_tmp_tree                  ) wesveg = 5
+               if (clmveg == ndllf_evr_brl_tree                  ) wesveg = 5
+               if (clmveg == ndllf_dcd_brl_tree                  ) wesveg = 5
+               if (clmveg == nbrdlf_evr_trp_tree                 ) wesveg = 4
+               if (clmveg == nbrdlf_evr_tmp_tree                 ) wesveg = 4
+               if (clmveg == nbrdlf_dcd_trp_tree                 ) wesveg = 4
+               if (clmveg == nbrdlf_dcd_tmp_tree                 ) wesveg = 4
+               if (clmveg == nbrdlf_dcd_brl_tree                 ) wesveg = 4
+               if (clmveg == nbrdlf_evr_shrub                    ) wesveg = 11
+               if (clmveg == nbrdlf_dcd_tmp_shrub                ) wesveg = 11
+               if (clmveg == nbrdlf_dcd_brl_shrub                ) wesveg = 11
+               if (clmveg == nc3_arctic_grass                    ) wesveg = 3
+               if (clmveg == nc3_nonarctic_grass                 ) wesveg = 3
+               if (clmveg == nc4_grass                           ) wesveg = 3
+               if (clmveg == nc3crop                             ) wesveg = 2
+               if (clmveg == nc3irrig                            ) wesveg = 2
+               if (is_prognostic_crop(clmveg)) wesveg = 2
+            endif
+
+
             if (wesveg == wveg_unset )then
                write(iulog,*) 'clmveg = ', clmveg, 'lun%itype = ', lun%itype(l)
                call endrun(subgrid_index=pi, subgrid_level=subgrid_level_patch, &
                     msg='ERROR: Not able to determine Wesley vegetation type'//&
                     errMsg(sourcefile, __LINE__))
             end if
+            
 
+             if(wesveg<0 .or. wesveg>11 )then
+                if (use_fates) then
+                   call endrun(subgrid_index=pi, subgrid_level=subgrid_level_patch, &
+                        msg='ERROR: FATES could not determine Wesley vegetation type'//&
+                        errMsg(sourcefile, __LINE__))
+                else
+                   call endrun(subgrid_index=pi, subgrid_level=subgrid_level_patch, &
+                        msg='ERROR: No sensible Wesley vegetation type '//&
+                        errMsg(sourcefile, __LINE__))
+                endif
+             endif
             ! create seasonality index used to index wesely data tables from LAI,  Bascially
             !if elai is between max lai from input data and half that max the index_season=1
 
@@ -376,12 +403,13 @@ CONTAINS
             ! 4 - Winter, snow on ground and subfreezing
             ! 5 - Transitional spring with partially green short annuals
 
-
-            !mlaidiff=jan-feb
-            minlai=minval(annlai(:,pi))
-            maxlai=maxval(annlai(:,pi))
-
-            index_season = -1
+            if(.not. use_fates)then !for non-FATES runs we use satellite phenology to choose the season for the ressistance parameters. 
+               !mlaidiff=jan-feb
+               minlai=minval(annlai(:,pi))
+               maxlai=maxval(annlai(:,pi))
+            endif
+            
+               index_season = -1
 
             if ( lun%itype(l) /= istsoil )then
                if ( lun%itype(l) == istice ) then
@@ -399,27 +427,38 @@ CONTAINS
                end if
             else if ( snow_depth(c) > 0 ) then
                index_season = 4
-            else if(elai(pi) > 0.5_r8*maxlai) then
+            else if( (.not. use_fates) .and. elai(pi) > 0.5_r8*maxlai) then
                index_season = 1
             endif
-
-            if (index_season<0) then
-               if (elai(pi) < (minlai+0.05_r8*(maxlai-minlai))) then
-                  index_season = 3
+            
+            if(use_fates.and.index_season<1)then 
+               if(patch%is_fates(pi))then
+                  index_season = wesley_season_index(pi)
+               else
+                  index_season = 3 !set bare autumn season for bare ground
                endif
-            endif
+               
+            else ! not fates
 
-            if (index_season<0) then
-               if (mlaidiff(pi) > 0.0_r8) then
-                  index_season = 2
-               elseif (mlaidiff(pi) < 0.0_r8) then
-                  index_season = 5
-               elseif (mlaidiff(pi).eq.0.0_r8) then
-                  index_season = 3
+               if (index_season<0) then
+                  if (elai(pi) < (minlai+0.05_r8*(maxlai-minlai))) then
+                     index_season = 3
+                  endif
                endif
-            endif
 
-            if (index_season<0) then
+               if (index_season<0) then
+                  if (mlaidiff(pi) > 0.0_r8) then
+                     index_season = 2
+                  elseif (mlaidiff(pi) < 0.0_r8) then
+                     index_season = 5
+                  elseif (mlaidiff(pi).eq.0.0_r8) then
+                     index_season = 3
+                  endif
+               endif
+               
+            endif ! use_fates
+            
+            if (index_season<0.or.index_season>5) then
                call endrun('ERROR: not able to determine season'//errmsg(sourcefile, __LINE__))
             endif
 
@@ -472,7 +511,6 @@ CONTAINS
 
                ! correction for frost
                cts = 1000._r8*exp( -tc - 4._r8 )
-
                !ground resistance
                rgsx(ispec) = 1._r8/((heff(ispec)/(1.e5_r8*(rgss(index_season,wesveg)+cts))) + &
                     (foxd(ispec)/(rgso(index_season,wesveg)+cts)))
@@ -480,6 +518,7 @@ CONTAINS
                !-------------------------------------------------------------------------------------
                ! special case for H2 and CO;; CH4 is set ot a fraction of dv(H2)
                !-------------------------------------------------------------------------------------
+
                if( ispec == index_h2 .or. ispec == index_co .or. ispec == index_ch4 ) then
 
                   if( ispec == index_co ) then

@@ -29,10 +29,11 @@ module CanopyStateType
      real(r8) , pointer :: elai_patch               (:)   ! patch canopy one-sided leaf area index with burying by snow
      real(r8) , pointer :: esai_patch               (:)   ! patch canopy one-sided stem area index with burying by snow
 
-     real(r8) , pointer :: tlai_hist_patch               (:)   ! patch canopy one-sided leaf area index, for SP mode
-     real(r8) , pointer :: tsai_hist_patch               (:)   ! patch canopy one-sided stem area index, for SP mode
-     real(r8) , pointer :: htop_hist_patch               (:)   ! patch canopy height, for SP mode
-
+     real(r8) , pointer :: tlai_input_patch          (:)   ! patch canopy one-sided leaf area index driver data for SP mode (no burying by snow)
+     real(r8) , pointer :: tsai_input_patch          (:)   ! patch canopy one-sided stem area index driver data for SP mode (no burying by snow)
+     real(r8) , pointer :: htop_input_patch          (:)   ! patch canopy height driver data for SP mode
+     real(r8) , pointer :: hbot_input_patch          (:)   ! patch canopy bottom driver data for SP mode
+     
      real(r8) , pointer :: elai240_patch            (:)   ! patch canopy one-sided leaf area index with burying by snow average over 10days
      real(r8) , pointer :: laisun_patch             (:)   ! patch patch sunlit projected leaf area index
      real(r8) , pointer :: laisha_patch             (:)   ! patch patch shaded projected leaf area index
@@ -50,8 +51,10 @@ module CanopyStateType
      real(r8) , pointer :: fsun24_patch             (:)   ! patch 24hr average of sunlit fraction of canopy
      real(r8) , pointer :: fsun240_patch            (:)   ! patch 240hr average of sunlit fraction of canopy
 
-     real(r8) , pointer :: dleaf_patch              (:)   ! patch characteristic leaf width (diameter) [m]
-                                                          ! for non-ED/FATES this is the same as pftcon%dleaf()
+     real(r8) , pointer :: dleaf_patch              (:)   ! patch characteristic leaf width (diameter) [m]  for non-ED/FATES this is the same as pftcon%dleaf()          
+
+     integer ,  pointer :: voc_pftindex_patch      (:)   ! FATES specific MEGAN pft index. 
+
      real(r8) , pointer :: rscanopy_patch           (:)   ! patch canopy stomatal resistance (s/m) (ED specific)
 
      real(r8) , pointer :: vegwp_patch              (:,:) ! patch vegetation water matric potential (mm)
@@ -119,9 +122,10 @@ contains
 
     allocate(this%frac_veg_nosno_patch     (begp:endp))           ; this%frac_veg_nosno_patch     (:)   = huge(1)
     allocate(this%frac_veg_nosno_alb_patch (begp:endp))           ; this%frac_veg_nosno_alb_patch (:)   = 0
-    allocate(this%tlai_hist_patch          (begp:endp))           ; this%tlai_hist_patch          (:)   = nan
-    allocate(this%tsai_hist_patch          (begp:endp))           ; this%tsai_hist_patch          (:)   = nan
-    allocate(this%htop_hist_patch          (begp:endp))           ; this%htop_hist_patch          (:)   = nan
+    allocate(this%tlai_input_patch         (begp:endp))           ; this%tlai_input_patch         (:)   = nan
+    allocate(this%tsai_input_patch         (begp:endp))           ; this%tsai_input_patch         (:)   = nan
+    allocate(this%htop_input_patch         (begp:endp))           ; this%htop_input_patch         (:)   = nan
+    allocate(this%hbot_input_patch         (begp:endp))           ; this%hbot_input_patch         (:)   = nan
     allocate(this%tlai_patch               (begp:endp))           ; this%tlai_patch               (:)   = nan
     allocate(this%tsai_patch               (begp:endp))           ; this%tsai_patch               (:)   = nan
     allocate(this%elai_patch               (begp:endp))           ; this%elai_patch               (:)   = nan
@@ -144,6 +148,7 @@ contains
     allocate(this%fsun240_patch            (begp:endp))           ; this%fsun240_patch            (:)   = nan
 
     allocate(this%dleaf_patch              (begp:endp))           ; this%dleaf_patch              (:)   = nan
+    allocate(this%voc_pftindex_patch       (begp:endp))           ; this%voc_pftindex_patch       (:)   = 0    
     allocate(this%rscanopy_patch           (begp:endp))           ; this%rscanopy_patch           (:)   = nan
 !    allocate(this%gccanopy_patch           (begp:endp))           ; this%gccanopy_patch           (:)   = 0.0_r8
     allocate(this%vegwp_patch              (begp:endp,1:nvegwcs)) ; this%vegwp_patch              (:,:) = nan
@@ -217,10 +222,10 @@ contains
             ptr_patch=this%displa_patch, default='inactive', l2g_scale_type='veg')
 
        if(use_fates_sp)then
-          this%htop_hist_patch(begp:endp) = spval
+          this%htop_input_patch(begp:endp) = spval
           call hist_addfld1d (fname='HTOP', units='m', &
               avgflag='A', long_name='HTOP weights for SP mode', &
-              ptr_patch=this%htop_hist_patch)
+              ptr_patch=this%htop_input_patch)
        else
           this%htop_patch(begp:endp) = spval
           call hist_addfld1d (fname='HTOP', units='m', &
@@ -230,15 +235,15 @@ contains
     endif
 
     if(use_fates_sp)then
-      this%tlai_hist_patch(begp:endp) = spval
+      this%tlai_input_patch(begp:endp) = spval
       call hist_addfld1d (fname='TLAI', units='m', &
           avgflag='A', long_name='TLAI weights for SP mode', &
-          ptr_patch=this%tlai_hist_patch)
+          ptr_patch=this%tlai_input_patch)
 
-      this%tsai_hist_patch(begp:endp) = spval
+      this%tsai_input_patch(begp:endp) = spval
       call hist_addfld1d (fname='TSAI', units='m', &
           avgflag='A', long_name='TSAI weights for SP mode', &
-          ptr_patch=this%tsai_hist_patch)
+          ptr_patch=this%tsai_input_patch)
 
     else
        this%tlai_patch(begp:endp) = spval
@@ -294,11 +299,11 @@ contains
        this%vegwp_ln_patch(begp:endp,:) = spval
        call hist_addfld2d (fname='VEGWPLN',  units='mm', type2d='nvegwcs', &
             avgflag='A', long_name='vegetation water matric potential for sun/sha canopy,xyl,root at local noon', &
-            ptr_patch=this%vegwp_ln_patch, default='active')
+            ptr_patch=this%vegwp_ln_patch, default='inactive')
        this%vegwp_pd_patch(begp:endp,:) = spval
        call hist_addfld2d (fname='VEGWPPD',  units='mm', type2d='nvegwcs', avgflag='A', &
             long_name='predawn vegetation water matric potential for sun/sha canopy,xyl,root', &
-            ptr_patch=this%vegwp_pd_patch, default='active')
+            ptr_patch=this%vegwp_pd_patch, default='inactive')
     end if
 
   end subroutine InitHistory
@@ -541,10 +546,11 @@ contains
           this%laisha_patch(p) = 0._r8
        end if
 
-       this%tlai_hist_patch(p)       = 0._r8
-       this%tsai_hist_patch(p)       = 0._r8
-       this%htop_hist_patch(p)       = 0._r8
-
+       this%tlai_input_patch(p)       = 0._r8
+       this%tsai_input_patch(p)       = 0._r8
+       this%htop_input_patch(p)       = 0._r8
+       this%hbot_input_patch(p)       = 0._r8
+       
        ! needs to be initialized to spval to avoid problems when averaging for the accum
        ! field
        this%fsun_patch(p) = spval
@@ -584,6 +590,14 @@ contains
     call restartvar(ncid=ncid, flag=flag, varname='tsai', xtype=ncd_double,  &
          dim1name='pft', long_name='one-sided stem area index, no burying by snow', units='', &
          interpinic_flag='interp', readvar=readvar, data=this%tsai_patch)
+         
+     call restartvar(ncid=ncid, flag=flag, varname='tlai_input', xtype=ncd_double,  &
+         dim1name='pft', long_name='sp mode driver data for one-sided leaf area index, no burying by snow', units='', &
+         interpinic_flag='interp', readvar=readvar, data=this%tlai_input_patch)
+
+    call restartvar(ncid=ncid, flag=flag, varname='tsai_input', xtype=ncd_double,  &
+         dim1name='pft', long_name='sp mode driver data for one-sided stem area index, no burying by snow', units='', &
+         interpinic_flag='interp', readvar=readvar, data=this%tsai_input_patch)
 
     call restartvar(ncid=ncid, flag=flag, varname='elai', xtype=ncd_double,  &
          dim1name='pft', long_name='one-sided leaf area index, with burying by snow', units='', &
@@ -604,10 +618,18 @@ contains
     call restartvar(ncid=ncid, flag=flag, varname='htop', xtype=ncd_double,  &
          dim1name='pft', long_name='canopy top', units='m', &
          interpinic_flag='interp', readvar=readvar, data=this%htop_patch)
+         
+     call restartvar(ncid=ncid, flag=flag, varname='htop_input', xtype=ncd_double,  &
+         dim1name='pft', long_name='sp-mode driver data for canopy top', units='m', &
+         interpinic_flag='interp', readvar=readvar, data=this%htop_input_patch)
 
     call restartvar(ncid=ncid, flag=flag, varname='hbot', xtype=ncd_double,  &
-         dim1name='pft', long_name='canopy botton', units='m', &
+         dim1name='pft', long_name='canopy bottom', units='m', &
          interpinic_flag='interp', readvar=readvar, data=this%hbot_patch)
+         
+     call restartvar(ncid=ncid, flag=flag, varname='hbot_input', xtype=ncd_double,  &
+         dim1name='pft', long_name='sp-mode driver data for canopy bottom', units='m', &
+         interpinic_flag='interp', readvar=readvar, data=this%hbot_input_patch)
 
     call restartvar(ncid=ncid, flag=flag, varname='mlaidiff', xtype=ncd_double,  &
          dim1name='pft', long_name='difference between lai month one and month two', units='', &
