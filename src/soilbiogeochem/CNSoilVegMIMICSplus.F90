@@ -621,6 +621,8 @@ contains
    integer :: p, fp, c, fc, j, k, l, s, i, g
    integer :: begp, endp, begc, endc
    integer :: iveg
+
+   logical, parameter :: use_myc_dormancy = .true.          ! Set to .false. to disable mycorrhizal winter dormancy
    
    real(r8), parameter :: N_stress_max = 2.0_r8             ! Maximum N demand of plant, based on current N amount in plant []
    real(r8), parameter :: N_stress_min = 0.05_r8            ! Miminmum value of N_stress
@@ -681,6 +683,8 @@ contains
    real(r8) :: scale_N_to_plant(bounds%begp:bounds%endp)                          ! Scale factor to scale N uptake to plant if it is bigger that the uptake capazitiy of plant
 
    real(r8) :: norm_froot_prof(bounds%begp:bounds%endp,1:nlevdecomp)              ! normalized fine root profile
+   real(r8) :: dormancy_myc(bounds%begp:bounds%endp)                              ! Mycorrhizal dormancy scalar [-] 0.001=frozen, ~1=active
+   real(r8), parameter :: myc_dormancy_min = 0.001_r8                             ! Minimum activity in frozen soil [-]
 
    ! Nstress
    real(r8) :: N_demand(bounds%begp:bounds%endp)
@@ -819,6 +823,8 @@ contains
    N_mine_somp2soma(bounds%begp:bounds%endp, 1:nlevdecomp)        = 0.0_r8
    symbiont_gr_patch(bounds%begp:bounds%endp)                     = 0.0_r8
    symbiont_maint_patch(bounds%begp:bounds%endp)                  = 0.0_r8
+   dormancy_myc(bounds%begp:bounds%endp)                          = 0.0_r8
+   
 
   
    do i = 1,n_symb
@@ -852,6 +858,31 @@ contains
          smin_nh4_avail(p,j) = smin_nh4_to_plant_vr(c,j)  
          smin_no3_avail(p,j) = smin_no3_to_plant_vr(c,j) 
       end do
+
+      ! Mycorrhizal activity scalar (dormancy_myc):
+      ! Controls seasonal suppression of mycorrhizal growth, turnover and N uptake.
+      ! Computed as the fraction of the root profile located in unfrozen, wet soil, weighted by norm_froot_prof (which sums to 1.0 across all layers).
+      !
+      ! Value ranges from myc_dormancy_min (~0.001) when all soil is frozen, to 1.0 when all roots are in thawed, wet soil. In spring/autumn, when
+      ! only part of the rooting zone is thawed, the scalar reflects the fraction of roots that are active — e.g. 0.7 if 70% of roots are
+      ! in unfrozen layers.
+      ! The fixer symbiont is not affected — its temperature response is already handled by the Houlton et al. (2008) function applied to N_fixation.
+      ! Set use_myc_dormancy = .false. to disable and run with full year-round activity.
+      if (use_myc_dormancy) then
+         dormancy_myc(p) = myc_dormancy_min
+         do j = 1, nlevdecomp
+            t_soi_degC = t_soisno(c,j) - tfrz
+            if (norm_froot_prof(p,j) > 0.0_r8 .and. &
+                t_soi_degC > 0.01_r8           .and. &
+                h2osoi_liq(c,j) > 0.01_r8) then
+               dormancy_myc(p) = dormancy_myc(p) + norm_froot_prof(p,j)
+            end if
+         end do
+         dormancy_myc(p) = min(dormancy_myc(p), 1.0_r8)   ! clamp to [myc_dormancy_min, 1.0]
+      else
+         dormancy_myc(p) = 1.0_r8   ! fully active year-round
+      end if
+
    end do
 
    !-----------------------------------------------------------------------
@@ -890,6 +921,13 @@ contains
                                     bounds, symbiont_inst, norm_froot_prof(begp:endp,1:nlevdecomp), &
                                     smin_no3_avail(begp:endp,1:nlevdecomp), smin_nh4_avail(begp:endp,1:nlevdecomp), &
                                     no3_scav_up(begp:endp,1:nlevdecomp), nh4_scav_up(begp:endp,1:nlevdecomp)) 
+      do fp = 1,num_soilp
+         p = filter_soilp(fp)
+         do j = 1,nlevdecomp
+            no3_scav_up(p,j) = no3_scav_up(p,j) * dormancy_myc(p)
+            nh4_scav_up(p,j) = nh4_scav_up(p,j) * dormancy_myc(p)
+         end do
+      end do
    end if
 
    ! Mycorrhizal N mining (ECM-style)
@@ -901,6 +939,17 @@ contains
                               somc_nuptake(begp:endp,1:nlevdecomp), somp_nuptake(begp:endp,1:nlevdecomp), &
                               somc_cuptake(begp:endp,1:nlevdecomp), somp_cuptake(begp:endp,1:nlevdecomp), &
                               N_mine_somc2soma(begp:endp,1:nlevdecomp), N_mine_somp2soma(begp:endp,1:nlevdecomp))
+      do fp = 1,num_soilp
+         p = filter_soilp(fp)
+         do j = 1,nlevdecomp
+            somc_nuptake(p,j)     = somc_nuptake(p,j)     * dormancy_myc(p)
+            somp_nuptake(p,j)     = somp_nuptake(p,j)     * dormancy_myc(p)
+            somc_cuptake(p,j)     = somc_cuptake(p,j)     * dormancy_myc(p)
+            somp_cuptake(p,j)     = somp_cuptake(p,j)     * dormancy_myc(p)
+            N_mine_somc2soma(p,j) = N_mine_somc2soma(p,j) * dormancy_myc(p)
+            N_mine_somp2soma(p,j) = N_mine_somp2soma(p,j) * dormancy_myc(p)
+         end do
+      end do
    end if
 
    ! Active root uptake 
@@ -1027,7 +1076,7 @@ contains
        ! GROWTH AND TURNOVER
       
        ! gross symbiotic growth (without applying CUE) [gC/m2/s]
-       symb_growth_gross(p,i_scav) = ((sulman_max_symb_growth) * C_reservoir(p,i_scav) / (C_reservoir(p,i_scav) + sulman_kgrowth))
+       symb_growth_gross(p,i_scav) = dormancy_myc(p) * ((sulman_max_symb_growth) * C_reservoir(p,i_scav) / (C_reservoir(p,i_scav) + sulman_kgrowth))
 
        ! Growth respiration: C loss during growth from C reservoir to C biomass pool due to CUE [gC/m2/s]
        growth_resp(p,i_scav) = symb_growth_gross(p,i_scav) * (1.0 - symbiont_CUE(i_scav))
@@ -1036,7 +1085,7 @@ contains
        symb_growth(p,i_scav) =  symb_growth_gross(p,i_scav) *  symbiont_CUE(i_scav)
 
        ! Maintainance respiration [gC/m2]
-       maint_resp = min(C_biomass(p,i_scav) * (symbiont_tau(i_scav) * dt) * symbiont_mr, symb_growth(p,i_scav) * dt)
+       maint_resp = min(C_biomass(p,i_scav) * (symbiont_tau(i_scav) * dt) * symbiont_mr * dormancy_myc(p), symb_growth(p,i_scav) * dt)
        !Nitrogen limitation
        if ((symb_growth(p,i_scav) * dt) - maint_resp > sulman_cn_symbionts(i_scav) * N_reservoir(p,i_scav) * 0.9_r8)  then
           ! Not enough nitrogen to support growth. Limit to available N, and leave a little bit left over for plant
@@ -1049,8 +1098,8 @@ contains
        ! N_reservoir(p,i_scav) = N_reservoir(p,i_scav) + ((N_biomass(p,i_scav) * symbiont_tau(i_scav) * dt) * symbiont_mr))
        
        ! Total symbiont Turnover (including necromass and maintanance respiration) [gC/m2/s]
-       total_symbiont_turnover_C(p,i_scav)  = C_biomass(p,i_scav)  * symbiont_tau(i_scav) 
-       total_symbiont_turnover_N(p,i_scav)  = N_biomass(p,i_scav)  * symbiont_tau(i_scav) 
+       total_symbiont_turnover_C(p,i_scav)  = C_biomass(p,i_scav)  * symbiont_tau(i_scav) * dormancy_myc(p)
+       total_symbiont_turnover_N(p,i_scav)  = N_biomass(p,i_scav)  * symbiont_tau(i_scav) * dormancy_myc(p)
 
        ! Fraction of N from maintainace respiration stays in N reservoir while C is respiered
        maint_resp_N(p,i_scav) = total_symbiont_turnover_N(p,i_scav) * symbiont_mr
@@ -1070,19 +1119,19 @@ contains
       
 
        ! Mycorrhizal miners
-       symb_growth_gross(p,i_miner) = (sulman_max_symb_growth * C_reservoir(p,i_miner) / (C_reservoir(p,i_miner) + sulman_kgrowth))
+       symb_growth_gross(p,i_miner) = dormancy_myc(p) * (sulman_max_symb_growth * C_reservoir(p,i_miner) / (C_reservoir(p,i_miner) + sulman_kgrowth))
        growth_resp(p,i_miner) = symb_growth_gross(p,i_miner) * (1.0 - symbiont_CUE(i_miner))
        symb_growth(p,i_miner) = symb_growth_gross(p,i_miner) * symbiont_CUE(i_miner)
        
-       maint_resp = min(C_biomass(p,i_miner) * (symbiont_tau(i_miner) * dt) * symbiont_mr, symb_growth(p,i_miner) * dt)
+       maint_resp = min(C_biomass(p,i_miner) * (symbiont_tau(i_miner) * dt) * symbiont_mr * dormancy_myc(p), symb_growth(p,i_miner) * dt)
 
        if ((symb_growth(p,i_miner) * dt) - maint_resp > sulman_cn_symbionts(i_miner) * N_reservoir(p,i_miner) * 0.9_r8) then
            symb_growth(p,i_miner) = (sulman_cn_symbionts(i_miner) * N_reservoir(p,i_miner) * 0.9_r8 + maint_resp) / dt
            growth_resp(p,i_miner) = symb_growth(p,i_miner) * (1.0 - symbiont_CUE(i_miner)) / symbiont_CUE(i_miner)
        end if
 
-       total_symbiont_turnover_C(p,i_miner) = C_biomass(p,i_miner) * symbiont_tau(i_miner)
-       total_symbiont_turnover_N(p,i_miner) = N_biomass(p,i_miner) * symbiont_tau(i_miner)
+       total_symbiont_turnover_C(p,i_miner) = C_biomass(p,i_miner) * symbiont_tau(i_miner) * dormancy_myc(p)
+       total_symbiont_turnover_N(p,i_miner) = N_biomass(p,i_miner) * symbiont_tau(i_miner) * dormancy_myc(p)
 
        !N_reservoir(p,i_miner) = N_reservoir(p,i_miner) + ((total_symbiont_turnover_N(p,i_miner) * dt) * symbiont_mr)
        maint_resp_N(p,i_miner) = total_symbiont_turnover_N(p,i_miner) * symbiont_mr
@@ -1197,7 +1246,7 @@ contains
       n_to_plant_mimicsplus(p) = N_to_plant(p,i_scav) + N_to_plant(p,i_miner) + N_to_plant(p,i_fixer) + root_N_to_plant(p)
 
       if (availc(p) > 0.0_r8) then
-        C_allocation_to_N_acq(p) = availc(p)  * 0.05_r8 * n_stress(p)
+        C_allocation_to_N_acq(p) = availc(p)  * 0.08_r8 * n_stress(p)
         npp_growth(p) = (availc(p) - C_allocation_to_N_acq(p)) / (1.0_r8 + pftcon%grperc(ivt(p)))  ! why do we do this grwoth respiration thing here?
         C_allocation_to_N_acq(p) = availc(p) - npp_growth(p)*(1.0_r8 + pftcon%grperc(ivt(p)))
       else

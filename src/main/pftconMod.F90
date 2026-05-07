@@ -172,9 +172,6 @@ module pftconMod
      real(r8), allocatable :: ndays_on(:)         ! number of days to complete leaf onset
      real(r8), allocatable :: mimics_fi(:)        ! fraction of litter going directly to SOM pools [-]
 
-     ! MIMICS
-     real(r8), allocatable :: mimics_fi(:)
-
      !  crop
 
      ! These arrays give information about the merge of unused crop types to the types CLM
@@ -527,7 +524,6 @@ contains
     allocate( this%mimics_fi(2) )
     allocate( this%crit_onset_gdd_sf (0:mxpft) )
     allocate( this%ndays_on      (0:mxpft) )
-    allocate( this%mimics_fi(2))
  
   end subroutine InitAllocate
 
