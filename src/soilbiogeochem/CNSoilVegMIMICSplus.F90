@@ -628,6 +628,9 @@ contains
    real(r8), parameter :: N_stress_min = 0.05_r8            ! Miminmum value of N_stress
    real(r8), parameter :: sulman_fnalloc = 0.05_r8          ! Fraction of NPP allocated to N uptake per unit N stress [fraction] 
    real(r8), parameter :: sulman_plant_n_subsidy = 0.01_r8  ! Fraction of C flux send back as N flux to symbionts
+   real(r8), parameter :: ammonium_solubility = 0.1_r8      ! Amount of ammonium dissolves in soil water at saturated moisture (fraction)
+   real(r8), parameter :: nitrate_solubility = 0.8_r8       ! Amount of nitrate dissolves in soil water at saturated moisture (fraction)
+
    
    real(r8) :: n_subsidy_miner, n_subsidy_scav                         ! N flux from Plant (taken from N to plant flux) to symbionts      
    real(r8) :: root_dens_sum                                            ! Fine root C per layer             [gC/m2]
@@ -823,7 +826,7 @@ contains
    N_mine_somp2soma(bounds%begp:bounds%endp, 1:nlevdecomp)        = 0.0_r8
    symbiont_gr_patch(bounds%begp:bounds%endp)                     = 0.0_r8
    symbiont_maint_patch(bounds%begp:bounds%endp)                  = 0.0_r8
-   dormancy_myc(bounds%begp:bounds%endp)                          = 0.0_r8
+   dormancy_myc(bounds%begp:bounds%endp)                          = 1.0_r8
    
 
   
@@ -973,8 +976,13 @@ contains
       do j = 1,nlevdecomp
          t_soi_degC = t_soisno(c,j) - tfrz     ! Soil temperature in degrees Celcius
          if (t_soi_degC > 0.01_r8 .and. h2osoi_liq(c,j) > 0.01_r8) then
-            no3_passiv_up(p,j) = (waterfluxbulk_inst%qflx_tran_veg_patch(p) * dt) * (smin_no3_avail(p,j) / h2osoi_liq(c,j))
-            nh4_passiv_up(p,j) = (waterfluxbulk_inst%qflx_tran_veg_patch(p) * dt) * (smin_nh4_avail(p,j) / h2osoi_liq(c,j))
+           
+            !h2osoi_liq= kg/m2
+            !smin_no3_avail = gN/m3/s
+            !qflx_tran_veg_patch = kg/m2/s
+            no3_passiv_up(p,j) = (waterfluxbulk_inst%qflx_tran_veg_patch(p) * dt) * smin_no3_avail(p,j)  / h2osoi_liq(c,j) * nitrate_solubility
+
+            nh4_passiv_up(p,j) = ((waterfluxbulk_inst%qflx_tran_veg_patch(p) * dt) * smin_nh4_avail(p,j) / h2osoi_liq(c,j)) * ammonium_solubility
          else
             nh4_passiv_up(p,j) = 0.0_r8
             no3_passiv_up(p,j) = 0.0_r8
@@ -1017,7 +1025,7 @@ contains
          if ( (sum_no3_up(p,j) > smin_no3_avail(p,j)) .and. &
               (smin_no3_avail(p,j) > 0.0_r8) ) then
            write(iulog,*)'NO3 uptake by passive / active / scavenger pathway exceeds soil N uptake and was scaled down, leaving 10% N in soil'
-           no3_passiv_up(p,j)  = no3_passiv_up(p,j)  * ((smin_no3_avail(p,j) / sum_no3_up(p,j)) * 0.9_r8)
+           no3_passiv_up(p,j)  = no3_passiv_up(p,j)  * ((smin_no3_avail(p,j) * nitrate_solubility / sum_no3_up(p,j)) * 0.9_r8)
            no3_active_up(p,j)  = no3_active_up(p,j)  * ((smin_no3_avail(p,j) / sum_no3_up(p,j)) * 0.9_r8)
            no3_scav_up(p,j)    = no3_scav_up(p,j)    * ((smin_no3_avail(p,j) / sum_no3_up(p,j)) * 0.9_r8)
          endif
@@ -1025,7 +1033,7 @@ contains
          if ( (sum_nh4_up(p,j) > smin_nh4_avail(p,j)) .and. &
               (smin_nh4_avail(p,j) > 0.0_r8) ) then
             write(iulog,*)'NH4 uptake by passive / active / scavenger pathway exceeds soil N uptake and was scaled down, leaving 10% N in soil'
-            nh4_passiv_up(p,j)  = nh4_passiv_up(p,j)  * ((smin_nh4_avail(p,j) / sum_nh4_up(p,j)) * 0.9_r8)
+            nh4_passiv_up(p,j)  = nh4_passiv_up(p,j)  * ((smin_nh4_avail(p,j) * ammonium_solubility / sum_nh4_up(p,j)) * 0.9_r8)
             nh4_active_up(p,j)  = nh4_active_up(p,j)  * ((smin_nh4_avail(p,j) / sum_nh4_up(p,j)) * 0.9_r8)
             nh4_scav_up(p,j)    = nh4_scav_up(p,j)    * ((smin_nh4_avail(p,j) / sum_nh4_up(p,j)) * 0.9_r8)
          endif
@@ -1991,7 +1999,8 @@ contains
    if (is_active(p,i_scav)) then 
       !N_to_plant(p,i_scav) = N_reservoir(p,i_scav) * params_inst%sulman_rup_veg
       if (C_biomass(p,i_scav) > 0.0_r8) then  ! or (C_biomass(p,i_scav) < 0.0_r8)
-          scav_roi(p) = (max(0.0_r8, N_to_plant(p,i_scav)))  / (C_biomass(p,i_scav) * params_inst%symbiont_CUE(i_scav) * (params_inst%symbiont_tau(i_scav)))
+          scav_roi(p) = (max(0.0_r8, N_to_plant(p,i_scav)) *  params_inst%symbiont_CUE(i_scav))  / &
+                        (C_biomass(p,i_scav) * (params_inst%symbiont_tau(i_scav)))
       else 
       ! scav_efficiency is calculated in myc_scavenger_N_uptake under myc_efficiency
       scav_roi(p) = symb_eff(p,i_scav) / (params_inst%symbiont_CUE(i_scav) * (params_inst%symbiont_tau(i_scav) * dt))
@@ -2009,7 +2018,8 @@ contains
    if (is_active(p,i_miner)) then
       !N_to_plant(p,i_miner) = N_reservoir(p,i_miner) * params_inst%sulman_rup_veg 
       if (C_biomass(p,i_miner) > 0.0_r8) then 
-         mine_roi(p) = (max(0.0_r8, N_to_plant(p,i_miner))) / (C_biomass(p,i_miner) * params_inst%symbiont_CUE(i_miner) * (params_inst%symbiont_tau(i_miner)))
+         mine_roi(p) = (max(0.0_r8, N_to_plant(p,i_miner)) * params_inst%symbiont_CUE(i_miner)) / &
+                       (C_biomass(p,i_miner) * params_inst%symbiont_tau(i_miner))
       else 
          ! mine is calculated in one of the mining routines under myc_efficiency
          mine_roi(p) = symb_eff(p,i_miner) / (params_inst%symbiont_CUE(i_miner) * (params_inst%symbiont_tau(i_miner) * dt))
@@ -2019,7 +2029,8 @@ contains
    end if 
 
    if (C_allocation_to_N_acq(p) > 0.0_r8) then
-      root_roi(p) = max(0.0000001,(root_N_active_uptake(p))/C_allocation_to_N_acq(p))
+      !root_roi(p) = max(0.001,(root_N_active_uptake(p))/C_allocation_to_N_acq(p))
+       root_roi(p) = root_N_active_uptake(p)/C_allocation_to_N_acq(p)
    else
       root_roi(p) = (mine_roi(p) + scav_roi(p))*0.25_r8 ! make as above root roi should be akways super small 0.0000000000001
    endif
@@ -2029,7 +2040,7 @@ contains
    if (is_active(p,i_fixer)) then
       !N_to_plant(p,i_fixer) = N_reservoir(p,i_fixer) * params_inst%sulman_rup_veg
       if (C_biomass(p,i_fixer) > 0.0_r8) then 
-         fix_roi(p) = N_to_plant(p,i_fixer) / (C_biomass(p,i_fixer) * params_inst%symbiont_CUE(i_fixer) * params_inst%symbiont_tau(i_fixer))
+         fix_roi(p) = (N_to_plant(p,i_fixer) * params_inst%symbiont_CUE(i_fixer)) / (C_biomass(p,i_fixer) * params_inst%symbiont_tau(i_fixer))
       else 
          fix_roi(p) =  params_inst%sulman_rfix / (params_inst%symbiont_CUE(i_fixer) * params_inst%symbiont_tau(i_fixer) * dt)
       end if 
