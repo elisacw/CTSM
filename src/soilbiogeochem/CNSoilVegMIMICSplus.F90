@@ -1026,7 +1026,7 @@ contains
          if ( (sum_no3_up(p,j) > smin_no3_avail(p,j)) .and. &
               (smin_no3_avail(p,j) > 0.0_r8) ) then
            write(iulog,*)'NO3 uptake by passive / active / scavenger pathway exceeds soil N uptake and was scaled down, leaving 10% N in soil'
-           no3_passiv_up(p,j)  = no3_passiv_up(p,j)  * ((smin_no3_avail(p,j) * no3_solubility / sum_no3_up(p,j)) * 0.9_r8)
+           no3_passiv_up(p,j)  = no3_passiv_up(p,j)  * ((smin_no3_avail(p,j) / sum_no3_up(p,j)) * 0.9_r8)
            no3_active_up(p,j)  = no3_active_up(p,j)  * ((smin_no3_avail(p,j) / sum_no3_up(p,j)) * 0.9_r8)
            no3_scav_up(p,j)    = no3_scav_up(p,j)    * ((smin_no3_avail(p,j) / sum_no3_up(p,j)) * 0.9_r8)
          endif
@@ -1034,7 +1034,7 @@ contains
          if ( (sum_nh4_up(p,j) > smin_nh4_avail(p,j)) .and. &
               (smin_nh4_avail(p,j) > 0.0_r8) ) then
             write(iulog,*)'NH4 uptake by passive / active / scavenger pathway exceeds soil N uptake and was scaled down, leaving 10% N in soil'
-            nh4_passiv_up(p,j)  = nh4_passiv_up(p,j)  * ((smin_nh4_avail(p,j) * nh4_solubility / sum_nh4_up(p,j)) * 0.9_r8)
+            nh4_passiv_up(p,j)  = nh4_passiv_up(p,j)  * ((smin_nh4_avail(p,j) / sum_nh4_up(p,j)) * 0.9_r8)
             nh4_active_up(p,j)  = nh4_active_up(p,j)  * ((smin_nh4_avail(p,j) / sum_nh4_up(p,j)) * 0.9_r8)
             nh4_scav_up(p,j)    = nh4_scav_up(p,j)    * ((smin_nh4_avail(p,j) / sum_nh4_up(p,j)) * 0.9_r8)
          endif
@@ -1292,17 +1292,25 @@ contains
       
       n_to_plant_limit = 0.0_r8
 
-      n_to_plant_limit =  plant_ndemand(p) - root_N_to_plant(p) !gN/m2/s !+ (npool(p) / dt
+      n_to_plant_limit =  plant_ndemand(p) !gN/m2/s !+ (npool(p) / dt
       if (n_to_plant_limit < 0.0_r8 ) then
          n_to_plant_limit = 0.0_r8
       endif
 
-      if (n_to_plant_mimicsplus(p)-root_N_to_plant(p)> n_to_plant_limit ) then
+      if (n_to_plant_mimicsplus(p)> n_to_plant_limit ) then
         ! n_to_plant_mimicsplus(p) must be > 0 to go into this block
-        scale_N_to_plant(p)=n_to_plant_limit/(n_to_plant_mimicsplus(p)-root_N_to_plant(p))
+        scale_N_to_plant(p)=n_to_plant_limit/(n_to_plant_mimicsplus(p))
         N_to_plant(p,i_scav) = N_to_plant(p,i_scav) * scale_N_to_plant(p)
         N_to_plant(p,i_miner) = N_to_plant(p,i_miner) * scale_N_to_plant(p)
         N_to_plant(p,i_fixer)  = N_to_plant(p,i_fixer) * scale_N_to_plant(p)
+        do j = 1, nlevdecomp
+           !(no3_active_up(p,j) + nh4_active_up(p,j) +  no3_passiv_up(p,j) + nh4_passiv_up(p,j)) * col%dz(c,j)
+            no3_active_up(p,j) = no3_active_up(p,j) * scale_N_to_plant(p)
+            nh4_active_up(p,j) = nh4_active_up(p,j) * scale_N_to_plant(p)
+            no3_passiv_up(p,j) = no3_passiv_up(p,j) * scale_N_to_plant(p)
+            nh4_passiv_up(p,j) = nh4_passiv_up(p,j) * scale_N_to_plant(p)
+        end do
+        root_N_to_plant(p) = root_N_to_plant(p) * scale_N_to_plant(p)
         ! Scale uptake and return leftovers to reservoirs
         !N_reservoir(p,i_scav)  = N_reservoir(p,i_scav)  + (N_to_plant(p,i_scav) * dt) * (1.0_r8 - scale_N_to_plant(p))
         !N_reservoir(p,i_miner) = N_reservoir(p,i_miner) + (N_to_plant(p,i_miner) * dt) * (1.0_r8 - scale_N_to_plant(p))
