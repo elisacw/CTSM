@@ -1043,12 +1043,6 @@ contains
 
          root_N_to_plant(p) = root_N_to_plant(p) + (no3_active_up(p,j) + nh4_active_up(p,j) +  no3_passiv_up(p,j) + nh4_passiv_up(p,j)) * col%dz(c,j)
 
-         ! Total NO3 and NH4 soil uptake that needs to be substracted from inorganic N soil pool
-         smin_no3_to_symbiont_vr(p,j) = (no3_passiv_up(p,j) + no3_active_up(p,j) + no3_scav_up(p,j))
-         smin_nh4_to_symbiont_vr(p,j) = (nh4_passiv_up(p,j) + nh4_active_up(p,j) + nh4_scav_up(p,j))
-
-         sminn_to_symbiont_vr(p,j) = smin_nh4_to_symbiont_vr(p,j) + smin_no3_to_symbiont_vr(p,j)
-
       end do
    end do
 
@@ -1366,6 +1360,12 @@ contains
       do j = 1, nlevdecomp
          N_symb_up(p,i_scav) = N_symb_up(p,i_scav) + (no3_scav_up(p,j) + nh4_scav_up(p,j)) * col%dz(c,j)
          N_symb_up(p,i_miner) = N_symb_up(p,i_miner) + (somc_nuptake(p,j) + somp_nuptake(p,j)) * col%dz(c,j)
+         
+         ! Total NO3 and NH4 soil uptake that needs to be substracted from inorganic N soil pool
+         smin_no3_to_symbiont_vr(p,j) = (no3_passiv_up(p,j) + no3_active_up(p,j) + no3_scav_up(p,j))
+         smin_nh4_to_symbiont_vr(p,j) = (nh4_passiv_up(p,j) + nh4_active_up(p,j) + nh4_scav_up(p,j))
+
+         sminn_to_symbiont_vr(p,j) = smin_nh4_to_symbiont_vr(p,j) + smin_no3_to_symbiont_vr(p,j)
       end do
 
       N_symb_up(p,i_fixer) = N_fixation(p)
