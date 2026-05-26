@@ -628,8 +628,9 @@ contains
    real(r8), parameter :: N_stress_min = 0.05_r8            ! Miminmum value of N_stress
    real(r8), parameter :: sulman_fnalloc = 0.05_r8          ! Fraction of NPP allocated to N uptake per unit N stress [fraction] 
    real(r8), parameter :: sulman_plant_n_subsidy = 0.01_r8  ! Fraction of C flux send back as N flux to symbionts
-   real(r8), parameter :: ammonium_solubility = 0.1_r8      ! Amount of ammonium dissolves in soil water at saturated moisture (fraction)
-   real(r8), parameter :: nitrate_solubility = 0.8_r8       ! Amount of nitrate dissolves in soil water at saturated moisture (fraction)
+   ! Make these parameters per soil type (sand, clay, silt) in the future if needed
+   real(r8), parameter :: nh4_solubility = 0.01_r8      ! Amount of ammonium dissolves in soil water at saturated moisture (fraction)
+   real(r8), parameter :: no3_solubility = 0.8_r8       ! Amount of nitrate dissolves in soil water at saturated moisture (fraction)
 
    
    real(r8) :: n_subsidy_miner, n_subsidy_scav                         ! N flux from Plant (taken from N to plant flux) to symbionts      
@@ -980,9 +981,9 @@ contains
             !h2osoi_liq= kg/m2
             !smin_no3_avail = gN/m3/s
             !qflx_tran_veg_patch = kg/m2/s
-            no3_passiv_up(p,j) = (waterfluxbulk_inst%qflx_tran_veg_patch(p) * dt) * smin_no3_avail(p,j)  / h2osoi_liq(c,j) * nitrate_solubility
+            no3_passiv_up(p,j) = (waterfluxbulk_inst%qflx_tran_veg_patch(p) * dt) * smin_no3_avail(p,j)  / h2osoi_liq(c,j) * no3_solubility
 
-            nh4_passiv_up(p,j) = ((waterfluxbulk_inst%qflx_tran_veg_patch(p) * dt) * smin_nh4_avail(p,j) / h2osoi_liq(c,j)) * ammonium_solubility
+            nh4_passiv_up(p,j) = ((waterfluxbulk_inst%qflx_tran_veg_patch(p) * dt) * smin_nh4_avail(p,j) / h2osoi_liq(c,j)) * nh4_solubility
          else
             nh4_passiv_up(p,j) = 0.0_r8
             no3_passiv_up(p,j) = 0.0_r8
@@ -1025,7 +1026,7 @@ contains
          if ( (sum_no3_up(p,j) > smin_no3_avail(p,j)) .and. &
               (smin_no3_avail(p,j) > 0.0_r8) ) then
            write(iulog,*)'NO3 uptake by passive / active / scavenger pathway exceeds soil N uptake and was scaled down, leaving 10% N in soil'
-           no3_passiv_up(p,j)  = no3_passiv_up(p,j)  * ((smin_no3_avail(p,j) * nitrate_solubility / sum_no3_up(p,j)) * 0.9_r8)
+           no3_passiv_up(p,j)  = no3_passiv_up(p,j)  * ((smin_no3_avail(p,j) * no3_solubility / sum_no3_up(p,j)) * 0.9_r8)
            no3_active_up(p,j)  = no3_active_up(p,j)  * ((smin_no3_avail(p,j) / sum_no3_up(p,j)) * 0.9_r8)
            no3_scav_up(p,j)    = no3_scav_up(p,j)    * ((smin_no3_avail(p,j) / sum_no3_up(p,j)) * 0.9_r8)
          endif
@@ -1033,7 +1034,7 @@ contains
          if ( (sum_nh4_up(p,j) > smin_nh4_avail(p,j)) .and. &
               (smin_nh4_avail(p,j) > 0.0_r8) ) then
             write(iulog,*)'NH4 uptake by passive / active / scavenger pathway exceeds soil N uptake and was scaled down, leaving 10% N in soil'
-            nh4_passiv_up(p,j)  = nh4_passiv_up(p,j)  * ((smin_nh4_avail(p,j) * ammonium_solubility / sum_nh4_up(p,j)) * 0.9_r8)
+            nh4_passiv_up(p,j)  = nh4_passiv_up(p,j)  * ((smin_nh4_avail(p,j) * nh4_solubility / sum_nh4_up(p,j)) * 0.9_r8)
             nh4_active_up(p,j)  = nh4_active_up(p,j)  * ((smin_nh4_avail(p,j) / sum_nh4_up(p,j)) * 0.9_r8)
             nh4_scav_up(p,j)    = nh4_scav_up(p,j)    * ((smin_nh4_avail(p,j) / sum_nh4_up(p,j)) * 0.9_r8)
          endif
