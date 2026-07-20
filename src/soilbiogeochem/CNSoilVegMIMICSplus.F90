@@ -82,6 +82,7 @@ module CNSoilVegMIMICSplus
   real(r8), pointer           :: N_reservoir           (:,:) ! [patch,n_symb] Nitrogen intermediate pool biomass  [gN/m2]
 
   real(r8), pointer           :: C_allocation_to_N_acq   (:) ! [patch] Carbon allocation from plant               [gC/m2/s]
+  real(r8), pointer           :: C_alloc_root            (:) ! [patch] Carbon allocation from plant to active root uptake  [gC/m2/s]
   
   real(r8), pointer           :: C_alloc               (:,:) ! [patch,n_symb] Carbon allocation from plant to symbiont  [gC/m2/s]
   real(r8), pointer           :: symb_eff              (:,:) ! [patch,n_symb] Symbiont efficiency when biomass 0  [gC/gN]
@@ -203,6 +204,7 @@ contains
     allocate(this%N_reservoir(begp:endp,1:n_symb)) ; this%N_reservoir(begp:endp,1:n_symb)    = 0.0_r8
 
     allocate(this%C_allocation_to_N_acq(begp:endp)); this%C_allocation_to_N_acq(begp:endp)   = 0.0_r8
+    allocate(this%C_alloc_root(begp:endp))         ; this%C_alloc_root(begp:endp)            = 0.0_r8
 
     allocate(this%symb_eff(begp:endp,1:n_symb))    ; this%symb_eff(begp:endp,1:n_symb)       = 0.0_r8
     allocate(this%symb_growth(begp:endp,1:n_symb)) ; this%symb_growth(begp:endp,1:n_symb)    = 0.0_r8
@@ -397,6 +399,11 @@ contains
          call hist_addfld1d (fname='C_ALLOC_TO_N_ACQ', units='-', &
          avgflag='A', long_name='C allocated from plant to recive N', &
          ptr_patch=this%C_allocation_to_N_acq)
+
+         this%C_alloc_root(begp:endp) = spval
+         call hist_addfld1d (fname='C_ALLOC_TO_ROOT', units='-', &
+         avgflag='A', long_name='C allocated to active root uptake', &
+         ptr_patch=this%C_alloc_root)
 
 
    end subroutine InitHistory
@@ -629,7 +636,7 @@ contains
    real(r8), parameter :: sulman_fnalloc = 0.05_r8          ! Fraction of NPP allocated to N uptake per unit N stress [fraction] 
    real(r8), parameter :: sulman_plant_n_subsidy = 0.01_r8  ! Fraction of C flux send back as N flux to symbionts
    ! Make these parameters per soil type (sand, clay, silt) in the future if needed
-   real(r8), parameter :: nh4_solubility = 0.01_r8      ! Amount of ammonium dissolves in soil water at saturated moisture (fraction)
+   real(r8), parameter :: nh4_solubility = 0.2_r8       ! Amount of ammonium dissolves in soil water at saturated moisture (fraction)
    real(r8), parameter :: no3_solubility = 0.8_r8       ! Amount of nitrate dissolves in soil water at saturated moisture (fraction)
 
    
@@ -1063,7 +1070,7 @@ contains
 
       do j = 1,nlevdecomp
          N_reservoir(p,i_miner) =  N_reservoir(p,i_miner) + ((somc_nuptake(p,j) * dt + somp_nuptake(p,j) * dt) * col%dz(c,j))
-         C_reservoir(p,i_miner) =  C_reservoir(p,i_miner) + ((somc_cuptake(p,j) * dt + somp_cuptake(p,j) * dt) * col%dz(c,j))
+         C_reservoir(p,i_miner) =  C_reservoir(p,i_miner) + ((somc_cuptake(p,j) * dt + somp_cuptake(p,j) * dt) * col%dz(c,j)) * 0.1_r8  ! Only 20% of cuptake goes to miner reservoir, rest is going into SOMa 
          N_reservoir(p,i_scav) =  N_reservoir(p,i_scav) + ((no3_scav_up(p,j) * dt + nh4_scav_up(p,j) * dt) * col%dz(c,j))
       enddo
       N_reservoir(p,i_fixer) = N_reservoir(p,i_fixer) + (N_fixation(p) * dt)
@@ -1965,6 +1972,7 @@ contains
    real(r8), intent(inout) :: root_exudate_C(bounds%begp:bounds%endp)        ! Leftover C from allocation to symbionts     [gC/m2/s]
    real(r8), intent(in)    :: root_N_active_uptake(bounds%begp:bounds%endp)  ! active root N uptake                        [gN/m2/s]
    real(r8), intent(in)    :: root_N_to_plant(bounds%begp:bounds%endp)       ! total (active + passive) root N uptake      [gN/m2/s]
+   
    !
    ! ! LOCAL VARIABLES:
    integer :: p, fp, c, fc, j, k, l, s  ! indices
@@ -1992,8 +2000,8 @@ contains
    symb_eff               => symbiont_inst%symb_eff                            , & ! Symbiont efficiency N uptake per unit of mycorrhizal C biomass  [gN/gC]
    C_alloc                => symbiont_inst%C_alloc                             , & ! Carbon allocation to symbionts based on ROI [gC/m2/s]
    N_to_plant             => symbiont_inst%N_to_plant                          , &
-   C_allocation_to_N_acq  => symbiont_inst%C_allocation_to_N_acq                 &
-   
+   C_allocation_to_N_acq  => symbiont_inst%C_allocation_to_N_acq               , &
+   C_alloc_root           => symbiont_inst%C_alloc_root                          & ! Carbon allocation to roots based on ROI [gC/m2/s]
    )
 
    !--------------------------------------------------------------------------------------------------------------------------------
@@ -2078,6 +2086,7 @@ contains
     C_alloc(p,i_fixer) = C_allocation_to_N_acq(p) * fix_roi_frac
     C_alloc(p,i_miner) = C_allocation_to_N_acq(p) * mine_roi_frac
     C_alloc(p,i_scav)  = C_allocation_to_N_acq(p) * scav_roi_frac
+    C_alloc_root(p)    = C_allocation_to_N_acq(p) * root_roi_frac
 
     ! Carbon that wasn't spend on scav, miner or fixer (including root)
     root_exudate_C(p) = root_exudate_C(p) + C_allocation_to_N_acq(p) - C_alloc(p,i_scav) - C_alloc(p,i_miner) - C_alloc(p,i_fixer)
