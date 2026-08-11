@@ -162,11 +162,14 @@ module SoilBiogeochemDecompCascadeMIMICSMod
      real(r8), allocatable :: mimics_initial_Cstocks(:)  ! Initial C stocks for a cold-start (gC/m3)
      
      ! Sulman parameter
-     real(r8) :: sulman_max_symb_growth   !Maximum symbiont growth rate [gC/m2/s]
-     real(r8) :: sulman_kgrowth           !Half-saturation of intermediate C pool for symbiotic growth [gC/m2]
-     
-     real(r8) :: symbiont_necromass       !Fraction of symbiotic biomass turnover into SOM as necromass [fraction]
-     real(r8) :: symbiont_mr              !Fraction of symbiotic biomass turnover not used for maintenance respiration [fraction]
+     real(r8) :: N_stress_max             ! Maximum N demand of plant, based on current N amount in plant []
+     real(r8) :: N_stress_min             ! Miminmum value of N_stress
+     real(r8) :: sulman_fnalloc           ! Fraction of NPP allocated to N uptake per unit N stress [fraction] 
+
+     real(r8) :: sulman_max_symb_growth  !Maximum symbiont growth rate [gC/m2/s]
+     real(r8) :: sulman_kgrowth          !Half-saturation of intermediate C pool for symbiotic growth [gC/m2]
+     real(r8) :: symbiont_necromass      !Fraction of symbiotic biomass turnover into SOM as necromass [fraction]
+     real(r8) :: symbiont_mr             !Fraction of symbiotic biomass turnover not used for maintenance respiration [fraction]
      real(r8) :: sulman_cue_mine      !Carbon use efficiency of mycorrhizal mining [fraction]
      real(r8) :: sulman_nue_mine      !Nitrogen use efficiency of mycorrhizal mining [fraction]
      real(r8) :: sulman_root_no3      !Maximum root active nitrate uptake rate [gN/m3/s]
@@ -379,6 +382,22 @@ contains
 
 
     ! Sulman et al. Parameters
+
+    tString='N_stress_max'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%N_stress_max=tempr
+
+    tString='N_stress_min'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%N_stress_min=tempr
+
+    tString='sulman_fnalloc'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%sulman_fnalloc=tempr
+
     tString='sulman_v_nh4'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))

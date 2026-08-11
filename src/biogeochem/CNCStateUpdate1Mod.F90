@@ -243,7 +243,7 @@ contains
 
                                                                                  + (symbiont_inst%C_mortality(c,j) * dt * symb_tau_somc) &
 
-                                                                                 - (symbiont_inst%somc_cuptake_col(c,j) * dt)* 0.1_r8)
+                                                                                - (symbiont_inst%somc_cuptake_col(c,j) * dt)* 0.1_r8)
 
                         cf_soil%decomp_cpools_sourcesink_col(c,j,i_phys_som) = (cf_soil%decomp_cpools_sourcesink_col(c,j,i_phys_som) &
 
@@ -259,6 +259,7 @@ contains
                                                                                  !+ (symbiont_inst%somp_cuptake_col(c,j) * 0.5_r8 * dt))
                                                                                  
                         ! SOMc from chem & phys protected stays in pools, bc there is already a similar flux from MIMICS 
+                        ! only 10% of the decomposed C is respiered
                         ! add C enzyme fluxx here, if I ever make it symbiont_inst%C_enz_mine2soma_col(c,j)
 
                          !ECW ERROR MESSAGE HERE NEXT
