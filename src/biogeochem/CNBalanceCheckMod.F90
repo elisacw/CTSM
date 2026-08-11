@@ -697,7 +697,7 @@ contains
             col_ninputs(c) = col_ninputs(c)  + fates_litter_flux(c)
          end if
          
-         if(use_fun)then
+         if(use_fun .or. decomp_method == mimicsplus_decomp)then
             col_ninputs(c) = col_ninputs(c) + ffix_to_sminn(c) ! for FUN, free living fixation is a seprate flux. RF. 
          endif
 

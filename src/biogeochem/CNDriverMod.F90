@@ -307,7 +307,7 @@ contains
          atm2lnd_inst, soilbiogeochem_nitrogenflux_inst)
     call t_stopf('CNDeposition')
     
-    if(use_fun)then
+    if(use_fun .or. decomp_method == mimicsplus_decomp)then !.or. decomp_method == mimicsplus_decomp
         call t_startf('CNFLivFixation')
         call CNFreeLivingFixation( num_bgc_soilc, filter_bgc_soilc, &
              waterfluxbulk_inst, soilbiogeochem_nitrogenflux_inst)
@@ -325,7 +325,7 @@ contains
        call CNNFert(bounds, num_bgc_soilc,filter_bgc_soilc, &
             cnveg_nitrogenflux_inst, soilbiogeochem_nitrogenflux_inst)
 
-       if (.not. use_fun) then  ! if FUN is active, then soy fixation handled by FUN
+       if (.not. use_fun) then  ! if FUN is active, then soy fixation handled by FUN !ECW
           call  CNSoyfix (bounds, num_bgc_soilc, filter_bgc_soilc, num_bgc_vegp, filter_bgc_vegp, &
                waterdiagnosticbulk_inst, crop_inst, cnveg_state_inst, cnveg_nitrogenflux_inst , &
                soilbiogeochem_state_inst, soilbiogeochem_nitrogenstate_inst, soilbiogeochem_nitrogenflux_inst)

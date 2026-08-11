@@ -9,11 +9,12 @@ module SoilBiogeochemNitrogenFluxType
   use decompMod                          , only : bounds_type
   use clm_varctl                         , only : use_nitrif_denitrif, use_crop, use_fates
   use CNSharedParamsMod                  , only : use_fun
-  use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, use_soil_matrixcn
+  use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, use_soil_matrixcn, mimicsplus_decomp, decomp_method
   use abortutils                         , only : endrun
   use LandunitType                       , only : lun                
   use ColumnType                         , only : col
   use SparseMatrixMultiplyMod            , only : sparse_matrix_type, diag_matrix_type, vector_type
+ 
   ! 
   ! !PUBLIC TYPES:
   implicit none
@@ -374,7 +375,7 @@ contains
          avgflag='A', long_name='symbiotic/asymbiotic N fixation to soil mineral N', &
          ptr_col=this%nfix_to_sminn_mimicsplus_col, default=default)
          
-    if ( use_fun )then
+    if ( use_fun .or. decomp_method == mimicsplus_decomp)then
        this%ffix_to_sminn_col(begc:endc) = spval
        call hist_addfld1d (fname='FFIX_TO_SMINN', units='gN/m^2/s', &
             avgflag='A', long_name='free living  N fixation to soil mineral N', &

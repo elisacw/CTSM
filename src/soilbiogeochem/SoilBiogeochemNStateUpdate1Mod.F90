@@ -73,7 +73,7 @@ contains
 	               ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) + nf%ndep_to_sminn_col(c)*dt * ndep_prof(c,j)
 	               ns%smin_nh4_vr_col(c,j) = ns%smin_nh4_vr_col(c,j) + nf%ffix_to_sminn_col(c)*dt * nfixation_prof(c,j)
             
-                  !ECWN I THINK STH IS MISSING HERE
+                  !ECW I THINK STH IS MISSING HERE
                   ! Do i need to add nfix_to_sminn_mimicsplus_col below
 	          else
 	            if (.not. use_nitrif_denitrif) then
