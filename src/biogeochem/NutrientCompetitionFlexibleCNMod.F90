@@ -1412,6 +1412,8 @@ contains
                                        igrain,igrain_st,igrain_xf,iretransn,ioutc,ioutn
     use CNVegMatrixMod         , only : matrix_update_phn
     use SoilBiogeochemDecompCascadeConType, only : mimicsplus_decomp, decomp_method
+    use SoilBiogeochemDecompCascadeMIMICSMod, only : params_inst
+
     ! !ARGUMENTS:
     class(nutrient_competition_FlexibleCN_type), intent(inout) :: this
     type(bounds_type)               , intent(in)    :: bounds
@@ -1500,6 +1502,8 @@ contains
          leafn                 => cnveg_nitrogenstate_inst%leafn_patch              , & ! Input:  [real(r8) (:)   ]  (gN/m2) leaf N
          plant_ndemand         => cnveg_nitrogenflux_inst%plant_ndemand_patch       , & ! Output: [real(r8) (:)   ]  N flux required to support initial GPP (gN/m2/s)
          n_stress              => cnveg_nitrogenflux_inst%n_stress_patch            , &
+         n_stress_max         => params_inst%n_stress_max           , &   ! Maximum N demand of plant, based on current N amount in plant         []
+         n_stress_min         => params_inst%n_stress_min           , &   ! Miminmum value of N_stress                                            []
          leafn_storage         => cnveg_nitrogenstate_inst%leafn_storage_patch              , & ! Input:  [real(r8) (:)   ]  (gN/m2) leaf N
          frootn_storage        => cnveg_nitrogenstate_inst%frootn_storage_patch              , & ! Input:  [real(r8) (:)   ]  (gN/m2) leaf N
          npool                 => cnveg_nitrogenstate_inst%npool_patch                      , & ! Input:  [real(r8) (:)   ]  (gN/m2) temporary plant N pool

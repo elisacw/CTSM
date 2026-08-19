@@ -630,10 +630,7 @@ contains
    integer :: iveg
 
    logical, parameter :: use_myc_dormancy = .true.          ! Set to .false. to disable mycorrhizal winter dormancy
-   
-   real(r8), parameter :: N_stress_max = 2.0_r8             ! Maximum N demand of plant, based on current N amount in plant []
-   real(r8), parameter :: N_stress_min = 0.05_r8            ! Miminmum value of N_stress
-   real(r8), parameter :: sulman_fnalloc = 0.08_r8          ! Fraction of NPP allocated to N uptake per unit N stress [fraction] 
+
    real(r8), parameter :: sulman_plant_n_subsidy = 0.00_r8  ! Fraction of C flux send back as N flux to symbionts
    ! Make these parameters per soil type (sand, clay, silt) in the future if needed
    real(r8), parameter :: nh4_solubility = 0.2_r8       ! Amount of ammonium dissolves in soil water at saturated moisture (fraction)
@@ -708,6 +705,7 @@ contains
    dt   = get_step_size_real()
    
    associate(                                                   &
+   sulman_fnalloc       => params_inst%sulman_fnalloc         , &   ! Fraction of NPP allocated to N uptake per unit N stress       [fraction] 
    sulman_root_no3      => params_inst%sulman_root_no3        , &   ! Maximum root active nitrate uptake rate                        [gN/m3/s]
    sulman_root_nh4      => params_inst%sulman_root_nh4        , &   ! Maximum root active ammonium uptake rate                       [gN/m3/s]
    sulman_km_no3        => params_inst%sulman_km_no3          , &   ! Half-saturation nitrate concentration for root active uptake     [gN/m3]
@@ -1062,12 +1060,16 @@ contains
       p = filter_soilp(fp)
       c = patch%column(p)
       ! Amount of nitrogen fixed by fixer biomass
-      N_fixation(p) = C_biomass(p,i_fixer) * sulman_rfix * pftcon%fixer_symbiont(ivt(p))! units: gN/m2/s
+      ! The fixer fraction in MIMICS+ is different to the one in FUN, 
+      ! here it essentially just scales the rfix parameter lower to estimate better how much a PFT should be able to fixate N 
+      N_fixation(p) = C_biomass(p,i_fixer) * sulman_rfix !* pftcon%fixer_symbiont(ivt(p))! units: gN/m2/s
        ! T dependence of N fixation from Houlton et al. (2008) Nature paper (normalized to peak at 1.0)
        ! a=-3.62, b=0.27, c=25.15, T effect = exp(-0.5*b*c+b*Ts*(1-0.5*Ts/c))
        ! Could be used as if statement: if(N_fix_Tdep_Houlton) 
       ! ECW TODO MAKE FIXERS LIMITED BY LAYER TEMPERATURE DEPENDING ON ROOT PROFILE
        N_fixation(p) = N_fixation(p) * exp(-0.5*0.27*25.15 + 0.27*(t_soisno(c,1)-273.15)*(1.0-0.5*(t_soisno(c,1)-273.15)/25.15))
+       N_fixation(p) = N_fixation(p) * dormancy_myc(p)   ! scale by dormacy
+
 
       do j = 1,nlevdecomp
          N_reservoir(p,i_miner) =  N_reservoir(p,i_miner) + ((somc_nuptake(p,j) * dt + somp_nuptake(p,j) * dt) * col%dz(c,j))
@@ -1155,14 +1157,14 @@ contains
        
 
        ! Nitrogen Fixation
-       symb_growth_gross(p,i_fixer) = (sulman_max_symb_growth * C_reservoir(p,i_fixer) / (C_reservoir(p,i_fixer) + sulman_kgrowth))
+       symb_growth_gross(p,i_fixer) = dormancy_myc(p) * (sulman_max_symb_growth * C_reservoir(p,i_fixer) / (C_reservoir(p,i_fixer) + sulman_kgrowth))
        growth_resp(p,i_fixer) = symb_growth_gross(p,i_fixer) * (1.0 - symbiont_CUE(i_fixer))
        symb_growth(p,i_fixer) = symb_growth_gross(p,i_fixer) * symbiont_CUE(i_fixer) !C30
    
        ! Fixation has to be done at the biomas update, since it is reduced by the growth
 
-       total_symbiont_turnover_C(p,i_fixer) = C_biomass(p,i_fixer) * symbiont_tau(i_fixer)
-       total_symbiont_turnover_N(p,i_fixer) = N_biomass(p,i_fixer) * symbiont_tau(i_fixer)
+       total_symbiont_turnover_C(p,i_fixer) = C_biomass(p,i_fixer) * symbiont_tau(i_fixer) * dormancy_myc(p)
+       total_symbiont_turnover_N(p,i_fixer) = N_biomass(p,i_fixer) * symbiont_tau(i_fixer) * dormancy_myc(p)
 
        maint_resp_N(p,i_fixer) = total_symbiont_turnover_N(p,i_fixer) * symbiont_mr
       
@@ -1246,7 +1248,7 @@ contains
          N_to_plant(p,i_miner) = 0.0_r8
       endif
       if (is_active(p,i_fixer)) then 
-         N_to_plant(p,i_fixer) = N_reservoir(p,i_fixer) * params_inst%sulman_rup_veg
+         N_to_plant(p,i_fixer) = N_reservoir(p,i_fixer) * params_inst%sulman_rup_veg * dormancy_myc(p)
       else
          N_to_plant(p,i_fixer) = 0.0_r8
       endif
@@ -1257,7 +1259,7 @@ contains
       n_to_plant_mimicsplus(p) = N_to_plant(p,i_scav) + N_to_plant(p,i_miner) + N_to_plant(p,i_fixer) + root_N_to_plant(p)
 
       if (availc(p) > 0.0_r8) then
-        C_allocation_to_N_acq(p) = availc(p)  * 0.08_r8 * n_stress(p)
+        C_allocation_to_N_acq(p) = availc(p)  * params_inst%sulman_fnalloc * n_stress(p)
         npp_growth(p) = (availc(p) - C_allocation_to_N_acq(p)) / (1.0_r8 + pftcon%grperc(ivt(p)))  ! why do we do this grwoth respiration thing here?
         C_allocation_to_N_acq(p) = availc(p) - npp_growth(p)*(1.0_r8 + pftcon%grperc(ivt(p)))
       else
@@ -1376,6 +1378,7 @@ contains
       end do
 
       N_symb_up(p,i_fixer) = N_fixation(p)
+
    
           
    ! LOCAL CARBON BALANCE CHECK
@@ -2061,7 +2064,7 @@ contains
       if (C_biomass(p,i_fixer) > 0.0_r8) then 
          fix_roi(p) = (N_to_plant(p,i_fixer) * params_inst%symbiont_CUE(i_fixer)) / (C_biomass(p,i_fixer) * params_inst%symbiont_tau(i_fixer))
       else 
-         fix_roi(p) =  params_inst%sulman_rfix / (params_inst%symbiont_CUE(i_fixer) * params_inst%symbiont_tau(i_fixer) * dt)
+         fix_roi(p) =  (params_inst%sulman_rfix * dt) / (params_inst%symbiont_CUE(i_fixer) * params_inst%symbiont_tau(i_fixer) * dt)
       end if 
    else
      fix_roi = 0.0_r8
