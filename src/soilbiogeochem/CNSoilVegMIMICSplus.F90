@@ -84,6 +84,11 @@ module CNSoilVegMIMICSplus
   real(r8), pointer           :: C_allocation_to_N_acq   (:) ! [patch] Carbon allocation from plant               [gC/m2/s]
   real(r8), pointer           :: C_alloc_root            (:) ! [patch] Carbon allocation from plant to active root uptake  [gC/m2/s]
   
+  real(r8), pointer           :: mine_roi              (:) ! [patch] Nitrogen return on C investment, miner symbiont     [gN/gC]
+  real(r8), pointer           :: scav_roi              (:) ! [patch] Nitrogen return on C investment, scavenger symbiont [gN/gC]
+  real(r8), pointer           :: fix_roi               (:) ! [patch] Nitrogen return on C investment, fixer symbiont     [gN/gC]
+  real(r8), pointer           :: root_roi              (:) ! [patch] Nitrogen return on C investment, active root uptake [gN/gC]
+  
   real(r8), pointer           :: C_alloc               (:,:) ! [patch,n_symb] Carbon allocation from plant to symbiont  [gC/m2/s]
   real(r8), pointer           :: symb_eff              (:,:) ! [patch,n_symb] Symbiont efficiency when biomass 0  [gC/gN]
   real(r8), pointer           :: symb_growth           (:,:) ! [patch,n_symb] Symbiotic biomass growth rate       [gC/m2/s]
@@ -205,6 +210,11 @@ contains
 
     allocate(this%C_allocation_to_N_acq(begp:endp)); this%C_allocation_to_N_acq(begp:endp)   = 0.0_r8
     allocate(this%C_alloc_root(begp:endp))         ; this%C_alloc_root(begp:endp)            = 0.0_r8
+
+    allocate(this%mine_roi(begp:endp)) ; this%mine_roi(begp:endp) = 0.0_r8
+    allocate(this%scav_roi(begp:endp)) ; this%scav_roi(begp:endp) = 0.0_r8
+    allocate(this%fix_roi(begp:endp))  ; this%fix_roi(begp:endp)  = 0.0_r8
+    allocate(this%root_roi(begp:endp)) ; this%root_roi(begp:endp) = 0.0_r8
 
     allocate(this%symb_eff(begp:endp,1:n_symb))    ; this%symb_eff(begp:endp,1:n_symb)       = 0.0_r8
     allocate(this%symb_growth(begp:endp,1:n_symb)) ; this%symb_growth(begp:endp,1:n_symb)    = 0.0_r8
@@ -404,6 +414,26 @@ contains
          call hist_addfld1d (fname='C_ALLOC_TO_ROOT', units='-', &
          avgflag='A', long_name='C allocated to active root uptake', &
          ptr_patch=this%C_alloc_root)
+        
+         this%mine_roi(begp:endp) = spval
+         call hist_addfld1d (fname='MINE_ROI', units='gN/gC', &
+         avgflag='A', long_name='Nitrogen return on carbon investment, mycorrhizal miner', &
+         ptr_patch=this%mine_roi, set_spec=spval, default='inactive')
+
+         this%scav_roi(begp:endp) = spval
+         call hist_addfld1d (fname='SCAV_ROI', units='gN/gC', &
+         avgflag='A', long_name='Nitrogen return on carbon investment, mycorrhizal scavenger', &
+         ptr_patch=this%scav_roi, set_spec=spval, default='inactive')
+
+         this%fix_roi(begp:endp) = spval
+         call hist_addfld1d (fname='FIX_ROI', units='gN/gC', &
+         avgflag='A', long_name='Nitrogen return on carbon investment, N fixer', &
+         ptr_patch=this%fix_roi, set_spec=spval, default='inactive')
+
+         this%root_roi(begp:endp) = spval
+         call hist_addfld1d (fname='ROOT_ROI', units='gN/gC', &
+         avgflag='A', long_name='Nitrogen return on carbon investment, active root uptake', &
+         ptr_patch=this%root_roi, set_spec=spval, default='inactive')
 
 
    end subroutine InitHistory
@@ -1062,7 +1092,7 @@ contains
       ! Amount of nitrogen fixed by fixer biomass
       ! The fixer fraction in MIMICS+ is different to the one in FUN, 
       ! here it essentially just scales the rfix parameter lower to estimate better how much a PFT should be able to fixate N 
-      N_fixation(p) = C_biomass(p,i_fixer) * sulman_rfix !* pftcon%fixer_symbiont(ivt(p))! units: gN/m2/s
+      N_fixation(p) = C_biomass(p,i_fixer) * sulman_rfix !* 0.25_r8 !pftcon%fixer_symbiont(ivt(p))! units: gN/m2/s
        ! T dependence of N fixation from Houlton et al. (2008) Nature paper (normalized to peak at 1.0)
        ! a=-3.62, b=0.27, c=25.15, T effect = exp(-0.5*b*c+b*Ts*(1-0.5*Ts/c))
        ! Could be used as if statement: if(N_fix_Tdep_Houlton) 
@@ -1269,8 +1299,10 @@ contains
 
       ! Partial drain of intermediate C reservoirs to root exudates
       ! sulman_tau_int [s-1] controls the drain rate
-      ! At sulman_tau_int = 1/86400 s-1, reservoir has ~1 day turnover    
-      drain_frac = min(sulman_tau_int * dt, 0.95_r8)  ! never drain more than 95%
+      ! At sulman_tau_int = 3.17e-5, s-1, reservoir has ~1 day turnover    
+
+      
+      drain_frac = sulman_tau_int * dt
       
       root_exudate_C(p) = root_exudate_C(p) &
           + (C_reservoir(p,i_scav) + C_reservoir(p,i_miner) + C_reservoir(p,i_fixer)) &
@@ -1537,7 +1569,10 @@ contains
       ! If there is carbon avaliable, calculate mycorrhizal repiration     
       if (soil_carbon > 0.0_r8 .and. wliq > 0.0_r8) then 
          !resp_myc = Vmax_myc(soil_T) * soil_carbon * enzymes / (soil_carbon * params_inst%sulman_km_mine + enzymes) * theta_func ! not unit consitent
-         resp_myc = Vmax_myc(soil_T) * enzymes * (soil_carbon / (soil_carbon + params_inst%sulman_km_mine)) * theta_func
+         !resp_myc = Vmax_myc(soil_T) * enzymes * (soil_carbon / (soil_carbon + params_inst%sulman_km_mine)) * theta_func
+         !Terje suggest 
+         resp_myc = Vmax_myc(soil_T) * theta_func * enzymes * soil_carbon * ((myc_biomass_layer / soil_carbon) / (myc_biomass_layer / soil_carbon + params_inst%sulman_km_mine))
+         
       else 
          resp_myc = 0.0_r8
       end if 
@@ -1984,10 +2019,10 @@ contains
    real(r8) :: local_active            ! Indicates which pathway is active, based on symbiont type of PFT
    
    real(r8) :: roi(bounds%begp:bounds%endp)                      ! Return of investment for all pathways [gN/gC]
-   real(r8) :: mine_roi(bounds%begp:bounds%endp)                 ! Nitrogen return of carbon investment  [gN/gC]
-   real(r8) :: scav_roi(bounds%begp:bounds%endp)                 ! Nitrogen return of carbon investment  [gN/gC]
-   real(r8) :: fix_roi(bounds%begp:bounds%endp)                  ! Nitrogen return of carbon investment  [gN/gC]
-   real(r8) :: root_roi(bounds%begp:bounds%endp)                 ! 
+   !real(r8) :: mine_roi(bounds%begp:bounds%endp)                 ! Nitrogen return of carbon investment  [gN/gC]
+   !real(r8) :: scav_roi(bounds%begp:bounds%endp)                 ! Nitrogen return of carbon investment  [gN/gC]
+   !real(r8) :: fix_roi(bounds%begp:bounds%endp)                  ! Nitrogen return of carbon investment  [gN/gC]
+   !real(r8) :: root_roi(bounds%begp:bounds%endp)                 ! 
    real(r8) :: scav_roi_frac                                     ! Scavenger fraction of ROI [-]
    real(r8) :: mine_roi_frac                                     ! Miner fraction of ROI [-]
    real(r8) :: fix_roi_frac                                      ! Fixer fraction of ROI [-]
@@ -2006,12 +2041,16 @@ contains
    N_to_plant             => symbiont_inst%N_to_plant                          , &
    C_allocation_to_N_acq  => symbiont_inst%C_allocation_to_N_acq               , &
    C_alloc_root           => symbiont_inst%C_alloc_root                        , & ! Carbon allocation to roots based on ROI [gC/m2/s]
+   mine_roi               => symbiont_inst%mine_roi                            , &
+   scav_roi               => symbiont_inst%scav_roi                            , &
+   fix_roi                => symbiont_inst%fix_roi                             , &
+   root_roi               => symbiont_inst%root_roi                            , &
    ivt                    => patch%itype                                        & ! Input: (:) patch vegetation type    [-]
    )     
 
    !--------------------------------------------------------------------------------------------------------------------------------
 
-   ! RETURN OF INVESTMENT
+  ! RETURN OF INVESTMENT
   
   do fp = 1,num_soilp
       p = filter_soilp(fp)
@@ -2025,10 +2064,15 @@ contains
                         (C_biomass(p,i_scav) * (params_inst%symbiont_tau(i_scav)))
       else 
       ! scav_efficiency is calculated in myc_scavenger_N_uptake under myc_efficiency
-      scav_roi(p) = symb_eff(p,i_scav) / (params_inst%symbiont_CUE(i_scav) * (params_inst%symbiont_tau(i_scav) * dt))
+          scav_roi(p) = symb_eff(p,i_scav) / (params_inst%symbiont_CUE(i_scav) * (params_inst%symbiont_tau(i_scav) * dt))
       end if 
+     ! if (C_alloc(p,i_scav) > 0.0_r8) then
+     !    scav_roi(p) = N_to_plant(p,i_scav) / C_alloc(p,i_scav)
+     ! else
+     !    scav_roi(p) = symb_eff(p,i_scav)   ! fallback for cold-start / zero-investment case
+     ! end if
    else
-      scav_roi = 0.0_r8
+      scav_roi(p) = 0.0_r8
    end if 
 
 
@@ -2046,6 +2090,11 @@ contains
          ! mine is calculated in one of the mining routines under myc_efficiency
          mine_roi(p) = symb_eff(p,i_miner) / (params_inst%symbiont_CUE(i_miner) * (params_inst%symbiont_tau(i_miner) * dt))
       end if 
+      !if (C_alloc(p,i_miner) > 0.0_r8) then
+      !   mine_roi(p) = N_to_plant(p,i_miner) / C_alloc(p,i_miner)
+      !else
+      !   mine_roi(p) = symb_eff(p,i_miner)   ! fallback for cold-start / zero-investment case
+      !end if
    else
        mine_roi(p) = 0.0_r8
    end if 
@@ -2066,8 +2115,13 @@ contains
       else 
          fix_roi(p) =  (params_inst%sulman_rfix * dt) / (params_inst%symbiont_CUE(i_fixer) * params_inst%symbiont_tau(i_fixer) * dt)
       end if 
+      !if (C_alloc(p,i_fixer) > 0.0_r8) then
+      !   fix_roi(p) = N_to_plant(p,i_fixer) / C_alloc(p,i_fixer)
+      !else
+      !   fix_roi(p) = symb_eff(p,i_fixer)   ! fallback for cold-start / zero-investment case
+      !end if
    else
-     fix_roi = 0.0_r8
+     fix_roi(p) = 0.0_r8
    end if 
 
    
@@ -2092,16 +2146,6 @@ contains
     C_alloc(p,i_miner) = C_allocation_to_N_acq(p) * mine_roi_frac
     C_alloc(p,i_scav)  = C_allocation_to_N_acq(p) * scav_roi_frac
     C_alloc_root(p)    = C_allocation_to_N_acq(p) * root_roi_frac
-
-   !C_alloc(p,i_fixer)     = C_allocation_to_N_acq(p) * fix_roi_frac * pftcon%FUN_fracfixers(ivt(p))
-   !C_alloc_fixer_leftover = C_allocation_to_N_acq(p) * fix_roi_frac - C_alloc(p,i_fixer)
-
-   !C_alloc(p,i_miner) = C_allocation_to_N_acq(p) * mine_roi_frac &
-   !                     + C_alloc_fixer_leftover * (mine_roi_frac / max(1.0_r8 - fix_roi_frac, 1.0e-20_r8))
-   !C_alloc(p,i_scav)  = C_allocation_to_N_acq(p) * scav_roi_frac &
-   !                     + C_alloc_fixer_leftover * (scav_roi_frac / max(1.0_r8 - fix_roi_frac, 1.0e-20_r8))
-   !C_alloc_root(p)    = C_allocation_to_N_acq(p) * root_roi_frac &
-   !                     + C_alloc_fixer_leftover * (root_roi_frac / max(1.0_r8 - fix_roi_frac, 1.0e-20_r8))
 
     ! Carbon that wasn't spend on scav, miner or fixer (including root)
     root_exudate_C(p) = root_exudate_C(p) + C_allocation_to_N_acq(p) - C_alloc(p,i_scav) - C_alloc(p,i_miner) - C_alloc(p,i_fixer)
