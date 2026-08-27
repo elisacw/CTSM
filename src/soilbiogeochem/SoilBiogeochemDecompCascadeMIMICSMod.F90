@@ -1538,12 +1538,23 @@ contains
                pathfrac_decomp_cascade(c,j,i_s1m2) = 0._r8
             end if
 
-            decomp_k(c,j,i_phys_som) = desorption * depth_scalar(c,j)
+            ! Desorption of physically protected SOM to available SOM.
+            ! With MIMICSplus, this pathway is replaced by mycorrhizal mining
+           ! if (decomp_method == mimicsplus_decomp) then
+            !   decomp_k(c,j,i_phys_som) = 0._r8
+            !else
+               decomp_k(c,j,i_phys_som) = desorption * depth_scalar(c,j)
+            !end if
 
             term_1 = vmax_l2_m1 * m1_conc / (mimics_ko_r * km_l2_m1 + m1_conc)
             term_2 = vmax_l2_m2 * m2_conc / (mimics_ko_k * km_l2_m2 + m2_conc)
-            ! The right hand side is OXIDAT in the testbed (line 1145)
-            decomp_k(c,j,i_chem_som) = (term_1 + term_2) * w_d_o_scalars
+            ! With MIMICSplus, this pathway is replaced by mycorrhizal mining
+            !if (decomp_method == mimicsplus_decomp) then
+            !   decomp_k(c,j,i_chem_som) = 0._r8
+            !else
+               ! The right hand side is OXIDAT in the testbed (line 1145)
+               decomp_k(c,j,i_chem_som) = (term_1 + term_2) * w_d_o_scalars
+            !end if
 
             ! Currently, mimics_densdep = 1 so as to have no effect
             decomp_k(c,j,i_cop_mic) = tau_m1 * m1_conc**(mimics_densdep) 
