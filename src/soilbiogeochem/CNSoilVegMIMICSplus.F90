@@ -1520,7 +1520,7 @@ contains
    end function Vmax_myc
 
    
-   function resp_myc(soil_carbon, myc_biomass_layer, soil_T, wliq, wair)
+   function resp_myc(soil_carbon, soil_carbon_total, myc_biomass_layer, soil_T, wliq, wair)
       ! This is the rate of C removed from soil pool as respiration(not actual respiration, rename)
       ! Respiration is driven by mycorrhizae, and depends on how much mycorrhizal biomass there is and how many enzymes they produce 
       ! also limited by environmental conditions (soil moisture & temperature)
@@ -1528,14 +1528,15 @@ contains
       ! USES
       use decompMod         , only : bounds_type
       !
-      real(r8), intent(in) :: soil_carbon                      ! Soil carbon stocks, vertically resolved            [gC/m3]
+      real(r8), intent(in) :: soil_carbon                      ! Soil carbon stocks, vertically resolved                [gC/m3]
+      real(r8), intent(in) :: soil_carbon_total                ! Soil carbon SOMc & SOMp stocks, vertically resolved    [gC/m3]
       
       real(r8), intent(in) :: myc_biomass_layer                ! Mycorrhyzal biomass per soillayer                  [gC/m3]
       real(r8), intent(in) :: soil_T                           ! Soil temperature                                       [K]
       real(r8), intent(in) :: wliq                             ! Fraction of liquid water-filled pore space (0.0 - 1.0) [-]  
       real(r8), intent(in) :: wair                             ! Fraction of air-filled pore space (0.0 - 1.0)          [-]
       
-      real(r8), parameter  :: enzyme_frac=0.1_r8                  ! Relative amount of enzymes produced by microbes     [-]
+      real(r8), parameter  :: enzyme_frac= 1.0_r8                 ! Relative amount of enzymes produced by microbes     [-]
       real(r8), parameter  :: substrate_diffusion_exp = 3.0_r8    ! Exponent for theta dependence at low theta. See Davison et al DAMM model paper
       real(r8), parameter  :: gas_diffusion_exp = 2.5_r8          ! Exponent for gas diffusion power law dependence on theta See Meslin et al 2010, SSAJ
       real(r8), parameter  :: min_anaerobic_resp_factor = 0.0_r8  ! Minimum for high soil moisture Resp limitation [-]
@@ -1568,10 +1569,17 @@ contains
 
       ! If there is carbon avaliable, calculate mycorrhizal repiration     
       if (soil_carbon > 0.0_r8 .and. wliq > 0.0_r8) then 
-         !resp_myc = Vmax_myc(soil_T) * soil_carbon * enzymes / (soil_carbon * params_inst%sulman_km_mine + enzymes) * theta_func ! not unit consitent
-         !resp_myc = Vmax_myc(soil_T) * enzymes * (soil_carbon / (soil_carbon + params_inst%sulman_km_mine)) * theta_func
+          !resp_myc = Vmax_myc(soil_T) * enzymes * (soil_carbon / (soil_carbon + params_inst%sulman_km_mine)) * theta_func
+         
          !Terje suggest 
-         resp_myc = Vmax_myc(soil_T) * theta_func * enzymes * soil_carbon * ((myc_biomass_layer / soil_carbon) / (myc_biomass_layer / soil_carbon + params_inst%sulman_km_mine))
+         !resp_myc = Vmax_myc(soil_T) * theta_func * soil_carbon * ((myc_biomass_layer / soil_carbon) / (myc_biomass_layer / soil_carbon + params_inst%sulman_km_mine))
+         
+         !Sulman with enz frac = 0.1
+         resp_myc = Vmax_myc(soil_T) * theta_func * soil_carbon * enzymes / (soil_carbon_total * params_inst%sulman_km_mine + enzymes)
+         
+
+         !Betty suggests with enz frac = 0.1, this rans faily okay, vegc bit low
+         !resp_myc = Vmax_myc(soil_T) * theta_func * soil_carbon * enzymes / (soil_carbon_total * params_inst%sulman_km_mine + enzymes)
          
       else 
          resp_myc = 0.0_r8
@@ -1859,27 +1867,39 @@ contains
                   wair = max(0.0_r8, 1.0_r8 - wliq- wice)         ! fraction of air-filled pore space (0.0 - 1.0)
 
                   ! N uptake by mineres from SOMc & SOMp
-                  somc_nuptake(p,j) = miner_nuptake(decomp_cpools_vr(c,j,i_chem_som), decomp_npools_vr(c,j,i_chem_som), &
+                  somc_nuptake(p,j) = miner_nuptake(decomp_cpools_vr(c,j,i_chem_som), &
+                                      decomp_cpools_vr(c,j,i_chem_som) + decomp_cpools_vr(c,j,i_phys_som), &
+                                      decomp_npools_vr(c,j,i_chem_som), &
+                                      myc_biomass_layer(p,j), t_soisno(c,j), wliq, wair)
+
+                  somp_nuptake(p,j) = miner_nuptake(decomp_cpools_vr(c,j,i_phys_som), &
+                                       decomp_cpools_vr(c,j,i_chem_som) + decomp_cpools_vr(c,j,i_phys_som), &
+                                       decomp_npools_vr(c,j,i_phys_som), &
                                        myc_biomass_layer(p,j), t_soisno(c,j), wliq, wair)
                   
-                  somp_nuptake(p,j) = miner_nuptake(decomp_cpools_vr(c,j,i_phys_som), decomp_npools_vr(c,j,i_phys_som), &
-                                        myc_biomass_layer(p,j), t_soisno(c,j), wliq, wair)
-                 
                   total_org_nuptake(p) = total_org_nuptake(p) + (somc_nuptake(p,j) + somp_nuptake(p,j)) * col%dz(c,j)
                   
                   ! Co-mineralized carbon during mining, is send to SOMa pool (could also be respiered)
-                  somc_cuptake(p,j) = resp_myc(decomp_cpools_vr(c,j,i_chem_som), myc_biomass_layer(p,j), t_soisno(c,j), wliq, wair)
-                  
-                  somp_cuptake(p,j) = resp_myc(decomp_cpools_vr(c,j,i_phys_som), myc_biomass_layer(p,j), t_soisno(c,j), wliq, wair)
-                  
+                  somc_cuptake(p,j) = resp_myc(decomp_cpools_vr(c,j,i_chem_som), &
+                                      decomp_cpools_vr(c,j,i_chem_som) + decomp_cpools_vr(c,j,i_phys_som), &
+                                      myc_biomass_layer(p,j), t_soisno(c,j), wliq, wair)
+
+                  somp_cuptake(p,j) = resp_myc(decomp_cpools_vr(c,j,i_phys_som), &
+                                      decomp_cpools_vr(c,j,i_chem_som) + decomp_cpools_vr(c,j,i_phys_som), &
+                                      myc_biomass_layer(p,j), t_soisno(c,j), wliq, wair)
                   
                   ! Leftover N in soil after applying  NUE added to SOMa pool
-                  N_mine_somc2soma(p,j) = leftover_n_mining(decomp_cpools_vr(c,j,i_chem_som), decomp_npools_vr(c,j,i_chem_som), &   
+                  N_mine_somc2soma(p,j) = leftover_n_mining(decomp_cpools_vr(c,j,i_chem_som), &
+                                          decomp_cpools_vr(c,j,i_chem_som) + decomp_cpools_vr(c,j,i_phys_som), &
+                                          decomp_npools_vr(c,j,i_chem_som), &   
                                           myc_biomass_layer(p,j), t_soisno(c,j), wliq, wair)
-   
-                  N_mine_somp2soma(p,j) = leftover_n_mining(decomp_cpools_vr(c,j,i_phys_som), decomp_npools_vr(c,j,i_phys_som), &
-                                           myc_biomass_layer(p,j), t_soisno(c,j), wliq, wair)
+                  
+                  N_mine_somp2soma(p,j) = leftover_n_mining(decomp_cpools_vr(c,j,i_phys_som), &
+                                          decomp_cpools_vr(c,j,i_chem_som) + decomp_cpools_vr(c,j,i_phys_som), &
+                                          decomp_npools_vr(c,j,i_phys_som), &
+                                          myc_biomass_layer(p,j), t_soisno(c,j), wliq, wair)
                                           
+                        
                else 
                   somc_nuptake(p,j)    = 0.0_r8
                   somp_nuptake(p,j)    = 0.0_r8
@@ -1903,12 +1923,13 @@ contains
    !------------------------------------------------------------------------------------------------
    ! MINER FUNCTIONS
 
-   function potential_mined_n(soil_carbon, soil_nitrogen, myc_biomass_layer, soil_T, soil_water, soil_air)
+   function potential_mined_n(soil_carbon, soil_carbon_total, soil_nitrogen, myc_biomass_layer, soil_T, soil_water, soil_air)
      ! DESCRIPTION
      ! This helper returns the co-mineralized N before NUE is applied
 
      ! ARGUMENTS
       real(r8), intent(in) :: soil_carbon        ! Soil carbon stocks, vertically resolved   [gC/m3]
+      real(r8), intent(in) :: soil_carbon_total  ! Soil carbon stocks toatal, vertically resolved   [gC/m3]
       real(r8), intent(in) :: soil_nitrogen      ! Soil nitrogen stocks, vertically resolved [gN/m3]
       real(r8), intent(in) :: myc_biomass_layer  ! Mycorrhyzal biomass                       [gC/m3]
       real(r8), intent(in) :: soil_T             ! Soil temperature                              [K]
@@ -1922,7 +1943,7 @@ contains
       potential_mined_n = 0.0_r8
 
       ! Call resp_myc(...) to get the soil carbon respiration by mycorrhiza
-      potential_tempResp=resp_myc(soil_carbon, myc_biomass_layer, soil_T, soil_water, soil_air)
+      potential_tempResp=resp_myc(soil_carbon, soil_carbon_total, myc_biomass_layer, soil_T, soil_water, soil_air)
 
       ! Don't exceed avaliable C
       if(dt*potential_tempResp > soil_carbon) then
@@ -1939,12 +1960,13 @@ contains
    end function potential_mined_n
    
   
-   function miner_nuptake(soil_carbon, soil_nitrogen, myc_biomass_layer, soil_T, soil_water, soil_air)
+   function miner_nuptake(soil_carbon, soil_carbon_total, soil_nitrogen, myc_biomass_layer, soil_T, soil_water, soil_air)
    ! This calculates the amount of nitrogen taken up from SOM pools by mycorrhizal mining.
    ! Converts carbon processing (decomposition) into nitrogen uptake, which is the key biogeochemical role of mining.
      
       ! ARGUMENTS
       real(r8), intent(in) :: soil_carbon        ! Soil carbon stocks, vertically resolved   [gC/m3]
+      real(r8), intent(in) :: soil_carbon_total  ! Soil carbon stocks total, vertically resolved   [gC/m3]
       real(r8), intent(in) :: soil_nitrogen      ! Soil nitrogen stocks, vertically resolved [gN/m3]
       real(r8), intent(in) :: myc_biomass_layer  ! Mycorrhyzal biomass                       [gC/m3]
       real(r8), intent(in) :: soil_T             ! Soil temperature                              [K]
@@ -1957,7 +1979,7 @@ contains
       miner_nuptake    = 0.0_r8
 
       !Call potential_mined_n to get the potential mined N before NUE
-      pot_tempN_decomposed = potential_mined_n(soil_carbon, soil_nitrogen, myc_biomass_layer, soil_T, soil_water, soil_air)
+      pot_tempN_decomposed = potential_mined_n(soil_carbon, soil_carbon_total, soil_nitrogen, myc_biomass_layer, soil_T, soil_water, soil_air)
 
      ! Apply nitrogen use efficiency (sulman_nue_mine) to scale the actual uptake.
       miner_nuptake  = pot_tempN_decomposed*params_inst%sulman_nue_mine
@@ -1965,10 +1987,11 @@ contains
    end function miner_nuptake
 
 
-   function leftover_n_mining(soil_carbon, soil_nitrogen, myc_biomass_layer, soil_T, soil_water, soil_air)
+   function leftover_n_mining(soil_carbon, soil_carbon_total, soil_nitrogen, myc_biomass_layer, soil_T, soil_water, soil_air)
 
        ! ARGUMENTS
       real(r8), intent(in) :: soil_carbon        ! Soil carbon stocks, vertically resolved   [gC/m3]
+      real(r8), intent(in) :: soil_carbon_total  !
       real(r8), intent(in) :: soil_nitrogen      ! Soil nitrogen stocks, vertically resolved [gN/m3]
       real(r8), intent(in) :: myc_biomass_layer  ! Mycorrhyzal biomass                       [gC/m3]
       real(r8), intent(in) :: soil_T             ! Soil temperature                              [K]
@@ -1983,7 +2006,7 @@ contains
       leftover_n_mining = 0.0_r8
 
        !Call potential_mined_n to get the potential mined N before NUE
-      pot_tempN_decomposed = potential_mined_n(soil_carbon, soil_nitrogen, myc_biomass_layer, soil_T, soil_water, soil_air)
+      pot_tempN_decomposed = potential_mined_n(soil_carbon, soil_carbon_total, soil_nitrogen, myc_biomass_layer, soil_T, soil_water, soil_air)
 
      ! Apply nitrogen use efficiency (sulman_nue_mine) to scale the actual uptake.
       n_som_to_miner  = pot_tempN_decomposed*params_inst%sulman_nue_mine
