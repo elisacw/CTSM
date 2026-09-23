@@ -114,6 +114,7 @@ module CNSoilVegMIMICSplus
   real(r8), pointer           :: somc_cuptake_col      (:,:) ! Carbon uptake from SOMc pool per column      [gC/m3/s]
   real(r8), pointer           :: somp_cuptake_col      (:,:) ! Carbon uptake from SOMp pool per column      [gC/m3/s]
   real(r8), pointer           :: root_exudate_C_col    (:,:) ! Leftover C from allocation to symbionts      [gC/m3/s]
+  real(r8), pointer           :: miner_resp_col        (:,:) ! Mining C respired rather than sent to SOMa  [gC/m3/s]
   logical, pointer            :: is_active             (:,:) ! If the symbiont type is active               [-]
   character(len=10), pointer  :: symb_name             (:)   ! Symbiont name                                [-]
   character(len=10), pointer  :: symb_hist_name        (:)   ! Symbiont name on history tapes               [-]
@@ -235,6 +236,7 @@ contains
     allocate(this%somp_nuptake_col(begc:endc,1:nlevdecomp)) ; this%somp_nuptake_col(begc:endc,1:nlevdecomp) = 0.0_r8
     allocate(this%somc_cuptake_col(begc:endc,1:nlevdecomp)) ; this%somc_cuptake_col(begc:endc,1:nlevdecomp) = 0.0_r8
     allocate(this%somp_cuptake_col(begc:endc,1:nlevdecomp)) ; this%somp_cuptake_col(begc:endc,1:nlevdecomp) = 0.0_r8
+    allocate(this%miner_resp_col(begc:endc,1:nlevdecomp))   ; this%miner_resp_col(begc:endc,1:nlevdecomp)   = 0.0_r8
 
     allocate(this%root_exudate_C_col(begc:endc,1:nlevdecomp))      ; this%root_exudate_C_col(begc:endc,1:nlevdecomp)    = 0.0_r8
     allocate(this%total_symbiont_turnover_C(begp:endp,1:n_symb))   ; this%total_symbiont_turnover_C(begp:endp,1:n_symb) = 0.0_r8
@@ -405,6 +407,11 @@ contains
          avgflag='A', long_name='Leftover root exudate C from symbiont allocation', &
          ptr_col=this%root_exudate_C_col, set_spec=spval, default='inactive')
 
+         this%miner_resp_col(begc:endc,1:nlevdecomp) = spval
+         call hist_addfld2d (fname='MINER_RESP_MIMICSPLUS', units='gC/m3/s', type2d='levsoi', &
+         avgflag='A', long_name='C respired during mining, subtracted from SOMa flux', &
+         ptr_col=this%miner_resp_col, set_spec=spval, default='inactive')
+
          this%C_allocation_to_N_acq(begp:endp) = spval
          call hist_addfld1d (fname='C_ALLOC_TO_N_ACQ', units='-', &
          avgflag='A', long_name='C allocated from plant to recive N', &
@@ -495,6 +502,7 @@ contains
       this%C_mortality(bounds%begc:bounds%endc,1:nlevdecomp)            = 0.0_r8
       this%N_mortality(bounds%begc:bounds%endc,1:nlevdecomp)            = 0.0_r8
       this%root_exudate_C_col(bounds%begc:bounds%endc,1:nlevdecomp)     = 0.0_r8
+      this%miner_resp_col(bounds%begc:bounds%endc,1:nlevdecomp)         = 0.0_r8
 
     end subroutine InitCold
 
@@ -724,6 +732,9 @@ contains
    real(r8) :: dormancy_myc(bounds%begp:bounds%endp)                              ! Mycorrhizal dormancy scalar [-] 0.001=frozen, ~1=active
    real(r8), parameter :: myc_dormancy_min = 0.001_r8                             ! Minimum activity in frozen soil [-]
 
+   real(r8)            :: miner_resp_layer(bounds%begp:bounds%endp, 1:nlevdecomp) ! Mining C respired, per patch,layer [gC/m3/s]
+   real(r8), parameter :: miner_resp_frac = 0.0_r8                                ! fraction of the non-assimilated mined C
+
    ! Nstress
    real(r8) :: N_demand(bounds%begp:bounds%endp)
    real(r8) :: total_N(bounds%begp:bounds%endp)
@@ -747,6 +758,8 @@ contains
    sulman_km_mine       => params_inst%sulman_km_mine         , &   ! Half-saturation mycorrhizal biomass concentration for mining     [gC miners/gC substrate]
    sulman_nue_mine      => params_inst%sulman_nue_mine        , &   ! Nitrogen use efficiency of mycorrhizal mining                        [-]
    sulman_cue_mine      => params_inst%sulman_cue_mine        , &   ! Carbon use efficiency of mycorrhizal mining                          [-]
+   miner_som_resp_patch => cnveg_carbonflux_inst%miner_som_resp_patch  , &   ! Output: mining respiration diagnostic [gC/m2/s]
+   miner_resp_col       => symbiont_inst%miner_resp_col      , &   ! Output: mining respiration, column,layer [gC/m3/s]
    sulman_vmax_ref_mine => params_inst%sulman_vmax_ref_mine   , &   ! Maximum decomposition rate at reference temp for mycorrhizal mining  [s]
    sulman_rfix          => params_inst%sulman_rfix            , &   ! N fixation rate per unit symbiotic biomass                     [gN/gC/s]
    sulman_kgrowth       => params_inst%sulman_kgrowth         , &   ! Half-saturation of intermediate C pool for symbiotic growth      [gC/m2]
@@ -863,6 +876,8 @@ contains
    N_mine_somp2soma(bounds%begp:bounds%endp, 1:nlevdecomp)        = 0.0_r8
    symbiont_gr_patch(bounds%begp:bounds%endp)                     = 0.0_r8
    symbiont_maint_patch(bounds%begp:bounds%endp)                  = 0.0_r8
+   miner_resp_layer(bounds%begp:bounds%endp, 1:nlevdecomp)        = 0.0_r8
+   miner_som_resp_patch(bounds%begp:bounds%endp)                  = 0.0_r8
    dormancy_myc(bounds%begp:bounds%endp)                          = 1.0_r8
    
 
@@ -988,6 +1003,14 @@ contains
             somp_cuptake(p,j)     = somp_cuptake(p,j)     * dormancy_myc(p)
             N_mine_somc2soma(p,j) = N_mine_somc2soma(p,j) * dormancy_myc(p)
             N_mine_somp2soma(p,j) = N_mine_somp2soma(p,j) * dormancy_myc(p)
+
+            ! mining respiration: fraction of the non-assimilated, co-decomposed C
+            ! that is respired rather than sent to SOMa
+            miner_resp_layer(p,j) = (somc_cuptake(p,j) + somp_cuptake(p,j)) &
+                                     * (1.0_r8 - sulman_cue_mine) * miner_resp_frac
+
+            miner_som_resp_patch(p) = miner_som_resp_patch(p) + miner_resp_layer(p,j) * col%dz(c,j)
+         
          end do
       end do
    end if
@@ -1017,9 +1040,11 @@ contains
             !h2osoi_liq= kg/m2
             !smin_no3_avail = gN/m3/s
             !qflx_tran_veg_patch = kg/m2/s
-            no3_passiv_up(p,j) = (waterfluxbulk_inst%qflx_tran_veg_patch(p) * dt) * smin_no3_avail(p,j)  / h2osoi_liq(c,j) * no3_solubility
+            no3_passiv_up(p,j) = (waterfluxbulk_inst%qflx_tran_veg_patch(p) * dt) * &
+                                 norm_froot_prof(p,j) * smin_no3_avail(p,j)  / h2osoi_liq(c,j) * no3_solubility
 
-            nh4_passiv_up(p,j) = ((waterfluxbulk_inst%qflx_tran_veg_patch(p) * dt) * smin_nh4_avail(p,j) / h2osoi_liq(c,j)) * nh4_solubility
+            nh4_passiv_up(p,j) = (waterfluxbulk_inst%qflx_tran_veg_patch(p) * dt) * &
+                                 norm_froot_prof(p,j) * smin_nh4_avail(p,j) / h2osoi_liq(c,j) * nh4_solubility
          else
             nh4_passiv_up(p,j) = 0.0_r8
             no3_passiv_up(p,j) = 0.0_r8
@@ -1490,6 +1515,10 @@ contains
       root_exudate_C_layer(bounds%begp:bounds%endp,j), &
       root_exudate_C_col(bounds%begc:bounds%endc,j))  
 
+      call p2c(bounds, num_bgc_soilc, filter_bgc_soilc, &
+      miner_resp_layer(bounds%begp:bounds%endp,j), &
+      miner_resp_col(bounds%begc:bounds%endc,j))
+
    end do
 
     ! This needs to be here, bc N_fixation gets a different value later
@@ -1574,7 +1603,7 @@ contains
          !Terje suggest 
          !resp_myc = Vmax_myc(soil_T) * theta_func * soil_carbon * ((myc_biomass_layer / soil_carbon) / (myc_biomass_layer / soil_carbon + params_inst%sulman_km_mine))
          
-         !Sulman with enz frac = 0.1
+         !Sulman with enz frac = 1.0
          resp_myc = Vmax_myc(soil_T) * theta_func * soil_carbon * enzymes / (soil_carbon_total * params_inst%sulman_km_mine + enzymes)
          
 
@@ -1822,7 +1851,7 @@ contains
       real(r8) :: wice                                                     ! Fraction of frozen water-filled pore space (0.0 - 1.0)
       real(r8) :: wair                                                     ! Fraction of air-filled pore space (0.0 - 1.0)
       real(r8) :: myc_biomass_layer(bounds%begp:bounds%endp, 1:nlevdecomp) ! Mycorrhyzal biomass in soil                   [gC/m3]
-      real(r8) :: total_org_nuptake(bounds%begp:bounds%endp)               ! Total N uptake from all soil layers           [gN/m3/s]
+      real(r8) :: total_org_nuptake(bounds%begp:bounds%endp)               ! Total N uptake from all soil layers           [gN/m2/s]
       
       associate(                                                     &
          t_soisno          => temperature_inst%t_soisno_col        , &     ! Input:  [real(r8) (:,:)] soil temperature (Kelvin)  (-nlevsno+1:nlevgrnd)

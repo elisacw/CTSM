@@ -176,6 +176,7 @@ contains
     real(r8) :: check_cpool
     real(r8) :: cpool_delta
     real(r8), parameter :: kprod05 = 1.44e-7_r8   ! decay constant for 0.5-year product pool (1/s) (lose ~90% over a half year)
+    real(r8), parameter :: resorp_frac = 0.9_r8   ! fraction of destabilized C that is resorbed into SOMc and SOMp
     !---------------------------------------------------------------------
 
     associate(                                                               & 
@@ -184,7 +185,8 @@ contains
          symb_tau_soma         => params_inst%symbiont_tau_som(1)          , & ! Fraction symbiont necromass into SOM pools, 
          symb_tau_somc         => params_inst%symbiont_tau_som(2)          , & ! Flux in SOMc & SOMp pools is higher, as mycorrhizal necromass is harder to decompose [-]
          symb_tau_somp         => params_inst%symbiont_tau_som(3)          , &
-         sulman_cue_mine      => params_inst%sulman_cue_mine               , & ! Carbon use efficiency of mycorrhizal mining                          [-]
+         sulman_cue_mine       => params_inst%sulman_cue_mine              , & ! Carbon use efficiency of mycorrhizal mining                          [-]
+         miner_som_resp_patch  => cnveg_carbonflux_inst%miner_som_resp_patch   , & ! miner respiration during decomposing SOM (gC/m2/s)
          woody                 => pftcon%woody                             , & ! Input:  binary flag for woody lifeform (1=woody, 0=not woody)
          cascade_donor_pool    => decomp_cascade_con%cascade_donor_pool    , & ! Input:  [integer  (:)     ]  which pool is C taken from for a given decomposition step
          cascade_receiver_pool => decomp_cascade_con%cascade_receiver_pool , & ! Input:  [integer  (:)     ]  which pool is C added to for a given decomposition step
@@ -234,31 +236,44 @@ contains
                         ! Fraction of necromass from symbiont into each SOM pool & enzyme flux !ECW
                         !ECW increase necromass flux from myc to SOMc&p
                         !ECW add leftover root C into SOMa
+
+                        
                         cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som) = (cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som) &
-                        
-                                                                                 + (symbiont_inst%C_mortality(c,j) * dt * symb_tau_soma) &
+                   
+                                                                            + (symbiont_inst%C_mortality(c,j) * dt * symb_tau_soma) &
+                   
+                                                                            + (symbiont_inst%root_exudate_C_col(c,j) * dt))
 
-                                                                                 + (symbiont_inst%root_exudate_C_col(c,j) * dt))
+                        cf_soil%decomp_cpools_sourcesink_col(c,j,i_chem_som) = cf_soil%decomp_cpools_sourcesink_col(c,j,i_chem_som) &
                         
-                        cf_soil%decomp_cpools_sourcesink_col(c,j,i_chem_som) = (cf_soil%decomp_cpools_sourcesink_col(c,j,i_chem_som) &
-
                                                                                  + (symbiont_inst%C_mortality(c,j) * dt * symb_tau_somc) &
-
-                                                                                - (symbiont_inst%somc_cuptake_col(c,j) * dt)* sulman_cue_mine)
-
-                        cf_soil%decomp_cpools_sourcesink_col(c,j,i_phys_som) = (cf_soil%decomp_cpools_sourcesink_col(c,j,i_phys_som) &
-
-                                                                                 + (symbiont_inst%C_mortality(c,j) * dt * symb_tau_somp)  &
-
-                                                                                 - (symbiont_inst%somp_cuptake_col(c,j) * dt) * sulman_cue_mine) ! * sulman_cue_mine)
-
-                        ! Carbon send to SOMa due to mining
-                        cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som) = (cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som)) 
-
-                                                                               !  + (symbiont_inst%somc_cuptake_col(c,j) * (1.0_r8 - sulman_cue_mine) * dt) &
-
-                                                                               !  + (symbiont_inst%somp_cuptake_col(c,j) * (1.0_r8 - sulman_cue_mine) * dt)
-                                                                                 
+                        
+                                                                                 - (symbiont_inst%somc_cuptake_col(c,j) * dt) &                                     ! full extraction leaves SOMc
+                        
+                                                                                 + (symbiont_inst%somc_cuptake_col(c,j) * dt &
+                                                                                    * (1.0_r8 - sulman_cue_mine) * resorp_frac)                                          ! resorption: 70% of leftover returns to SOMc
+                        
+                        cf_soil%decomp_cpools_sourcesink_col(c,j,i_phys_som) = cf_soil%decomp_cpools_sourcesink_col(c,j,i_phys_som) &
+                        
+                                                                                 + (symbiont_inst%C_mortality(c,j) * dt * symb_tau_somp) &
+                        
+                                                                                 - (symbiont_inst%somp_cuptake_col(c,j) * dt) &                                     ! full extraction leaves SOMp
+                        
+                                                                                 + (symbiont_inst%somp_cuptake_col(c,j) * dt &
+                                                                                    * (1.0_r8 - sulman_cue_mine) * resorp_frac)                                          ! resorption: 70% of leftover returns to SOMp
+                        
+                        ! Carbon sent to SOMa due to mining: only the non-resorbed remainder of the leftover (30%)
+                        cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som) = cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som) &
+                        
+                                                                               + (symbiont_inst%somc_cuptake_col(c,j) * dt &
+                                                                                  * (1.0_r8 - sulman_cue_mine) * (1.0_r8 - resorp_frac)) &
+                        
+                                                                               + (symbiont_inst%somp_cuptake_col(c,j) * dt &
+                                                                                  * (1.0_r8 - sulman_cue_mine) * (1.0_r8 - resorp_frac)) !&
+                        
+                                                                             !  - (symbiont_inst%miner_resp_col(c,j) * dt)
+                        
+                                                                                      
                         ! SOMc from chem & phys protected stays in pools, bc there is already a similar flux from MIMICS 
                         ! only 10% of the decomposed C is respiered
                         ! add C enzyme fluxx here, if I ever make it symbiont_inst%C_enz_mine2soma_col(c,j)
