@@ -37,7 +37,7 @@ module CNVegCarbonFluxType
   use dynSubgridControlMod               , only : get_for_testing_allow_non_annual_changes, get_do_grossunrep
   use abortutils                         , only : endrun
   use SparseMatrixMultiplyMod            , only : sparse_matrix_type, diag_matrix_type, vector_type
-  use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, mimicsplus_decomp, decomp_method
+  use SoilBiogeochemDecompCascadeConType , only : decomp_cascade_con, mimicsplus_decomp, decomp_method, mimics_decomp
   ! 
   ! !PUBLIC TYPES:
   implicit none
@@ -160,6 +160,9 @@ module CNVegCarbonFluxType
      real(r8), pointer :: repr_grainc_to_seed_patch               (:,:)     ! grain C to seed for prognostic crop(gC/m2/s) [patch, repr_grain_min:repr_grain_max]
      real(r8), pointer :: repr_grainc_to_seed_perharv_patch       (:,:,:)   ! grain C to seed for prognostic crop accumulated by harvest (gC/m2) [patch, harvest, repr_grain_min:repr_grain_max]. Not per-second because this variable represents an accumulation over each growing season, to be instantaneously at the end of each calendar year, to provide output that's easier to work with.
      real(r8), pointer :: repr_grainc_to_seed_thisyr_patch        (:,:)     ! grain C to seed for prognostic crop accumulated this calendar year (gC/m2) [patch, repr_grain_min:repr_grain_max]. Not per-second because this variable represents an accumulation over an entire calendar year, to be saved instantaneously at the end of each calendar year, to provide output that's easier to work with.
+
+     real(r8), pointer :: litr_to_somp_c_vr_col(:,:) ! (gC/m3/s) metabolic litter input directly to SOMp (mimics_fi(1))
+     real(r8), pointer :: litr_to_somc_c_vr_col(:,:) ! (gC/m3/s) structural litter input directly to SOMc (mimics_fi(2))
 
      ! maintenance respiration fluxes     
      real(r8), pointer :: cpool_to_resp_patch                       (:)     ! CNflex excess C maintenance respiration (gC/m2/s)
@@ -1032,6 +1035,8 @@ contains
     allocate(this%repr_grainc_to_seed_patch(begp:endp, repr_grain_min:repr_grain_max)) ; this%repr_grainc_to_seed_patch (:,:) = nan
     allocate(this%repr_grainc_to_seed_perharv_patch(begp:endp, 1:mxharvests, repr_grain_min:repr_grain_max)) ; this%repr_grainc_to_seed_perharv_patch (:,:,:) = nan
     allocate(this%repr_grainc_to_seed_thisyr_patch(begp:endp, repr_grain_min:repr_grain_max)) ; this%repr_grainc_to_seed_thisyr_patch (:,:) = nan
+    allocate(this%litr_to_somp_c_vr_col(begc:endc,1:nlevdecomp_full)) ; this%litr_to_somp_c_vr_col(:,:) = nan
+    allocate(this%litr_to_somc_c_vr_col(begc:endc,1:nlevdecomp_full)) ; this%litr_to_somc_c_vr_col(:,:) = nan
     allocate(this%reproductivec_xfer_to_reproductivec_patch(begp:endp, nrepr))
     this%reproductivec_xfer_to_reproductivec_patch(:,:) = nan
     allocate(this%cpool_reproductive_gr_patch        (begp:endp, nrepr)) ; this%cpool_reproductive_gr_patch             (:,:) = nan
@@ -1441,6 +1446,8 @@ contains
                   default='inactive')
           end do
        end if
+
+
 
        this%litterc_loss_col(begc:endc) = spval
        call hist_addfld1d (fname='LITTERC_LOSS', units='gC/m^2/s', &
@@ -2306,6 +2313,16 @@ contains
           call hist_addfld1d (fname='NPP_GROWTH', units='gC/m^2/s',      &
                avgflag='A', long_name='Total C used for growth in FUN/MIMICSplus',  &
                ptr_patch=this%npp_growth_patch)
+      
+          this%litr_to_somp_c_vr_col(begc:endc,:) = spval
+          call hist_addfld_decomp (fname='LIT_MET_C_TO_SOM_PHYS_C_DIRECT_vr', units='gC/m^3/s', type2d='levdcmp', &
+               avgflag='A', long_name='metabolic litter C input directly to SOMp (vertically resolved)', &
+               ptr_col=this%litr_to_somp_c_vr_col, default='inactive')
+     
+          this%litr_to_somc_c_vr_col(begc:endc,:) = spval
+          call hist_addfld_decomp (fname='LIT_STR_C_TO_SOM_CHEM_C_DIRECT_vr', units='gC/m^3/s', type2d='levdcmp', &
+               avgflag='A', long_name='structural litter C input directly to SOMc (vertically resolved)', &
+               ptr_col=this%litr_to_somc_c_vr_col, default='inactive')
       end if 
 ! FUN Ends 
 

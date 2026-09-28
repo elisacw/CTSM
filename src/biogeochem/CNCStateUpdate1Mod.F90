@@ -11,7 +11,7 @@ module CNCStateUpdate1Mod
   use clm_time_manager                   , only : get_step_size_real
   use clm_varctl                         , only : iulog
   use clm_varpar                         , only : i_litr_min, i_litr_max, i_cwd
-
+  use clm_varcon                         , only : dzsoi_decomp
   use clm_varpar                         , only : i_met_lit, i_str_lit, i_phys_som, i_avl_som, i_chem_som
   use pftconMod                          , only : is_prognostic_crop, nc3crop, pftcon
   use abortutils                         , only : endrun
@@ -231,6 +231,10 @@ contains
                         cf_veg%phenology_c_to_litr_c_col(c,j,i_met_lit) * dt
                      cf_soil%decomp_cpools_sourcesink_col(c,j,i_chem_som) = mimics_fi(2) * &
                         cf_veg%phenology_c_to_litr_c_col(c,j,i_str_lit) * dt
+
+                     ! Diagnostics: direct litter -> SOM (rate, no dt)
+                     cf_veg%litr_to_somp_c_vr_col(c,j) = mimics_fi(1) * cf_veg%phenology_c_to_litr_c_col(c,j,i_met_lit)
+                     cf_veg%litr_to_somc_c_vr_col(c,j) = mimics_fi(2) * cf_veg%phenology_c_to_litr_c_col(c,j,i_str_lit)
 
                      if (decomp_method == mimicsplus_decomp) then 
                         ! Fraction of necromass from symbiont into each SOM pool & enzyme flux !ECW
