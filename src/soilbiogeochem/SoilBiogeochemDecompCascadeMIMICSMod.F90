@@ -171,6 +171,7 @@ module SoilBiogeochemDecompCascadeMIMICSMod
      real(r8) :: symbiont_necromass      !Fraction of symbiotic biomass turnover into SOM as necromass [fraction]
      real(r8) :: symbiont_mr             !Fraction of symbiotic biomass turnover not used for maintenance respiration [fraction]
      real(r8) :: mimicsplus_cue_mine      !Carbon use efficiency of mycorrhizal mining [fraction]
+     real(r8) :: mimicsplus_resorp_frac   !Fraction of destabilized C from mining that is resorbed into SOMc and SOMp [fraction]
      real(r8) :: mimicsplus_nue_mine      !Nitrogen use efficiency of mycorrhizal mining [fraction]
      real(r8) :: mimicsplus_root_no3      !Maximum root active nitrate uptake rate [gN/m3/s]
      real(r8) :: mimicsplus_root_nh4      !Maximum root active ammonium uptake rate [gN/m3/s]
@@ -457,7 +458,12 @@ contains
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%mimicsplus_cue_mine=tempr
-    
+
+    tString='mimicsplus_resorp_frac'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
+    params_inst%mimicsplus_resorp_frac=tempr
+
     tString='mimicsplus_nue_mine'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))

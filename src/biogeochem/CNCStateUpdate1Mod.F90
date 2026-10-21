@@ -176,7 +176,6 @@ contains
     real(r8) :: check_cpool
     real(r8) :: cpool_delta
     real(r8), parameter :: kprod05 = 1.44e-7_r8   ! decay constant for 0.5-year product pool (1/s) (lose ~90% over a half year)
-    real(r8), parameter :: resorp_frac = 0.9_r8   ! fraction of destabilized C that is resorbed into SOMc and SOMp
     !---------------------------------------------------------------------
 
     associate(                                                               & 
@@ -186,6 +185,7 @@ contains
          symb_tau_somc         => params_inst%symbiont_tau_som(2)          , & ! Flux in SOMc & SOMp pools is higher, as mycorrhizal necromass is harder to decompose [-]
          symb_tau_somp         => params_inst%symbiont_tau_som(3)          , &
          mimicsplus_cue_mine       => params_inst%mimicsplus_cue_mine              , & ! Carbon use efficiency of mycorrhizal mining                          [-]
+         resorp_frac               => params_inst%mimicsplus_resorp_frac           , & ! Fraction of destabilized C that is resorbed into SOMc and SOMp       [-]
          miner_som_resp_patch  => cnveg_carbonflux_inst%miner_som_resp_patch   , & ! miner respiration during decomposing SOM (gC/m2/s)
          woody                 => pftcon%woody                             , & ! Input:  binary flag for woody lifeform (1=woody, 0=not woody)
          cascade_donor_pool    => decomp_cascade_con%cascade_donor_pool    , & ! Input:  [integer  (:)     ]  which pool is C taken from for a given decomposition step
