@@ -1541,7 +1541,7 @@ contains
             ! Desorption of physically protected SOM to available SOM.
             
             if (decomp_method == mimicsplus_decomp) then
-               decomp_k(c,j,i_phys_som) = desorption * depth_scalar(c,j)  * 0.0_r8
+               decomp_k(c,j,i_phys_som) = desorption * depth_scalar(c,j)  !* 0.1_r8
             else
                decomp_k(c,j,i_phys_som) = desorption * depth_scalar(c,j) 
             end if

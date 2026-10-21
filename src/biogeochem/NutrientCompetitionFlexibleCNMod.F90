@@ -1502,8 +1502,8 @@ contains
          leafn                 => cnveg_nitrogenstate_inst%leafn_patch              , & ! Input:  [real(r8) (:)   ]  (gN/m2) leaf N
          plant_ndemand         => cnveg_nitrogenflux_inst%plant_ndemand_patch       , & ! Output: [real(r8) (:)   ]  N flux required to support initial GPP (gN/m2/s)
          n_stress              => cnveg_nitrogenflux_inst%n_stress_patch            , &
-         n_stress_max         => params_inst%n_stress_max           , &   ! Maximum N demand of plant, based on current N amount in plant         []
-         n_stress_min         => params_inst%n_stress_min           , &   ! Miminmum value of N_stress                                            []
+         n_stress_max          => params_inst%n_stress_max           , &   ! Maximum N demand of plant, based on current N amount in plant         []
+         n_stress_min          => params_inst%n_stress_min           , &   ! Miminmum value of N_stress                                            []
          leafn_storage         => cnveg_nitrogenstate_inst%leafn_storage_patch              , & ! Input:  [real(r8) (:)   ]  (gN/m2) leaf N
          frootn_storage        => cnveg_nitrogenstate_inst%frootn_storage_patch              , & ! Input:  [real(r8) (:)   ]  (gN/m2) leaf N
          npool                 => cnveg_nitrogenstate_inst%npool_patch                      , & ! Input:  [real(r8) (:)   ]  (gN/m2) temporary plant N pool
@@ -1572,24 +1572,23 @@ contains
          temp_scalar = min( max(0.0_r8, temp_scalar), 1.0_r8 )
 
          ! Adding Npool or not to Nstress actually makes no difference
-         n_stress(p) = 0.05_r8
+         n_stress(p) = n_stress_min
          if (woody(ivt(p)) == 1._r8) then
             if ((leafn(p) + frootn(p) + livestemn(p) + deadstemn(p) + livecrootn(p) + deadcrootn(p)) > 0.0_r8) then
-                n_stress(p) = (2.0_r8 * (leafn(p) + frootn(p) + livestemn(p) + deadstemn(p) + livecrootn(p) + deadcrootn(p))  &
+                n_stress(p) = (n_stress_max * (leafn(p) + frootn(p) + livestemn(p) + deadstemn(p) + livecrootn(p) + deadcrootn(p))  &
                               - (leafn_storage(p) + frootn_storage(p) + livestemn_storage(p) + deadstemn_storage(p) + livecrootn_storage(p) & 
                               + deadcrootn_storage(p) ))                          &
                               / (leafn(p) + frootn(p) + livestemn(p) + deadstemn(p) + livecrootn(p) + deadcrootn(p)) 
             end if 
-             if (n_stress(p) < 0.0_r8) then
-                n_stress(p) = 0.05_r8
+             if (n_stress(p) < n_stress_min) then
+                n_stress(p) = n_stress_min
              end if 
          else 
             if ((leafn(p) + frootn(p)) > 0.0_r8) then
-               n_stress(p) = (2.0_r8 *(leafn(p) + frootn(p)) - (leafn_storage(p) + frootn_storage(p))) / (leafn(p) + frootn(p))
-               !  n_stress(p) = (2.0_r8 *(leafn(p) + frootn(p)) - (leafn_storage(p) + frootn_storage(p) + npool(p))) / (leafn(p) + frootn(p))
+               n_stress(p) = (n_stress_max *(leafn(p) + frootn(p)) - (leafn_storage(p) + frootn_storage(p))) / (leafn(p) + frootn(p))
             end if 
-            if (n_stress(p) < 0.0_r8) then
-                n_stress(p) = 0.05_r8
+            if (n_stress(p) < n_stress_min) then
+                n_stress(p) = n_stress_min
             end if 
          end if        
 

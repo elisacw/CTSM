@@ -185,7 +185,7 @@ contains
          symb_tau_soma         => params_inst%symbiont_tau_som(1)          , & ! Fraction symbiont necromass into SOM pools, 
          symb_tau_somc         => params_inst%symbiont_tau_som(2)          , & ! Flux in SOMc & SOMp pools is higher, as mycorrhizal necromass is harder to decompose [-]
          symb_tau_somp         => params_inst%symbiont_tau_som(3)          , &
-         sulman_cue_mine       => params_inst%sulman_cue_mine              , & ! Carbon use efficiency of mycorrhizal mining                          [-]
+         mimicsplus_cue_mine       => params_inst%mimicsplus_cue_mine              , & ! Carbon use efficiency of mycorrhizal mining                          [-]
          miner_som_resp_patch  => cnveg_carbonflux_inst%miner_som_resp_patch   , & ! miner respiration during decomposing SOM (gC/m2/s)
          woody                 => pftcon%woody                             , & ! Input:  binary flag for woody lifeform (1=woody, 0=not woody)
          cascade_donor_pool    => decomp_cascade_con%cascade_donor_pool    , & ! Input:  [integer  (:)     ]  which pool is C taken from for a given decomposition step
@@ -255,7 +255,7 @@ contains
                                                                                  - (symbiont_inst%somc_cuptake_col(c,j) * dt) &                                     ! full extraction leaves SOMc
                         
                                                                                  + (symbiont_inst%somc_cuptake_col(c,j) * dt &
-                                                                                    * (1.0_r8 - sulman_cue_mine) * resorp_frac)                                          ! resorption: 70% of leftover returns to SOMc
+                                                                                    * (1.0_r8 - mimicsplus_cue_mine) * resorp_frac)                                          ! resorption: 70% of leftover returns to SOMc
                         
                         cf_soil%decomp_cpools_sourcesink_col(c,j,i_phys_som) = cf_soil%decomp_cpools_sourcesink_col(c,j,i_phys_som) &
                         
@@ -264,16 +264,16 @@ contains
                                                                                  - (symbiont_inst%somp_cuptake_col(c,j) * dt) &                                     ! full extraction leaves SOMp
                         
                                                                                  + (symbiont_inst%somp_cuptake_col(c,j) * dt &
-                                                                                    * (1.0_r8 - sulman_cue_mine) * resorp_frac)                                          ! resorption: 70% of leftover returns to SOMp
+                                                                                    * (1.0_r8 - mimicsplus_cue_mine) * resorp_frac)                                          ! resorption: 70% of leftover returns to SOMp
                         
                         ! Carbon sent to SOMa due to mining: only the non-resorbed remainder of the leftover (30%)
                         cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som) = cf_soil%decomp_cpools_sourcesink_col(c,j,i_avl_som) &
                         
                                                                                + (symbiont_inst%somc_cuptake_col(c,j) * dt &
-                                                                                  * (1.0_r8 - sulman_cue_mine) * (1.0_r8 - resorp_frac)) &
+                                                                                  * (1.0_r8 - mimicsplus_cue_mine) * (1.0_r8 - resorp_frac)) &
                         
                                                                                + (symbiont_inst%somp_cuptake_col(c,j) * dt &
-                                                                                  * (1.0_r8 - sulman_cue_mine) * (1.0_r8 - resorp_frac)) !&
+                                                                                  * (1.0_r8 - mimicsplus_cue_mine) * (1.0_r8 - resorp_frac)) !&
                         
                                                                              !  - (symbiont_inst%miner_resp_col(c,j) * dt)
                         
