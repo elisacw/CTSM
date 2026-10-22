@@ -88,7 +88,12 @@ module CNSoilVegMIMICSplus
   real(r8), pointer           :: scav_roi              (:) ! [patch] Nitrogen return on C investment, scavenger symbiont [gN/gC]
   real(r8), pointer           :: fix_roi               (:) ! [patch] Nitrogen return on C investment, fixer symbiont     [gN/gC]
   real(r8), pointer           :: root_roi              (:) ! [patch] Nitrogen return on C investment, active root uptake [gN/gC]
-  
+
+  real(r8), pointer           :: n_acq_avg             (:) ! [patch] Running mean N delivered to plant via N acquisition [gN/m2/s]
+  real(r8), pointer           :: c_acq_avg             (:) ! [patch] Running mean C allocated to N acquisition           [gC/m2/s]
+  real(r8), pointer           :: roi_realized          (:) ! [patch] Realized N return on C allocated, n_acq_avg/c_acq_avg [gN/gC]
+  real(r8), pointer           :: f_alloc_n_acq         (:) ! [patch] Fraction of available C allocated to N acquisition  [-]
+
   real(r8), pointer           :: C_alloc               (:,:) ! [patch,n_symb] Carbon allocation from plant to symbiont  [gC/m2/s]
   real(r8), pointer           :: symb_eff              (:,:) ! [patch,n_symb] Symbiont efficiency when biomass 0  [gC/gN]
   real(r8), pointer           :: symb_growth           (:,:) ! [patch,n_symb] Symbiotic biomass growth rate       [gC/m2/s]
@@ -216,6 +221,11 @@ contains
     allocate(this%scav_roi(begp:endp)) ; this%scav_roi(begp:endp) = 0.0_r8
     allocate(this%fix_roi(begp:endp))  ; this%fix_roi(begp:endp)  = 0.0_r8
     allocate(this%root_roi(begp:endp)) ; this%root_roi(begp:endp) = 0.0_r8
+
+    allocate(this%n_acq_avg(begp:endp))     ; this%n_acq_avg(begp:endp)     = 0.0_r8
+    allocate(this%c_acq_avg(begp:endp))     ; this%c_acq_avg(begp:endp)     = 0.0_r8
+    allocate(this%roi_realized(begp:endp))  ; this%roi_realized(begp:endp)  = 0.0_r8
+    allocate(this%f_alloc_n_acq(begp:endp)) ; this%f_alloc_n_acq(begp:endp) = 0.0_r8
 
     allocate(this%symb_eff(begp:endp,1:n_symb))    ; this%symb_eff(begp:endp,1:n_symb)       = 0.0_r8
     allocate(this%symb_growth(begp:endp,1:n_symb)) ; this%symb_growth(begp:endp,1:n_symb)    = 0.0_r8
@@ -442,6 +452,16 @@ contains
          avgflag='A', long_name='Nitrogen return on carbon investment, active root uptake', &
          ptr_patch=this%root_roi, set_spec=spval, default='inactive')
 
+         this%roi_realized(begp:endp) = spval
+         call hist_addfld1d (fname='ROI_REALIZED', units='gN/gC', &
+         avgflag='A', long_name='Realized N return on C allocated to N acquisition (running mean)', &
+         ptr_patch=this%roi_realized, set_spec=spval, default='inactive')
+
+         this%f_alloc_n_acq(begp:endp) = spval
+         call hist_addfld1d (fname='F_ALLOC_N_ACQ', units='-', &
+         avgflag='A', long_name='Fraction of available C allocated to N acquisition', &
+         ptr_patch=this%f_alloc_n_acq, set_spec=spval, default='inactive')
+
 
    end subroutine InitHistory
 
@@ -504,6 +524,11 @@ contains
       this%root_exudate_C_col(bounds%begc:bounds%endc,1:nlevdecomp)     = 0.0_r8
       this%miner_resp_col(bounds%begc:bounds%endc,1:nlevdecomp)         = 0.0_r8
 
+      this%n_acq_avg(bounds%begp:bounds%endp)     = 0.0_r8
+      this%c_acq_avg(bounds%begp:bounds%endp)     = 0.0_r8
+      this%roi_realized(bounds%begp:bounds%endp)  = 0.0_r8
+      this%f_alloc_n_acq(bounds%begp:bounds%endp) = 0.0_r8
+
     end subroutine InitCold
 
    !------------------------------------------------------------------------
@@ -563,7 +588,18 @@ contains
              errMsg(sourcefile, __LINE__))
       endif
 
-   end do 
+   end do
+
+   ! Running means for balanced allocation; not on older restart files, then they restart from zero
+   call restartvar(ncid=ncid, flag=flag, varname='n_acq_avg', xtype=ncd_double,  &
+   dim1name='pft', long_name='Running mean N delivered to plant via N acquisition', units='gN/m2/s', &
+   interpinic_flag='interp', readvar=readvar, data=this%n_acq_avg)
+   if (flag == 'read' .and. (.not. readvar)) this%n_acq_avg(:) = 0.0_r8
+
+   call restartvar(ncid=ncid, flag=flag, varname='c_acq_avg', xtype=ncd_double,  &
+   dim1name='pft', long_name='Running mean C allocated to N acquisition', units='gC/m2/s', &
+   interpinic_flag='interp', readvar=readvar, data=this%c_acq_avg)
+   if (flag == 'read' .and. (.not. readvar)) this%c_acq_avg(:) = 0.0_r8
 
    end subroutine Restart
 
@@ -741,6 +777,8 @@ contains
    real(r8) :: potential_stored_N(bounds%begp:bounds%endp)
    real(r8) :: n_to_plant_limit
    real(r8) :: drain_frac   ! fraction of reservoir drained this timestep [-]
+   real(r8) :: cn_new       ! C:N of new growth incl. growth respiration, availc/plant_ndemand [gC/gN]
+   real(r8) :: wgt_roi      ! weight of this timestep in the running means of the realized N return [-]
    
    begp = bounds%begp; endp= bounds%endp
    dt   = get_step_size_real()
@@ -842,7 +880,13 @@ contains
    n_mine_somc2soma_col    => symbiont_inst%n_mine_somc2soma_col, &   ! Leftover part of co-mineralized N, not taken up by miners  [gN/m3/s]
    n_mine_somp2soma_col    => symbiont_inst%n_mine_somp2soma_col, &   ! Leftover part of co-mineralized N, not taken up by miners  [gN/m3/s]
 
-   C_allocation_to_N_acq => symbiont_inst%C_allocation_to_N_acq, &  
+   C_allocation_to_N_acq => symbiont_inst%C_allocation_to_N_acq, &
+   n_acq_avg             => symbiont_inst%n_acq_avg     , &   ! Running mean N delivered to plant via N acquisition [gN/m2/s]
+   c_acq_avg             => symbiont_inst%c_acq_avg     , &   ! Running mean C allocated to N acquisition           [gC/m2/s]
+   roi_realized          => symbiont_inst%roi_realized  , &   ! Realized N return on C allocated                    [gN/gC]
+   f_alloc_n_acq         => symbiont_inst%f_alloc_n_acq , &   ! Fraction of available C allocated to N acquisition  [-]
+   mimicsplus_alloc_method => params_inst%mimicsplus_alloc_method, & ! 0 = N stress x fnalloc, 1 = balanced allocation [-]
+   mimicsplus_tau_roi    => params_inst%mimicsplus_tau_roi , & ! Averaging time of the realized N return           [s]
    n_stress              => cnveg_nitrogenflux_inst%n_stress_patch            , &
    npool                 => cnveg_nitrogenstate_inst%npool_patch                      , & ! Input:  [real(r8) (:)   ]  (gN/m2) temporary plant N pool
          
@@ -1314,7 +1358,18 @@ contains
       n_to_plant_mimicsplus(p) = N_to_plant(p,i_scav) + N_to_plant(p,i_miner) + N_to_plant(p,i_fixer) + root_N_to_plant(p)
 
       if (availc(p) > 0.0_r8) then
-        C_allocation_to_N_acq(p) = availc(p)  * params_inst%mimicsplus_fnalloc * n_stress(p)
+        if (nint(mimicsplus_alloc_method) == 1 .and. c_acq_avg(p) > 0.0_r8 .and. n_acq_avg(p) > 0.0_r8 &
+            .and. plant_ndemand(p) > 0.0_r8) then
+          ! Balanced allocation: the N bought with C_allocation_to_N_acq at the realized return
+          ! matches the N needed to grow with the rest of availc at the C:N of new growth
+          ! (availc/plant_ndemand = c_allometry/n_allometry, incl. growth respiration):
+          !   roi_realized * C_acq = (availc - C_acq) / cn_new  ->  C_acq = availc / (1 + cn_new * roi_realized)
+          cn_new = availc(p) / plant_ndemand(p)
+          C_allocation_to_N_acq(p) = availc(p) / (1.0_r8 + cn_new * roi_realized(p))
+        else
+          ! N stress based allocation; with method 1 only until the running means have values (cold start)
+          C_allocation_to_N_acq(p) = availc(p)  * params_inst%mimicsplus_fnalloc * n_stress(p)
+        end if
         npp_growth(p) = (availc(p) - C_allocation_to_N_acq(p)) / (1.0_r8 + pftcon%grperc(ivt(p)))  ! why do we do this grwoth respiration thing here?
         C_allocation_to_N_acq(p) = availc(p) - npp_growth(p)*(1.0_r8 + pftcon%grperc(ivt(p)))
       else
@@ -1418,8 +1473,24 @@ contains
       N_reservoir(p,i_miner) = N_reservoir(p,i_miner) - (N_to_plant(p,i_miner) * dt)
       N_reservoir(p,i_fixer) = N_reservoir(p,i_fixer) - (N_to_plant(p,i_fixer) * dt)
 
+      ! Running means of N delivered to the plant and C spent on N acquisition; their ratio is the
+      ! realized N return used for balanced allocation (N reaches the plant later than C is spent)
+      wgt_roi = min(1.0_r8, dt / mimicsplus_tau_roi)
+      n_acq_avg(p) = n_acq_avg(p) + (n_to_plant_mimicsplus(p) - n_acq_avg(p)) * wgt_roi
+      c_acq_avg(p) = c_acq_avg(p) + (C_allocation_to_N_acq(p) - c_acq_avg(p)) * wgt_roi
+      if (c_acq_avg(p) > 0.0_r8) then
+         roi_realized(p) = n_acq_avg(p) / c_acq_avg(p)
+      else
+         roi_realized(p) = 0.0_r8
+      end if
+      if (availc(p) > 0.0_r8) then
+         f_alloc_n_acq(p) = C_allocation_to_N_acq(p) / availc(p)
+      else
+         f_alloc_n_acq(p) = 0.0_r8
+      end if
+
       !----------------------------------------------------------------------------------------------------------------------------
-       
+
       N_symb_up(p,i_scav)  = 0._r8
       N_symb_up(p,i_miner) = 0._r8
       N_symb_up(p,i_fixer) = 0._r8

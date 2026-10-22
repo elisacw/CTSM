@@ -164,7 +164,9 @@ module SoilBiogeochemDecompCascadeMIMICSMod
      ! Sulman parameter
      real(r8) :: n_stress_max             ! Maximum N demand of plant, based on current N amount in plant []
      real(r8) :: n_stress_min             ! Miminmum value of N_stress
-     real(r8) :: mimicsplus_fnalloc           ! Fraction of NPP allocated to N uptake per unit N stress [fraction] 
+     real(r8) :: mimicsplus_fnalloc           ! Fraction of NPP allocated to N uptake per unit N stress [fraction]
+     real(r8) :: mimicsplus_alloc_method      ! C allocation to N acquisition: 0 = N stress x fnalloc, 1 = balanced (realized N return) [-]
+     real(r8) :: mimicsplus_tau_roi           ! Averaging time of the realized N return used for balanced allocation [s]
 
      real(r8) :: mimicsplus_max_symb_growth  !Maximum symbiont growth rate [gC/m2/s]
      real(r8) :: mimicsplus_kgrowth          !Half-saturation of intermediate C pool for symbiotic growth [gC/m2]
@@ -398,6 +400,21 @@ contains
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
     if ( .not. readv ) call endrun(msg=trim(errCode)//trim(tString)//errMsg(sourcefile, __LINE__))
     params_inst%mimicsplus_fnalloc=tempr
+
+    ! Optional: missing in older parameter files, which then keep the N stress based allocation
+    tString='mimicsplus_alloc_method'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) tempr = 0.0_r8
+    params_inst%mimicsplus_alloc_method=tempr
+
+    tString='mimicsplus_tau_roi'
+    call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
+    if ( .not. readv ) tempr = 30.0_r8 * 86400.0_r8
+    params_inst%mimicsplus_tau_roi=tempr
+    if (masterproc) then
+       write(iulog,*) 'MIMICSplus C allocation method = ', params_inst%mimicsplus_alloc_method, &
+                      ', tau_roi (days) = ', params_inst%mimicsplus_tau_roi / 86400.0_r8
+    end if
 
     tString='mimicsplus_v_nh4'
     call ncd_io(trim(tString), tempr, 'read', ncid, readvar=readv)
