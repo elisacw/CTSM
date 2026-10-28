@@ -1,7 +1,7 @@
 module CNSoilVegMIMICSplus
 
   !-----------------------------------------------------------------------
-  ! !DESCRIPTION:
+  ! !DESCRIPTION: 
   ! This module connects the soil decomposition module MIMICS (Wieder et al. 2015) with the vegetation through the 
   ! symbiosis between mycorrhizal fungi and plants.
   ! Coupling follows Sulman et al. (2019)
